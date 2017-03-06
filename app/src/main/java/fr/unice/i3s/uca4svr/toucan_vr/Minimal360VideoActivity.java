@@ -61,7 +61,7 @@ public class Minimal360VideoActivity extends GVRActivity {
 
         if (null != videoSceneObjectPlayer) {
             final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer);
-            setMain(main);
+            setMain(main, "gvr.xml");
         }
     }
 
