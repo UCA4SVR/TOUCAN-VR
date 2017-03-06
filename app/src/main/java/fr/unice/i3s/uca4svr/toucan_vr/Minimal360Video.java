@@ -53,5 +53,11 @@ public class Minimal360Video extends GVRMain
         scene.addSceneObject( video );
     }
 
+
+    @Override
+    public void onStep() {
+
+    }
+
     private final GVRVideoSceneObjectPlayer<?> mPlayer;
 }
