@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply from: '../jacoco.gradle'
 
 sonarqube {
     properties {
@@ -9,6 +10,8 @@ sonarqube {
         property "sonar.import_unknown_files", true
 
         property "sonar.android.lint.report", "./build/outputs/lint-results.xml"
+
+        property "sonar.jacoco.reportPath", "./build/jacoco/testFullReleaseUnitTest.exec"
     }
 }
 
