@@ -28,7 +28,20 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+
+        debug {
+            applicationIdSuffix ".debug"
+        }
     }
+
+    productFlavors {
+        full {
+            applicationIdSuffix ".full"
+            versionNameSuffix "-full"
+        }
+    }
+
+
 
     // ignore the x86 and arm-v8 files from the google vr libraries
     packagingOptions {
