@@ -19,7 +19,7 @@ sonarqube {
         property "sonar.junit.reportsPath", "build/test-results/fullRelease"
         property "sonar.surefire.reportsPath", "build/test-results/fullRelease"
 
-        property "sonar.java.binaries", "build/intermediated/classes/full/release"
+        property "sonar.java.binaries", "build/intermediates/classes/full/release"
     }
 }
 
