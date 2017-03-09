@@ -11,6 +11,7 @@ sonarqube {
         property "sonar.surefire.reportsPath", "build/test-results/fullDebug"
 
         property "sonar.android.lint.report", "build/outputs/lint-results-fullDebug.xml"
+        property "sonar.import_unknown_files", "true"
     }
 }
 
