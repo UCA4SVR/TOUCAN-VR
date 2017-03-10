@@ -1,4 +1,20 @@
 apply plugin: 'com.android.application'
+apply from: '../jacoco.gradle'
+
+sonarqube {
+    properties {
+        androidVariant 'fullDebug'
+        property "sonar.java.coveragePlugin", "jacoco"
+        property "sonar.jacoco.reportPath", "build/jacoco/testFullDebugUnitTest.exec"
+
+        property "sonar.junit.reportsPath", "build/test-results/fullDebug"
+        property "sonar.surefire.reportsPath", "build/test-results/fullDebug"
+
+        property "sonar.android.lint.report", "build/outputs/lint-results-fullDebug.xml"
+        property "sonar.import_unknown_files", "true"
+        property "sonar.exclusions", "**/*.mp4"
+    }
+}
 
 allprojects {
     repositories {
@@ -28,7 +44,20 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+
+        debug {
+            applicationIdSuffix ".debug"
+        }
     }
+
+    productFlavors {
+        full {
+            applicationIdSuffix ".full"
+            versionNameSuffix "-full"
+        }
+    }
+
+
 
     // ignore the x86 and arm-v8 files from the google vr libraries
     packagingOptions {

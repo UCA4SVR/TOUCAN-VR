@@ -12,6 +12,12 @@ buildscript {
     }
 }
 
+plugins {
+    id "org.sonarqube" version "2.2.1"
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+
