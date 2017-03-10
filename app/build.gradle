@@ -12,6 +12,7 @@ sonarqube {
 
         property "sonar.android.lint.report", "build/outputs/lint-results-fullDebug.xml"
         property "sonar.import_unknown_files", "true"
+        property "sonar.exclusions", "**/*.mp4"
     }
 }
 
