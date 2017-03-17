@@ -15,7 +15,7 @@
  * Modifications:
  * Package name
  * Displaying head rotations in the debug log
- * Copyright 2017 Laboratoire I3S, CNR, Université côte d'azur
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  * Author: Romaric Pighetti
  */
 
@@ -33,13 +33,18 @@ import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.util.Locale;
 
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
+
 public class Minimal360Video extends GVRMain
 {
     // Tag to be  used when logging
     private static final String TAG = "Minimal360Video";
 
-    // Holds the main scene associated to the context in which this object is put.
-    private GVRContext mContext;
+    // The head motion tracker to log head motions
+    private HeadMotionTracker mHeadMotionTracker;
+    // stores the current number of times onStep has been called, used as the frame number for the
+    // head motion logging for now.
+    private float mCurrentFrame;
 
     Minimal360Video(GVRVideoSceneObjectPlayer<?> player) {
         mPlayer = player;
@@ -66,17 +71,15 @@ public class Minimal360Video extends GVRMain
         // The scene object contained in the context may change (a new instance may be created),
         // but the context itself won't change. This allows to retrieve correct information in the
         // onStep method.
-        mContext = gvrContext;
+        mHeadMotionTracker = new HeadMotionTracker(gvrContext, "karate");
+        mCurrentFrame = 0;
     }
 
 
     @Override
     public void onStep() {
-        GVRTransform headTransform = mContext.getMainScene().getMainCameraRig().getHeadTransform();
-        String rotationsString = String.format(Locale.ENGLISH, "[%1$.0f,%2$.0f,%3$.0f]",
-                headTransform.getRotationPitch(), headTransform.getRotationYaw(),
-                headTransform.getRotationRoll());
-        android.util.Log.d(TAG, rotationsString);
+        // logging with frame number for now
+        mHeadMotionTracker.track(mCurrentFrame++);
     }
 
     private final GVRVideoSceneObjectPlayer<?> mPlayer;

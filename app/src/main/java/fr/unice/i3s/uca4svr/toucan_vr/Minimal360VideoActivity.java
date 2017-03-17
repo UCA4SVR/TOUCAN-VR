@@ -14,7 +14,7 @@
  *
  * Modifications:
  * Package name
- * Copyright 2017 Laboratoire I3S, CNR, Université côte d'azur
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  * Author: Romaric Pighetti
  */
 
@@ -63,6 +63,7 @@ public class Minimal360VideoActivity extends GVRActivity {
             final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer);
             setMain(main, "gvr.xml");
         }
+
     }
 
     @Override
