@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package fr.unice.i3s.uca4svr.toucan_vr;
+package fr.unice.i3s.uca4svr.toucan_vr.ExoPlayer;
 
 import android.content.Context;
 import android.media.MediaCodec;
@@ -53,12 +53,16 @@ import com.google.android.exoplayer.util.Util;
 
 import java.io.IOException;
 
-import fr.unice.i3s.uca4svr.toucan_vr.MyExoPlayer.RendererBuilder;
-
 /**
- * A {@link RendererBuilder} for DASH.
+ * A {@link MyExoPlayer.RendererBuilder} for DASH.
+ * The class initialize the player for DASH streaming.
+ * The prepare method of MyExoPlayer is used to start building the renderers;
+ * AsyncRendererBuilder is used to fetch the manifest file;
+ * when the manifest is downloaded and available, a callback onSingleManifest is triggered
+ * and the player is initialized with all the components.
  */
-public class DashRendererBuilder implements RendererBuilder {
+
+public class DashRendererBuilder implements MyExoPlayer.RendererBuilder {
 
   private static final String TAG = "DashRendererBuilder";
 

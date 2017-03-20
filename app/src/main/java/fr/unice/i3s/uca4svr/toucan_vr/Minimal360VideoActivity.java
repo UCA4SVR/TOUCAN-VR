@@ -36,6 +36,10 @@ import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.io.IOException;
 
+import fr.unice.i3s.uca4svr.toucan_vr.ExoPlayer.DashRendererBuilder;
+import fr.unice.i3s.uca4svr.toucan_vr.ExoPlayer.ExtractorRendererBuilder;
+import fr.unice.i3s.uca4svr.toucan_vr.ExoPlayer.MyExoPlayer;
+
 
 public class Minimal360VideoActivity extends GVRActivity {
 

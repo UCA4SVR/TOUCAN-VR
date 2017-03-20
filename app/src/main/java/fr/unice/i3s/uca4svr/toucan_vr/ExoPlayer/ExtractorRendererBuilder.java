@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package fr.unice.i3s.uca4svr.toucan_vr;
+package fr.unice.i3s.uca4svr.toucan_vr.ExoPlayer;
 
 
 import android.content.Context;
@@ -35,12 +35,10 @@ import com.google.android.exoplayer.upstream.DefaultAllocator;
 import com.google.android.exoplayer.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer.upstream.DefaultUriDataSource;
 
-import fr.unice.i3s.uca4svr.toucan_vr.MyExoPlayer.RendererBuilder;
-
 /**
- * A {@link RendererBuilder} for streams that can be read using an {@link Extractor}.
+ * A {@link MyExoPlayer.RendererBuilder} for streams that can be read using an {@link Extractor}.
  */
-public class ExtractorRendererBuilder implements RendererBuilder {
+public class ExtractorRendererBuilder implements MyExoPlayer.RendererBuilder {
 
   private final Context context;
   private final String userAgent;

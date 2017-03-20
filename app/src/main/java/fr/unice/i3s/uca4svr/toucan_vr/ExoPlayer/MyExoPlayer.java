@@ -1,4 +1,4 @@
-package fr.unice.i3s.uca4svr.toucan_vr;
+package fr.unice.i3s.uca4svr.toucan_vr.ExoPlayer;
 
 import android.media.MediaCodec;
 import android.os.Handler;
@@ -29,8 +29,14 @@ import com.google.android.exoplayer.text.Cue;
 import com.google.android.exoplayer.text.TextRenderer;
 import com.google.android.exoplayer.upstream.BandwidthMeter;
 import com.google.android.exoplayer.upstream.DefaultBandwidthMeter;
+import com.google.android.exoplayer.util.Assertions;
+import com.google.android.exoplayer.util.Clock;
 import com.google.android.exoplayer.util.DebugTextViewHelper;
 import com.google.android.exoplayer.util.PlayerControl;
+import com.google.android.exoplayer.util.SlidingPercentile;
+import com.google.android.exoplayer.util.SystemClock;
+
+import org.gearvrf.utility.Log;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -38,7 +44,16 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Created by Giuseppe Samela on 20/02/17.
+ * Created by Giuseppe Samela on 20/03/17.
+ * MyExoPlayer class is based on the Demo application provided by the library.
+ * It provides an intermediate abstraction for creation, initialization and preparation of the player.
+ * It can also be used to obtain info from the player. In fact many redundant methods are provided in
+ * the class, while others are implementing internal callbacks and errors.
+ * The main methods are the constructor, prepare and onRenderers.
+ *
+ * DashRendererBuilder is used to build the player for DASH streaming (Additional info in the class)
+ * ExtractorRendererBuilder is used to build the player for MP4 files (we might not need it, but it
+ * was used by the initial Gear VR app, so I didn't remove the support)
  */
 
 public class MyExoPlayer implements ExoPlayer.Listener, ChunkSampleSource.EventListener,
@@ -596,4 +611,111 @@ public class MyExoPlayer implements ExoPlayer.Listener, ChunkSampleSource.EventL
         }
     }
 
+    /**
+     * The bandwidth meter counts transferred bytes while transfers are open and creates a bandwidth
+     * sample and an updated bandwidth estimate each time a transfer ends.
+     * The class is here customized to log the bandwidth estimate on a file.
+     * The method modified is onTransferEnd().
+     */
+    public static final class CustomBandwidthMeter implements BandwidthMeter {
+
+      public static final int DEFAULT_MAX_WEIGHT = 2000;
+
+      private final Handler eventHandler;
+      private final EventListener eventListener;
+      private final Clock clock;
+      private final SlidingPercentile slidingPercentile;
+
+      private long bytesAccumulator;
+      private long startTimeMs;
+      private long bitrateEstimate;
+      private int streamCount;
+
+      public CustomBandwidthMeter() {
+        this(null, null);
+      }
+
+      public CustomBandwidthMeter(Handler eventHandler, EventListener eventListener) {
+        this(eventHandler, eventListener, new SystemClock());
+      }
+
+      public CustomBandwidthMeter(Handler eventHandler, EventListener eventListener, Clock clock) {
+        this(eventHandler, eventListener, clock, DEFAULT_MAX_WEIGHT);
+      }
+
+      public CustomBandwidthMeter(Handler eventHandler, EventListener eventListener, int maxWeight) {
+        this(eventHandler, eventListener, new SystemClock(), maxWeight);
+      }
+
+      public CustomBandwidthMeter(Handler eventHandler, EventListener eventListener, Clock clock,
+                                  int maxWeight) {
+        this.eventHandler = eventHandler;
+        this.eventListener = eventListener;
+        this.clock = clock;
+        this.slidingPercentile = new SlidingPercentile(maxWeight);
+        bitrateEstimate = NO_ESTIMATE;
+      }
+
+      @Override
+      public synchronized long getBitrateEstimate() {
+        return bitrateEstimate;
+      }
+
+      @Override
+      public synchronized void onTransferStart() {
+        if (streamCount == 0) {
+          startTimeMs = clock.elapsedRealtime();
+        }
+        streamCount++;
+      }
+
+      @Override
+      public synchronized void onBytesTransferred(int bytes) {
+        bytesAccumulator += bytes;
+      }
+      /**
+       * Counts transferred bytes while transfers are open and creates a bandwidth sample and updated
+       * bandwidth estimate each time a transfer ends.
+       */
+      @Override
+      public synchronized void onTransferEnd() {
+        Assertions.checkState(streamCount > 0);
+        long nowMs = clock.elapsedRealtime();
+        int elapsedMs = (int) (nowMs - startTimeMs);
+        if (elapsedMs > 0) {
+          float bitsPerSecond = (bytesAccumulator * 8000) / elapsedMs;  //real bandwidth estimation
+
+          /* A SlidingPercentile is used to compare the estimation to a sliding window of past
+           * download rate observations, and provide a more conservative value.
+           */
+          slidingPercentile.addSample((int) Math.sqrt(bytesAccumulator), bitsPerSecond);
+          float bandwidthEstimateFloat = slidingPercentile.getPercentile(0.5f);
+          bitrateEstimate = Float.isNaN(bandwidthEstimateFloat) ? NO_ESTIMATE
+              : (long) bandwidthEstimateFloat;
+          notifyBandwidthSample(elapsedMs, bytesAccumulator, bitrateEstimate);
+
+          //testing logging
+          String textLog = "Timestamp: " + nowMs + " ms; Real bitrate: " + bitsPerSecond/1000 + " Kbps; " +
+                  "Final estimate: " + bitrateEstimate/1000 + " Kbps.";
+          Log.d("BandwidthMeter", textLog);
+        }
+        streamCount--;
+        if (streamCount > 0) {
+          startTimeMs = nowMs;
+        }
+        bytesAccumulator = 0;
+      }
+
+      private void notifyBandwidthSample(final int elapsedMs, final long bytes, final long bitrate) {
+        if (eventHandler != null && eventListener != null) {
+          eventHandler.post(new Runnable()  {
+            @Override
+            public void run() {
+              eventListener.onBandwidthSample(elapsedMs, bytes, bitrate);
+            }
+          });
+        }
+      }
+
+    }
 }
