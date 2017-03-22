@@ -96,7 +96,7 @@ public class PlayerActivity extends GVRActivity {
         if (needNewPlayer || needRetrySource) {
             Uri[] uris;
             String[] extensions;
-            uris = new Uri[] {Uri.parse("asset:///videos_s_3.mp4")};
+            uris = new Uri[] {Uri.parse("https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd")};
             extensions = new String[1];
 
             if (Util.maybeRequestReadExternalStoragePermission(this, uris)) {
