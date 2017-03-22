@@ -57,8 +57,6 @@ android {
         }
     }
 
-
-
     // ignore the x86 and arm-v8 files from the google vr libraries
     packagingOptions {
         exclude 'lib/x86/libgvr.so'
@@ -67,7 +65,7 @@ android {
 }
 
 // Versions vars
-ext.gearvrfVersion='3.1.1'
+ext.gearvrfVersion = '3.1.1'
 //project.ext.jomlVersion = "1.9.1-SNAPSHOT"
 
 dependencies {
@@ -82,8 +80,10 @@ dependencies {
     compile 'com.google.vr:sdk-base:1.10.0'
     compile 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'
 
+
     // App deps
-    compile 'com.google.android.exoplayer:exoplayer:r1.5.10'
+    compile 'com.google.android.exoplayer:exoplayer:r2.3.0'
+    compile 'com.android.support.constraint:constraint-layout:1.0.0-beta5'
 
     //compile fileTree(dir: 'libs', include: ['*.jar'])
 
