@@ -46,7 +46,7 @@ import java.util.Set;
  */
 public class PermissionManager {
 
-    private final int MAX_RETIES;
+    private final int MAX_RETRIES;
 
     // The activity for which this permission manager works
     private final Activity activity;
@@ -74,7 +74,7 @@ public class PermissionManager {
      */
     public PermissionManager(@NonNull Activity activity, int maxRetries) {
         this.activity = activity;
-        this.MAX_RETIES = maxRetries;
+        this.MAX_RETRIES = maxRetries;
     }
 
     /**
@@ -170,7 +170,7 @@ public class PermissionManager {
                     retries = 0;
                     numRetries.put(permission, retries);
                 }
-                if (retries >= MAX_RETIES) {
+                if (retries >= MAX_RETRIES) {
                     // At least one permission has been required too much, deny everything and stop
                     reportStatus(requestID, PackageManager.PERMISSION_DENIED);
                     return;
