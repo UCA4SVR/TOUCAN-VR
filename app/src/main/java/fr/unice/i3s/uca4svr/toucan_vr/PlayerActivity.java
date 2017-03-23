@@ -18,6 +18,7 @@ package fr.unice.i3s.uca4svr.toucan_vr;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.text.TextUtils;
 
 import com.google.android.exoplayer2.C;
@@ -47,10 +48,13 @@ import org.gearvrf.GVRActivity;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
+import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 
 public class PlayerActivity extends GVRActivity {
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
+
+    private PermissionManager permissionManager = null;
 
     private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
     private SimpleExoPlayer player;
@@ -67,6 +71,8 @@ public class PlayerActivity extends GVRActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        permissionManager = new PermissionManager(this);
+
         userAgent = Util.getUserAgent(this, "Toucan_VR");
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
@@ -74,9 +80,16 @@ public class PlayerActivity extends GVRActivity {
         videoSceneObjectPlayer = makeVideoSceneObject();
 
         if (null != videoSceneObjectPlayer) {
-            final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer);
+            final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
+                    permissionManager);
             setMain(main, "gvr.xml");
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        permissionManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     private GVRVideoSceneObjectPlayer<?> makeVideoSceneObject() {

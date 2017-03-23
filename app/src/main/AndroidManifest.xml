@@ -23,6 +23,7 @@
     package="fr.unice.i3s.uca4svr.toucan_vr">
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -32,7 +33,6 @@
         <meta-data
             android:name="com.samsung.android.vr.application.mode"
             android:value="vr_only" />
-
         <activity
             android:name=".PlayerActivity"
             android:label="@string/app_name"
@@ -41,7 +41,6 @@
             android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
