@@ -25,11 +25,7 @@ import android.media.MediaCodec;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
-<<<<<<< HEAD
-import android.view.MotionEvent;
-=======
 import android.support.annotation.NonNull;
->>>>>>> 7681a2a72209dd19eaeec45f94d26cf289b3598b
 import android.view.Surface;
 
 import com.google.android.exoplayer.ExoPlaybackException;
@@ -51,15 +47,11 @@ import java.io.IOException;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 
 public class Minimal360VideoActivity extends GVRActivity {
-
-<<<<<<< HEAD
-    private static long lastDownTime;
-=======
+    
     private PermissionManager permissionManager = null;
     private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
 
     static final boolean USE_EXO_PLAYER = true;
->>>>>>> 7681a2a72209dd19eaeec45f94d26cf289b3598b
 
     /**
      * Called when the activity is first created.
