@@ -11,5 +11,5 @@ public interface RequestPermissionResultListener {
      * @param requestID The id of the request made to the manager.
      * @param result either PERMISSION_GRANTED or PERMISSION_DENIED from PackageManager.
      */
-    public void onPermissionRequestDone(int requestID, int result);
+    void onPermissionRequestDone(int requestID, int result);
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,11 +35,11 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
 /**
- * Logs the pitch, yaw, roll angles from the headtransform of the main camera rig
+ * Logs the pitch, yaw, roll angles from the HeadTransform of the main camera rig
  * from the context given at initialization. Logging is done into a file which name is
- * TAG_datatime.csv where TAG is given as a parameter of the constructor and datetime is formated
+ * TAG_datetime.csv where TAG is given as a parameter of the constructor and datetime is formatted
  * as yyyy_MM_dd_HH_mm_ss.
- * The files is csv formated, with 4 entries on each line:
+ * The files is csv formatted, with 4 entries on each line:
  * frameNumber, pitch (or X) rotation, yaw (or Y) rotation, roll (or Z) rotation
  * Rotation are expressed as angles in degree.
  * The logging happens each time the <code>track</code> method is called, and the frame
@@ -55,12 +55,12 @@ public class HeadMotionTracker {
     private static int loggerNextID = 0;
 
     // The GearVR framework context from which we're logging the head motion
-    private GVRContext mContext;
+    private final GVRContext context;
 
-    private Logger mLogger;
+    private final Logger logger;
 
     /**
-     * Initialize a HeadMotionTracker, that will record the angles of the headtransform
+     * Initialize a HeadMotionTracker, that will record the angles of the HeadTransform
      * from the main camera of the given context to a file name logFilePrefix_date.csv.
      * Be aware that tracking is done by calling the <code>track</code> method every time
      * and entry is needed.
@@ -68,13 +68,13 @@ public class HeadMotionTracker {
      * @param logFilePrefix The prefix for the log file name
      */
     public HeadMotionTracker(GVRContext context, String logFilePrefix) {
-        this.mContext = context;
+        this.context = context;
 
         String logFilePath = Environment.getExternalStoragePublicDirectory("toucan/logs/")
                 + File.separator
                 + createLogFileName(logFilePrefix);
         Log.d("HeadMotionTracking", logFilePath);
-        // logFilePath = mContext.getContext().getFileStreamPath(logFilePath).getAbsolutePath();
+        // logFilePath = context.getContext().getFileStreamPath(logFilePath).getAbsolutePath();
 
         // Initialize and configure a new logger in logback
         LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
@@ -90,10 +90,10 @@ public class HeadMotionTracker {
         fileAppender.start();
 
         // getting the instanceof the logger
-        mLogger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.HeadMotionTracker"
+        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.HeadMotionTracker"
                 + loggerNextID++);
         // I know the logger is from logback, this is the implementation i'm using below slf4j API.
-        ((ch.qos.logback.classic.Logger) mLogger).addAppender(fileAppender);
+        ((ch.qos.logback.classic.Logger) logger).addAppender(fileAppender);
     }
 
     /**
@@ -103,11 +103,11 @@ public class HeadMotionTracker {
      * @param frameTime The timestamps of the record in the log file
      */
     public void track(float frameTime) {
-        GVRTransform headTransform = mContext.getMainScene().getMainCameraRig().getHeadTransform();
+        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
         String rotationsString = String.format(Locale.ENGLISH, "%1f,%2$.0f,%3$.0f,%4$.0f",
                 frameTime, headTransform.getRotationPitch(), headTransform.getRotationYaw(),
                 headTransform.getRotationRoll());
-        mLogger.error(rotationsString);
+        logger.error(rotationsString);
     }
 
     /**
@@ -116,9 +116,8 @@ public class HeadMotionTracker {
      * @return the name of the log file
      */
     private String createLogFileName(String logFilePrefix) {
-        DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss");
+        DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US);
         Date date = new Date();
-        String logFilePath = String.format("%s_%s.csv", logFilePrefix, dateFormat.format(date));
-        return logFilePath;
+        return String.format("%s_%s.csv", logFilePrefix, dateFormat.format(date));
     }
 }

@@ -15,67 +15,66 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.permissions;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
-import android.util.Log;
 import android.util.SparseArray;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Set;
 
 /**
- * This class is a singleton made to manage permissions in single activity apps.
- * Gear VR applications are such application and this is why we developed this.
- *
- * The createManager method allow the creation of the manager.
- * It must be called early in the initialization process of the activity (onCreate) to ensure
- * a smoother run.
- *
- * The requestPermission function is called each time a permission is needed.
- * Instances of RequestPermissionResultListener are used as callbacks for the objects asking for
+ * This class allows to manage permissions requests on behalf of an activity.
+ * Useful when the activity depends on a variety of components, each requiring its own set of
  * permissions.
  *
- * The single activity of the application must override the onRequestPermissionsResult method and
- * call PermissionManager.onRequestPermissionResult forwarding all the parameter.
+ * The best way to use it is to create the object in the onCreate method of the activity and
+ * pass it to each created component that needs to ask permissions.
+ * The activity must override onRequestPermissionsResult and forward the call to the permission
+ * manager onRequestPermissionsResult method for it to work properly.
  *
- * Permission requests are based on IDs defined defined in the class directly.
- * Meaning you'll need to modify the class code if you want to add a new permission set that is
- * not present.
+ * Each permission can be requested only a certain number of times (3 by default) to the user.
+ * If not granted after those retries, it will be silently denied, calling the callbacks directly.
+ *
+ * When asking for permissions, the provided listener's callback is guaranteed to be called only once.
+ * Meaning that if other requests are made for the same group of permissions, you won't be notified
+ * even if the result is not the same. You will have to make a new request yourself to get a new
+ * notification.
  */
 public class PermissionManager {
 
-    private static final String LOG_TAG = "TCN:Perm";
+    private final int MAX_RETIES;
 
-    // Permission requests IDs
-    // Requests read and write permissions to external storage
-    public static final int PERMISSIONS_REQUEST_EXTERNAL_STORAGE = 1;
-
-
-    // Internal purpose variables below this point
-    private static PermissionManager permissionManager;
-    private static SparseArray<ArrayList<RequestPermissionResultListener>> currentListeners
+    // The activity for which this permission manager works
+    private final Activity activity;
+    private final ArrayList<Set<String>> permissionRequests = new ArrayList<>();
+    private final SparseArray<ArrayList<RequestPermissionResultListener>> currentListeners
             = new SparseArray<>();
-
-    private Activity activity;
+    private final HashMap<String, Integer> numRetries = new HashMap<>();
 
     /**
-     * Creates the instance of the manager if activity is not null and an instance does not exist
-     * already. Does nothing otherwise.
+     * Creates a new PermissionManager for the specified activity.
+     * The default maximum number of retries (3) is used.
      *
-     * @param activity The main (and only) activity off the application
+     * @param activity The activity for which this manager works
      */
-    public static void createManager(Activity activity) {
-        if (activity != null && permissionManager == null) {
-            permissionManager = new PermissionManager(activity);
-        } else {
-            Log.e(LOG_TAG, "Try to create a log manager while one already " +
-                    "exists or using a null activity.");
-            Log.e(LOG_TAG, "Continue doing nothing, this may produce errors, please " +
-                    "verify and correct your app.");
-        }
+    public PermissionManager(@NonNull Activity activity) {
+        this(activity, 3);
+    }
+
+    /**
+     * Creates a new PermissionManager for the specified activity.
+     *
+     * @param activity The activity for which this manager works
+     * @param maxRetries The maximum number of time a permission can be asked before being
+     *                   automatically denied if it has not been granted by the user previously.
+     */
+    public PermissionManager(@NonNull Activity activity, int maxRetries) {
+        this.activity = activity;
+        this.MAX_RETIES = maxRetries;
     }
 
     /**
@@ -85,24 +84,30 @@ public class PermissionManager {
      * If you add an Id to the class, you must come here to define the set of permissions associated
      * to it.
      *
-     * @param requestID The id of the required set of permissions
-     * @param listener The listener which is called once the permission has been required
+     * @param requestedPermissions The required set of permissions
+     * @param listener The listener which is called once the permissions has been required
      */
-    public static void requestPermission(int requestID, RequestPermissionResultListener listener) {
-        String[] requestedPermissions = null;
+    public synchronized int requestPermissions(Set<String> requestedPermissions, RequestPermissionResultListener listener) {
+        int requestID = -1;
 
-        // populate the requested permission for your group of permissions here
-        switch (requestID) {
-            case PERMISSIONS_REQUEST_EXTERNAL_STORAGE: {
-                requestedPermissions = new String[2];
-                requestedPermissions[0] = Manifest.permission.READ_EXTERNAL_STORAGE;
-                requestedPermissions[1] = Manifest.permission.WRITE_EXTERNAL_STORAGE;
+        // Checking if this exact set of permissions has already been asked and getting its
+        // callID (index in the array), else crate an entry in the array.
+        for (Set<String> permissions : permissionRequests) {
+            if (permissions.containsAll(requestedPermissions) &&
+                requestedPermissions.containsAll(permissions)) {
+                requestID = permissionRequests.indexOf(permissions);
+                break;
             }
+        }
+
+        if (requestID < 0) {
+            permissionRequests.add(requestedPermissions);
+            requestID = permissionRequests.size()-1;
         }
 
         // Updating the list of listeners and requesting the permissions.
         // Do not modify unless you know what you are doing.
-        if (requestedPermissions != null && requestedPermissions.length > 0) {
+        if (requestedPermissions != null && requestedPermissions.size() > 0) {
             ArrayList<RequestPermissionResultListener> listeners =
                     currentListeners.get(requestID);
             if (listeners == null){
@@ -110,19 +115,22 @@ public class PermissionManager {
                 currentListeners.put(requestID, listeners);
             }
             listeners.add(listener);
-            requestPermission(requestedPermissions, requestID);
+            requestPermission(requestedPermissions.toArray(new String[0]), requestID);
         }
+
+        return requestID;
     }
 
     /**
-     * To be called ONLY by the main (and only) activity of the app inside its own
-     * onRequestPermissionsResult method, forwarding all the parameters.
-     * @param requestCode forwarded parameter
-     * @param permissions forwarded parameter
-     * @param grantResults forwarded parameter
+     * To be called ONLY by the holding activity inside its own onRequestPermissionsResult method,
+     * forwarding all the parameters.
+     * @param requestCode forwarded parameter from the caller
+     * @param permissions forwarded parameter from the caller
+     * @param grantResults forwarded parameter from the caller
      */
-    public static void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                                  @NonNull int[] grantResults) {
+    public synchronized void onRequestPermissionsResult(int requestCode,
+                                                        @NonNull String[] permissions,
+                                                        @NonNull int[] grantResults) {
         // Returns a granted flag only if all the requested permissions are granted
         if (grantResults.length > 0) {
             boolean permissionsGranted = true;
@@ -142,46 +150,52 @@ public class PermissionManager {
      * @param requestedPermissions The array of permission to be asked for.
      * @param requestID The callID for the request
      */
-    private static void requestPermission(String[] requestedPermissions, int requestID) {
+    private void requestPermission(String[] requestedPermissions, int requestID) {
 
         // Permission is already granted if all requested permissions are granted
         boolean permissionGranted = true;
         for (String permission : requestedPermissions) {
             permissionGranted &= ContextCompat.checkSelfPermission(
-                    permissionManager.activity.getApplicationContext(), permission)
+                    activity.getApplicationContext(), permission)
                     == PackageManager.PERMISSION_GRANTED;
         }
 
         if (!permissionGranted) {
-
-            // Should we show an explanation?
-            // Yes if it is needed for at least one of the permissions
-            boolean needExplanation = false;
+            // Permission are not granted, lets check how many times they have been asked already
+            // We won't update the number of retries here because we may exit without asking them
+            // if one has already been asked too much.
             for (String permission : requestedPermissions) {
-                needExplanation |= ActivityCompat.shouldShowRequestPermissionRationale(
-                        permissionManager.activity, permission);
+                Integer retries = numRetries.get(permission);
+                if (retries == null) {
+                    retries = 0;
+                    numRetries.put(permission, retries);
+                }
+                if (retries >= MAX_RETIES) {
+                    // At least one permission has been required too much, deny everything and stop
+                    reportStatus(requestID, PackageManager.PERMISSION_DENIED);
+                    return;
+                }
             }
 
-            if (needExplanation) {
-
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-                // TODO: improve by showing an explanation
-                ActivityCompat.requestPermissions(permissionManager.activity,
-                        requestedPermissions, requestID);
-
-            } else {
-                // No explanation needed, we can request the permission.
-                ActivityCompat.requestPermissions(permissionManager.activity,
-                        requestedPermissions, requestID);
+            // We can request the permissions, lets first increment the number of retries.
+            for (String permission : requestedPermissions) {
+                Integer retries = numRetries.get(permission);
+                numRetries.put(permission, retries+1);
             }
+            ActivityCompat.requestPermissions(activity,
+                    requestedPermissions, requestID);
         } else {
             reportStatus(requestID, PackageManager.PERMISSION_GRANTED);
         }
     }
 
-    private static void reportStatus(int requestID, int status) {
+    /**
+     * Reports the status of a request to all the listeners concerned.
+     * Listeners are removed from the list once they have been notified.
+     * @param requestID the concerned request ID
+     * @param status the status, either PERMISSION_GRANTED or PERMISSION_DENIED
+     */
+    private void reportStatus(int requestID, int status) {
         ArrayList<RequestPermissionResultListener> listeners = currentListeners.get(requestID);
         if (listeners != null) {
             while (listeners.size() > 0) {
@@ -189,9 +203,5 @@ public class PermissionManager {
                 listeners.remove(0);
             }
         }
-    }
-
-    private PermissionManager(Activity activity) {
-        this.activity = activity;
     }
 }

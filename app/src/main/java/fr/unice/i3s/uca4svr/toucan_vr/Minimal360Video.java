@@ -22,11 +22,7 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.pm.PackageManager;
-import android.content.res.Resources;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRMain;
@@ -37,6 +33,9 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
@@ -45,32 +44,29 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 {
     private final GVRVideoSceneObjectPlayer<?> player;
 
-    // Tag to be  used when logging
-    private static final String TAG = "Minimal360Video";
+    // The associated android context
+    private final PermissionManager permissionManager;
 
-    // The qssociated android context
-    Activity activity;
-
-    // The GVRContext associated with the scence.
+    // The GVRContext associated with the scene.
     // Needed by the headMotionTracker
-    GVRContext gvrContext;
+    private GVRContext gvrContext;
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
     // stores the current number of times onStep has been called, used as the frame number for the
     // head motion logging for now.
-    private float mCurrentFrame;
+    private float currentFrame;
 
-    Minimal360Video(GVRVideoSceneObjectPlayer<?> player, Activity activity) {
+    Minimal360Video(GVRVideoSceneObjectPlayer<?> player, PermissionManager permissionManager) {
         this.player = player;
-        this.activity = activity;
+        this.permissionManager = permissionManager;
     }
 
     /** Called when the activity is first created. */
     @Override
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
-        mCurrentFrame = 0;
+        currentFrame = 0;
 
         GVRScene scene = gvrContext.getMainScene();
 
@@ -86,13 +82,19 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         // apply video to scene
         scene.addSceneObject( video );
 
-        // The HeadmotionTracker needs permission to write to external storage.
+        // The HeadMotionTracker needs permission to write to external storage.
         // Lets check that now or ask for it if necessary
-        PermissionManager.requestPermission(PermissionManager.PERMISSIONS_REQUEST_EXTERNAL_STORAGE,
-                this);
+        Set<String> permissions = new HashSet<>();
+        permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+
+        // Only one permission request is done in this component. No need to save the callID to
+        // discriminate different permission requests, the callback will be called for these
+        // particular permissions only.
+        permissionManager.requestPermissions(permissions, this);
     }
 
-    public void initHeadMotionTracker() {
+    private void initHeadMotionTracker() {
         // Give the context to the logger so that it has access to the camera
         headMotionTracker = new HeadMotionTracker(gvrContext, "karate");
     }
@@ -102,9 +104,9 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     public void onStep() {
         // logging with frame number for now
         if (headMotionTracker != null) {
-            headMotionTracker.track(mCurrentFrame);
+            headMotionTracker.track(currentFrame);
         }
-        mCurrentFrame++;
+        currentFrame++;
     }
 
     @Override

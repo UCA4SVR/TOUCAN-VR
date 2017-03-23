@@ -81,7 +81,7 @@ dependencies {
     // App Compat
     compile 'com.android.support:appcompat-v7:25.2.0'
 
-    // VR deps
+    // VR dependencies
     // compile "org.joml:joml-android:${jomlVersion}"
     compile "org.gearvrf:framework:$gearvrfVersion"
     compile "org.gearvrf:backend_daydream:$gearvrfVersion"
@@ -99,7 +99,7 @@ dependencies {
 
     //compile fileTree(dir: 'libs', include: ['*.jar'])
 
-    // Tests deps
+    // Tests dependencies
     androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
