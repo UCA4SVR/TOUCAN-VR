@@ -14,7 +14,7 @@
  *
  * Modifications:
  * Package name
- * Copyright 2017 Laboratoire I3S, CNR, Université côte d'azur
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  * Author: Romaric Pighetti
  */
 
@@ -25,7 +25,11 @@ import android.media.MediaCodec;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+<<<<<<< HEAD
 import android.view.MotionEvent;
+=======
+import android.support.annotation.NonNull;
+>>>>>>> 7681a2a72209dd19eaeec45f94d26cf289b3598b
 import android.view.Surface;
 
 import com.google.android.exoplayer.ExoPlaybackException;
@@ -38,16 +42,24 @@ import com.google.android.exoplayer.upstream.AssetDataSource;
 import com.google.android.exoplayer.upstream.DefaultAllocator;
 
 import org.gearvrf.GVRActivity;
+import org.gearvrf.GVRMain;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.io.IOException;
 
-import fr.unice.i3s.uca4svr.toucan_vr.Minimal360Video;
+import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 
 public class Minimal360VideoActivity extends GVRActivity {
 
+<<<<<<< HEAD
     private static long lastDownTime;
+=======
+    private PermissionManager permissionManager = null;
+    private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
+
+    static final boolean USE_EXO_PLAYER = true;
+>>>>>>> 7681a2a72209dd19eaeec45f94d26cf289b3598b
 
     /**
      * Called when the activity is first created.
@@ -55,6 +67,7 @@ public class Minimal360VideoActivity extends GVRActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        permissionManager = new PermissionManager(this);
 
         if (!USE_EXO_PLAYER) {
             videoSceneObjectPlayer = makeMediaPlayer();
@@ -63,9 +76,10 @@ public class Minimal360VideoActivity extends GVRActivity {
         }
 
         if (null != videoSceneObjectPlayer) {
-            final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer);
+            final GVRMain main = new Minimal360Video(videoSceneObjectPlayer, permissionManager);
             setMain(main, "gvr.xml");
         }
+
     }
 
     @Override
@@ -98,30 +112,11 @@ public class Minimal360VideoActivity extends GVRActivity {
         }
     }
 
-    /**
-     * The event is triggered every time the user touches the trackpad.
-     * If the touch event lasts less than 200 ms it is recognized like a "Tap"
-     * and the playback is paused or restarted according to the current state.
-     */
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        super.onTouchEvent(event);
-        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
-            lastDownTime = event.getDownTime();
-        }
-        if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-            if (event.getEventTime() - lastDownTime < 200) {
-                if (null != videoSceneObjectPlayer) {
-                    final Object player = videoSceneObjectPlayer.getPlayer();
-                    ExoPlayer exoPlayer = (ExoPlayer) player;
-                    if(((ExoPlayer) player).getPlayWhenReady() == true)
-                        exoPlayer.setPlayWhenReady(false);
-                    else
-                        exoPlayer.setPlayWhenReady(true);
-                }
-            }
-        }
-        return true;
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // Forwarding the call to the PermissionManager.
+        permissionManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     private GVRVideoSceneObjectPlayer<MediaPlayer> makeMediaPlayer() {
@@ -223,8 +218,4 @@ public class Minimal360VideoActivity extends GVRActivity {
             }
         };
     }
-
-    private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
-
-    static final boolean USE_EXO_PLAYER = true;
 }
