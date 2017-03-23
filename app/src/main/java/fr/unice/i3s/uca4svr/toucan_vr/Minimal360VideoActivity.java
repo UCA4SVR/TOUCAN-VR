@@ -26,6 +26,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.view.MotionEvent;
 import android.view.Surface;
 
 import com.google.android.exoplayer.ExoPlaybackException;
@@ -38,7 +39,6 @@ import com.google.android.exoplayer.upstream.AssetDataSource;
 import com.google.android.exoplayer.upstream.DefaultAllocator;
 
 import org.gearvrf.GVRActivity;
-import org.gearvrf.GVRMain;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
@@ -50,6 +50,8 @@ public class Minimal360VideoActivity extends GVRActivity {
     
     private PermissionManager permissionManager = null;
     private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
+    private Minimal360Video main;
+    private long lastDownTime;
 
     static final boolean USE_EXO_PLAYER = true;
 
@@ -68,7 +70,7 @@ public class Minimal360VideoActivity extends GVRActivity {
         }
 
         if (null != videoSceneObjectPlayer) {
-            final GVRMain main = new Minimal360Video(videoSceneObjectPlayer, permissionManager);
+            main = new Minimal360Video(videoSceneObjectPlayer, permissionManager);
             setMain(main, "gvr.xml");
         }
 
@@ -102,6 +104,39 @@ public class Minimal360VideoActivity extends GVRActivity {
                 exoPlayer.setPlayWhenReady(true);
             }
         }
+    }
+
+    /**
+     * The event is triggered every time the user touches the GearVR trackpad.
+     * If the touch event lasts less than 200 ms it is recognized as a "Tap"
+     * and the playback is paused or restarted according to the current state.
+     */
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        super.onTouchEvent(event);
+        if (null != videoSceneObjectPlayer) {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN)
+                lastDownTime = event.getDownTime();
+            if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                if (event.getEventTime() - lastDownTime < 200) {
+                    final ExoPlayer exoPlayer = (ExoPlayer) videoSceneObjectPlayer.getPlayer();
+                    if (exoPlayer.getPlayWhenReady())
+                        exoPlayer.setPlayWhenReady(false);
+                    else
+                        exoPlayer.setPlayWhenReady(true);
+                }
+            }
+        }
+        return true;
+    }
+
+    private void onPlaybackEnded() {
+        // release the video scene object and put it to null to avoid tap actions
+        videoSceneObjectPlayer.release();
+        videoSceneObjectPlayer = null;
+
+        // update the 3D scene with the request to remove the headset
+        main.createEndScene();
     }
 
     @Override
@@ -163,7 +198,10 @@ public class Minimal360VideoActivity extends GVRActivity {
                             case ExoPlayer.STATE_BUFFERING:
                                 break;
                             case ExoPlayer.STATE_ENDED:
-                                player.seekTo(0);
+                                // release the video source
+                                release();
+                                // handle the event in order to rebuild the scene
+                                onPlaybackEnded();
                                 break;
                             case ExoPlayer.STATE_IDLE:
                                 break;
