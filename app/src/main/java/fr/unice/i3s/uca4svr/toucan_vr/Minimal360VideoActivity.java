@@ -14,7 +14,7 @@
  *
  * Modifications:
  * Package name
- * Copyright 2017 Laboratoire I3S, CNR, Université côte d'azur
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  * Author: Romaric Pighetti
  */
 
@@ -25,6 +25,7 @@ import android.media.MediaCodec;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.view.Surface;
 
 import com.google.android.exoplayer.ExoPlaybackException;
@@ -37,14 +38,20 @@ import com.google.android.exoplayer.upstream.AssetDataSource;
 import com.google.android.exoplayer.upstream.DefaultAllocator;
 
 import org.gearvrf.GVRActivity;
+import org.gearvrf.GVRMain;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.io.IOException;
 
-import fr.unice.i3s.uca4svr.toucan_vr.Minimal360Video;
+import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 
 public class Minimal360VideoActivity extends GVRActivity {
+
+    private PermissionManager permissionManager = null;
+    private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
+
+    static final boolean USE_EXO_PLAYER = true;
 
     /**
      * Called when the activity is first created.
@@ -52,6 +59,7 @@ public class Minimal360VideoActivity extends GVRActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        permissionManager = new PermissionManager(this);
 
         if (!USE_EXO_PLAYER) {
             videoSceneObjectPlayer = makeMediaPlayer();
@@ -60,9 +68,10 @@ public class Minimal360VideoActivity extends GVRActivity {
         }
 
         if (null != videoSceneObjectPlayer) {
-            final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer);
+            final GVRMain main = new Minimal360Video(videoSceneObjectPlayer, permissionManager);
             setMain(main, "gvr.xml");
         }
+
     }
 
     @Override
@@ -93,6 +102,13 @@ public class Minimal360VideoActivity extends GVRActivity {
                 exoPlayer.setPlayWhenReady(true);
             }
         }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // Forwarding the call to the PermissionManager.
+        permissionManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     private GVRVideoSceneObjectPlayer<MediaPlayer> makeMediaPlayer() {
@@ -194,8 +210,4 @@ public class Minimal360VideoActivity extends GVRActivity {
             }
         };
     }
-
-    private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
-
-    static final boolean USE_EXO_PLAYER = true;
 }
