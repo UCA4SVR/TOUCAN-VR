@@ -17,8 +17,12 @@ package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects;
 
 import android.view.Surface;
 
+import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.source.TrackGroupArray;
+import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
@@ -37,6 +41,44 @@ public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer
 
     @Override
     public void setSurface(Surface surface) {
+        player.addListener(new ExoPlayer.EventListener() {
+            @Override
+            public void onTimelineChanged(Timeline timeline, Object manifest) {
+                // Does Nothing
+            }
+
+            @Override
+            public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+                // Does Nothing
+            }
+
+            @Override
+            public void onLoadingChanged(boolean isLoading) {
+                // Does Nothing
+            }
+
+            @Override
+            public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                switch (playbackState) {
+                    case ExoPlayer.STATE_ENDED:
+                        // handle the event in order to rebuild the scene
+                        release();
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            @Override
+            public void onPlayerError(ExoPlaybackException error) {
+                release();
+            }
+
+            @Override
+            public void onPositionDiscontinuity() {
+                // Does Nothing
+            }
+        });
         // Set the surface on which the video will be displayed
         player.setVideoSurface(surface);
     }
@@ -45,6 +87,8 @@ public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer
     public void release() {
         // Release the player if the object is released
         player.release();
+        canReleaseSurfaceImmediately();
+        player = null;
     }
 
     @Override
@@ -54,11 +98,15 @@ public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer
 
     @Override
     public void pause() {
-        player.setPlayWhenReady(false);
+        if (player != null) {
+            player.setPlayWhenReady(false);
+        }
     }
 
     @Override
     public void start() {
-        player.setPlayWhenReady(true);
+        if (player != null) {
+            player.setPlayWhenReady(true);
+        }
     }
 }

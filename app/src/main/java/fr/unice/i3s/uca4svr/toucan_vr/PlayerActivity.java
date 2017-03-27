@@ -20,9 +20,12 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
+import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.SimpleExoPlayer;
@@ -58,7 +61,7 @@ public class PlayerActivity extends GVRActivity {
 
     private PermissionManager permissionManager = null;
 
-    private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
+    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
     private SimpleExoPlayer player;
 
     // Player's parameters to fine tune as we need
@@ -75,7 +78,9 @@ public class PlayerActivity extends GVRActivity {
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
 
-    private final boolean shouldAutoPlay = true;
+    private final boolean shouldAutoPlay = false;
+    // The last time at which the touch event was down
+    private long lastDownTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,6 +103,34 @@ public class PlayerActivity extends GVRActivity {
         }
     }
 
+    /**
+     * The event is triggered every time the user touches the GearVR trackpad.
+     * If the touch event lasts less than 200 ms it is recognized as a "Tap"
+     * and the playback is paused or restarted according to the current state.
+     */
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        super.onTouchEvent(event);
+        if (null != videoSceneObjectPlayer) {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN)
+                lastDownTime = event.getDownTime();
+            if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                if (event.getEventTime() - lastDownTime < 200) {
+                    Minimal360Video main = (Minimal360Video) getMain();
+                    main.displayVideo();
+                    final ExoPlayer exoPlayer = (ExoPlayer) videoSceneObjectPlayer.getPlayer();
+                    if (exoPlayer != null) {
+                        if (exoPlayer.getPlayWhenReady())
+                            videoSceneObjectPlayer.pause();
+                        else
+                            videoSceneObjectPlayer.start();
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -114,7 +147,7 @@ public class PlayerActivity extends GVRActivity {
      * ExoplayerSceneObject.
      * @return the created video scene object
      */
-    private GVRVideoSceneObjectPlayer<?> makeVideoSceneObject() {
+    private GVRVideoSceneObjectPlayer<ExoPlayer> makeVideoSceneObject() {
         boolean needNewPlayer = player == null;
         if (needNewPlayer) {
             // We are not using extensions right now (we use only the built in android media codec)
