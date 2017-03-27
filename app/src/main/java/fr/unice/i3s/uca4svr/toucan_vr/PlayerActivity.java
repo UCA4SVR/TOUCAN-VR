@@ -24,6 +24,7 @@ import android.text.TextUtils;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayerFactory;
+import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
@@ -38,6 +39,7 @@ import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
@@ -59,13 +61,21 @@ public class PlayerActivity extends GVRActivity {
     private GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
     private SimpleExoPlayer player;
 
+    // Player's parameters to fine tune as we need
+    private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
+    private int maxBufferMs = DefaultLoadControl.DEFAULT_MAX_BUFFER_MS;
+    private int bufferForPlaybackMs =
+            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
+    private int bufferForPlaybackAfterRebufferMs =
+            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
+    private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
+
     private String userAgent;
     private DefaultTrackSelector trackSelector;
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
 
-    private boolean shouldAutoPlay = true;
-    private boolean needRetrySource = false;
+    private final boolean shouldAutoPlay = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +86,8 @@ public class PlayerActivity extends GVRActivity {
         userAgent = Util.getUserAgent(this, "Toucan_VR");
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
+
+        mediaUri = "file:///android_asset/videos_s_3.mp4";
 
         videoSceneObjectPlayer = makeVideoSceneObject();
 
@@ -89,27 +101,49 @@ public class PlayerActivity extends GVRActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        // Forwarding the call to the permission manager
         permissionManager.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
+    /**
+     * Builds the video player scene object.
+     * This object holds the instance of the exoplayer and can be passed to the Minimal360Video
+     * to be displayed on a proper surface.
+     *
+     * This method mainly creates and prepares an exoplayer instance before wrapping it in an
+     * ExoplayerSceneObject.
+     * @return the created video scene object
+     */
     private GVRVideoSceneObjectPlayer<?> makeVideoSceneObject() {
         boolean needNewPlayer = player == null;
         if (needNewPlayer) {
+            // We are not using extensions right now (we use only the built in android media codec)
             @SimpleExoPlayer.ExtensionRendererMode int extensionRendererMode =
                     SimpleExoPlayer.EXTENSION_RENDERER_MODE_OFF;
+            // The video track selection factory and the track selector.
+            // May be extended or replace by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
             trackSelector = new DefaultTrackSelector(videoTrackSelectionFactory);
-            player = ExoPlayerFactory.newSimpleInstance(this, trackSelector, new DefaultLoadControl(),
+            // The LoadControl, responsible for the buffering strategy
+            LoadControl loadControl = new DefaultLoadControl(
+                    new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
+                    minBufferMs,
+                    maxBufferMs,
+                    bufferForPlaybackMs,
+                    bufferForPlaybackAfterRebufferMs
+            );
+            // Instantiation of the exoplayer using the SimpleExoplayer provided by the library
+            // and injecting the components created above.
+            player = ExoPlayerFactory.newSimpleInstance(this, trackSelector, loadControl,
                     /* drmSessionManager */ null, extensionRendererMode);
 
             player.setPlayWhenReady(shouldAutoPlay);
 
-        }
-        if (needNewPlayer || needRetrySource) {
+            // Creation of the data source
             Uri[] uris;
             String[] extensions;
-            uris = new Uri[] {Uri.parse("https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd")};
+            uris = new Uri[] {Uri.parse(mediaUri)};
             extensions = new String[1];
 
             if (Util.maybeRequestReadExternalStoragePermission(this, uris)) {
@@ -122,13 +156,25 @@ public class PlayerActivity extends GVRActivity {
             }
             MediaSource mediaSource = mediaSources.length == 1 ? mediaSources[0]
                     : new ConcatenatingMediaSource(mediaSources);
+
+            // Prepare the player with the given data source
             player.prepare(mediaSource);
-            needRetrySource = false;
         }
 
         return new ExoplayerSceneObject(player);
     }
 
+    /**
+     * Builds the media source, guessing the type of source using its extension (or the override
+     * extension string).
+     *
+     * Helper method taken from the exoplayer demo app.
+     *
+     * @param uri the uri to the media.
+     * @param overrideExtension the string to use as the extension instead of extracting the extension
+     *                          from the media uri.
+     * @return A media sources on which the player can prepare
+     */
     private MediaSource buildMediaSource(Uri uri, String overrideExtension) {
         int type = TextUtils.isEmpty(overrideExtension) ? Util.inferContentType(uri)
                 : Util.inferContentType("." + overrideExtension);
@@ -156,6 +202,8 @@ public class PlayerActivity extends GVRActivity {
     /**
      * Returns a new DataSource factory.
      *
+     * Helper method taken from the exoplayer demo app.
+     *
      * @param useBandwidthMeter Whether to set {@link #BANDWIDTH_METER} as a listener to the new
      *     DataSource factory.
      * @return A new DataSource factory.
@@ -164,11 +212,23 @@ public class PlayerActivity extends GVRActivity {
         return buildDataSourceFactory(useBandwidthMeter ? BANDWIDTH_METER : null);
     }
 
+    /**
+     * Helper method taken from the exoplayer demo app.
+     *
+     * @param bandwidthMeter The bandwidth meter to be used. May be null.
+     * @return A data source factory
+     */
     private DataSource.Factory buildDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
         return new DefaultDataSourceFactory(this, bandwidthMeter,
                 buildHttpDataSourceFactory(bandwidthMeter));
     }
 
+    /**
+     * Helper method taken from the exoplayer demo app.
+     *
+     * @param bandwidthMeter The bandwidth meter to be used. May be null.
+     * @return An HttpDataSource factory
+     */
     private HttpDataSource.Factory buildHttpDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
         return new DefaultHttpDataSourceFactory(userAgent, bandwidthMeter);
     }

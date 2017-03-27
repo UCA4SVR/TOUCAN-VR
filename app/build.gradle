@@ -69,6 +69,10 @@ android {
         exclude 'lib/x86/libgvr.so'
         exclude 'lib/arm64-v8a/libgvr.so'
     }
+    compileOptions {
+        targetCompatibility 1.7
+        sourceCompatibility 1.7
+    }
 }
 
 // Versions vars

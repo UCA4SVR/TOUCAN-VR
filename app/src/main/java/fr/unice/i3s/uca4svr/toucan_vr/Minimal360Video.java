@@ -40,10 +40,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
-public class Minimal360Video extends GVRMain implements RequestPermissionResultListener
-{
-    private final GVRVideoSceneObjectPlayer<?> player;
-
+public class Minimal360Video extends GVRMain implements RequestPermissionResultListener {
     // The associated android context
     private final PermissionManager permissionManager;
 
@@ -51,14 +48,17 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     // Needed by the headMotionTracker
     private GVRContext gvrContext;
 
+    private final GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer;
+
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
     // stores the current number of times onStep has been called, used as the frame number for the
     // head motion logging for now.
     private float currentFrame;
 
-    Minimal360Video(GVRVideoSceneObjectPlayer<?> player, PermissionManager permissionManager) {
-        this.player = player;
+    Minimal360Video(GVRVideoSceneObjectPlayer<?> videoSceneObjectPlayer,
+                    PermissionManager permissionManager) {
+        this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
     }
 
@@ -76,7 +76,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         sphere.getTransform().setScale(100f, 100f, 100f);
 
         // create video scene
-        GVRVideoSceneObject video = new GVRVideoSceneObject( gvrContext, mesh, player, GVRVideoType.MONO );
+        GVRVideoSceneObject video = new GVRVideoSceneObject( gvrContext, mesh,
+                videoSceneObjectPlayer, GVRVideoType.MONO );
         video.setName( "video" );
 
         // apply video to scene
