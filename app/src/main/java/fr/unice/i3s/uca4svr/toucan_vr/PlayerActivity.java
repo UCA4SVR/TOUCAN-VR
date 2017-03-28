@@ -15,6 +15,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -52,10 +54,14 @@ import com.google.android.exoplayer2.util.Util;
 import org.gearvrf.GVRActivity;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
+import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 
-public class PlayerActivity extends GVRActivity {
+public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
 
@@ -68,7 +74,7 @@ public class PlayerActivity extends GVRActivity {
     private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
     private int maxBufferMs = DefaultLoadControl.DEFAULT_MAX_BUFFER_MS;
     private int bufferForPlaybackMs =
-            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
+            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS;
     private int bufferForPlaybackAfterRebufferMs =
             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
@@ -79,8 +85,6 @@ public class PlayerActivity extends GVRActivity {
     private Handler mainHandler;
 
     private final boolean shouldAutoPlay = false;
-    // The last time at which the touch event was down
-    private long lastDownTime;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -95,12 +99,9 @@ public class PlayerActivity extends GVRActivity {
         mediaUri = "file:///android_asset/videos_s_3.mp4";
 
         videoSceneObjectPlayer = makeVideoSceneObject();
-
-        if (null != videoSceneObjectPlayer) {
-            final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                    permissionManager);
-            setMain(main, "gvr.xml");
-        }
+        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
+                permissionManager);
+        setMain(main, "gvr.xml");
     }
 
     /**
@@ -112,10 +113,8 @@ public class PlayerActivity extends GVRActivity {
     public boolean onTouchEvent(MotionEvent event) {
         super.onTouchEvent(event);
         if (null != videoSceneObjectPlayer) {
-            if (event.getActionMasked() == MotionEvent.ACTION_DOWN)
-                lastDownTime = event.getDownTime();
             if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-                if (event.getEventTime() - lastDownTime < 200) {
+                if (event.getEventTime() - event.getDownTime() < 200) {
                     Minimal360Video main = (Minimal360Video) getMain();
                     main.displayVideo();
                     final ExoPlayer exoPlayer = (ExoPlayer) videoSceneObjectPlayer.getPlayer();
@@ -127,6 +126,9 @@ public class PlayerActivity extends GVRActivity {
                     }
                 }
             }
+        } else {
+            videoSceneObjectPlayer = makeVideoSceneObject();
+            ((Minimal360Video)getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
         }
         return true;
     }
@@ -172,15 +174,28 @@ public class PlayerActivity extends GVRActivity {
                     /* drmSessionManager */ null, extensionRendererMode);
 
             player.setPlayWhenReady(shouldAutoPlay);
+        }
 
+        boolean needPreparePlayer = videoSceneObjectPlayer == null;
+        if (needPreparePlayer) {
             // Creation of the data source
             Uri[] uris;
             String[] extensions;
             uris = new Uri[] {Uri.parse(mediaUri)};
             extensions = new String[1];
 
-            if (Util.maybeRequestReadExternalStoragePermission(this, uris)) {
+            boolean isAUriLocal = false;
+            for (Uri uri : uris) {
+                if (Util.isLocalFileUri(uri)) {
+                    isAUriLocal = true;
+                }
+            }
+            Set<String> permissions = new HashSet<>();
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            if (isAUriLocal && !permissionManager.isPermissionGranted(permissions)) {
                 // The player will be reinitialized if the permission is granted.
+                permissionManager.requestPermissions(permissions, this);
                 return null;
             }
             MediaSource[] mediaSources = new MediaSource[uris.length];
@@ -195,6 +210,14 @@ public class PlayerActivity extends GVRActivity {
         }
 
         return new ExoplayerSceneObject(player);
+    }
+
+    @Override
+    public void onPermissionRequestDone(int requestID, int result) {
+        if (result == PackageManager.PERMISSION_GRANTED) {
+            videoSceneObjectPlayer = makeVideoSceneObject();
+            ((Minimal360Video)getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+        }
     }
 
     /**

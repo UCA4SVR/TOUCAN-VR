@@ -42,7 +42,8 @@ android {
         applicationId "fr.unice.i3s.uca4svr.toucan_vr"
         minSdkVersion 23
         targetSdkVersion 25
-        versionCode 1
+        // version code = major * 10 000 + minor * 100 + patch
+        versionCode 100
         versionName "0.1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }

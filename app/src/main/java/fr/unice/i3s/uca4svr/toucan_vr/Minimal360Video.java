@@ -63,7 +63,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     // Needed by the headMotionTracker
     private GVRContext gvrContext;
 
-    private final GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
+    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
@@ -78,6 +78,10 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                     PermissionManager permissionManager) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
+    }
+
+    public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
+        this.videoSceneObjectPlayer = videoSceneObjectPlayer;
     }
 
     /** Called when the activity is first created. */
@@ -98,12 +102,16 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         permissionManager.requestPermissions(permissions, this);
 
         // N.B. permissions need to be granted before playing the video
+        if (videoSceneObjectPlayer == null) {
+            createWaitForPermissionScene();
+        } else {
 
-        // create the initial scene as waiting screen
-        createInitialScene();
+            // create the initial scene as waiting screen
+            createInitialScene();
 
-        // pause the player from automatically starting
-        videoSceneObjectPlayer.pause();
+            // pause the player from automatically starting
+            videoSceneObjectPlayer.pause();
+        }
     }
 
     public void displayVideo() {
@@ -176,6 +184,33 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private void initHeadMotionTracker() {
         // Give the context to the logger so that it has access to the camera
         headMotionTracker = new HeadMotionTracker(gvrContext, "karate");
+    }
+
+    private void createWaitForPermissionScene() {
+        GVRScene scene = gvrContext.getMainScene();
+
+        // the initial scene contains the GearVRf logo, so we clean it
+        scene.removeAllSceneObjects();
+
+        // add a 360-photo as background, taken from resources
+        Future<GVRTexture> textureSphere  = gvrContext.loadFutureTexture(
+                new GVRAndroidResource(gvrContext, R.drawable.prague));
+        GVRSphereSceneObject sphereObject = new GVRSphereSceneObject(gvrContext, false, textureSphere);
+        sphereObject.getTransform().setScale(100, 100, 100);
+        scene.addSceneObject(sphereObject);
+
+        // add a message to the scene asking the user to tap the TrackPad to start the video
+        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 0.3f,
+                "Permission are needed to read videos from the phone and store the logs.\n" +
+                        "Tap to start after accepting the permissions.");
+        textObject.setBackgroundColor(Color.TRANSPARENT);
+        textObject.setTextColor(Color.RED);
+        textObject.setGravity(Gravity.CENTER);
+        textObject.setTextSize(5.0f);
+        textObject.getTransform().setPosition(0.0f, 0.0f, -2.0f);
+        textObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
+        scene.getMainCameraRig().addChildObject(textObject);
+        /* Alternative version: using image from < R.drawable.tap_text > as shown in createEndScene() */
     }
 
     private void createInitialScene()
