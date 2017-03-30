@@ -1,6 +1,8 @@
 /*
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
+ * Author: Romaric Pighetti
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -22,7 +24,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -49,6 +50,7 @@ import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
+import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Util;
 
 import org.gearvrf.GVRActivity;
@@ -58,12 +60,21 @@ import java.util.HashSet;
 import java.util.Set;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransfertListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
+    private static final TransfertListenerBroadcaster MASTER_TRANSFER_LISTENER =
+            new TransfertListenerBroadcaster();
+
+    static {
+        MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
+        MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker("karate"));
+    }
 
     private PermissionManager permissionManager = null;
 
@@ -260,32 +271,32 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      *
      * Helper method taken from the exoplayer demo app.
      *
-     * @param useBandwidthMeter Whether to set {@link #BANDWIDTH_METER} as a listener to the new
+     * @param useBandwidthMeter Whether to set {@link #MASTER_TRANSFER_LISTENER} as a listener to the new
      *     DataSource factory.
      * @return A new DataSource factory.
      */
     private DataSource.Factory buildDataSourceFactory(boolean useBandwidthMeter) {
-        return buildDataSourceFactory(useBandwidthMeter ? BANDWIDTH_METER : null);
+        return buildDataSourceFactory(useBandwidthMeter ? MASTER_TRANSFER_LISTENER : null);
     }
 
     /**
      * Helper method taken from the exoplayer demo app.
      *
-     * @param bandwidthMeter The bandwidth meter to be used. May be null.
+     * @param listener The transfert listener to be used. May be null.
      * @return A data source factory
      */
-    private DataSource.Factory buildDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
-        return new DefaultDataSourceFactory(this, bandwidthMeter,
-                buildHttpDataSourceFactory(bandwidthMeter));
+    private DataSource.Factory buildDataSourceFactory(TransferListener listener) {
+        return new DefaultDataSourceFactory(this, listener,
+                buildHttpDataSourceFactory(listener));
     }
 
     /**
      * Helper method taken from the exoplayer demo app.
      *
-     * @param bandwidthMeter The bandwidth meter to be used. May be null.
+     * @param listener The transfer listener to be used. May be null.
      * @return An HttpDataSource factory
      */
-    private HttpDataSource.Factory buildHttpDataSourceFactory(DefaultBandwidthMeter bandwidthMeter) {
-        return new DefaultHttpDataSourceFactory(userAgent, bandwidthMeter);
+    private HttpDataSource.Factory buildHttpDataSourceFactory(TransferListener listener) {
+        return new DefaultHttpDataSourceFactory(userAgent, listener);
     }
 }

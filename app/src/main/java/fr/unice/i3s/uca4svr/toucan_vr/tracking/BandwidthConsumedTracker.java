@@ -1,7 +1,7 @@
 /*
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
- *  Author: Romaric Pighetti
+ * Author: Romaric Pighetti
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,12 @@ package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 import android.os.Environment;
 import android.util.Log;
 
-import org.gearvrf.GVRContext;
-import org.gearvrf.GVRTransform;
+import com.google.android.exoplayer2.upstream.DataSpec;
+import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.util.Clock;
+import com.google.android.exoplayer2.util.SystemClock;
+
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -30,52 +34,42 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-import org.slf4j.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
 /**
- * Logs the pitch, yaw, roll angles from the HeadTransform of the main camera rig
- * from the context given at initialization. Logging is done into a file which name is
- * TAG_datetime.csv where TAG is given as a parameter of the constructor and datetime is formatted
- * as yyyy_MM_dd_HH_mm_ss.
- * The files is csv formatted, with 4 entries on each line:
- * frameNumber, pitch (or X) rotation, yaw (or Y) rotation, roll (or Z) rotation
- * Rotation are expressed as angles in degree.
- * The logging happens each time the <code>track</code> method is called, and the frame
- * number recorded is the one given as a parameter to the function.
- * The file is located under the External Storage Public Directory in a directory name toucan/logs.
- *
- * @author Romaric Pighetti
+ * Tracks the bandwidth consumed during the video playback.
  */
-public class HeadMotionTracker {
+public class BandwidthConsumedTracker implements TransferListener<Object> {
 
     // Each logger must have a different ID,
     // so that creating a new logger won't override the previous one
     private static int loggerNextID = 0;
 
-    // The GearVR framework context from which we're logging the head motion
-    private final GVRContext context;
-
     private final Logger logger;
 
+    private long totalBytesConsumed = 0;
+    private boolean firstTransfer = true;
+    private final Clock clock;
+
     /**
-     * Initialize a HeadMotionTracker, that will record the angles of the HeadTransform
-     * from the main camera of the given context to a file name logFilePrefix_date.csv.
+     * Initialize a {@link BandwidthConsumedTracker}, that will record the consumed
+     * bandwidth during playback to a file name logFilePrefix_date.csv.
      * Be aware that tracking is done by calling the <code>track</code> method every time
      * and entry is needed.
-     * @param context The GVRContext from which the mainCamera movements must be tracked.
+     *
      * @param logFilePrefix The prefix for the log file name
      */
-    public HeadMotionTracker(GVRContext context, String logFilePrefix) {
-        this.context = context;
+    public BandwidthConsumedTracker(String logFilePrefix) {
+
+        clock = new SystemClock();
 
         String logFilePath = Environment.getExternalStoragePublicDirectory("toucan/logs/")
                 + File.separator
                 + createLogFileName(logFilePrefix);
-        Log.d("HeadMotionTracking", logFilePath);
+        Log.d("BandwidthTracker", logFilePath);
         // logFilePath = context.getContext().getFileStreamPath(logFilePath).getAbsolutePath();
 
         // Initialize and configure a new logger in logback
@@ -92,24 +86,10 @@ public class HeadMotionTracker {
         fileAppender.start();
 
         // getting the instanceof the logger
-        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.HeadMotionTracker"
+        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.BandwidthConsumedTracker"
                 + loggerNextID++);
         // I know the logger is from logback, this is the implementation i'm using below slf4j API.
         ((ch.qos.logback.classic.Logger) logger).addAppender(fileAppender);
-    }
-
-    /**
-     * Outputs a track record to the log file.
-     * The frameTime argument is used as a timestamp.
-     * It can be a frame number or whatever time value you see fit.
-     * @param frameTime The timestamps of the record in the log file
-     */
-    public void track(float frameTime) {
-        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-        String rotationsString = String.format(Locale.ENGLISH, "%1f,%2$.0f,%3$.0f,%4$.0f",
-                frameTime, headTransform.getRotationPitch(), headTransform.getRotationYaw(),
-                headTransform.getRotationRoll());
-        logger.error(rotationsString);
     }
 
     /**
@@ -120,6 +100,27 @@ public class HeadMotionTracker {
     private String createLogFileName(String logFilePrefix) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US);
         Date date = new Date();
-        return String.format("%s_headMotion_%s.csv", logFilePrefix, dateFormat.format(date));
+        return String.format("%s_bandwidth_%s.csv", logFilePrefix, dateFormat.format(date));
+    }
+
+    @Override
+    public void onTransferStart(Object source, DataSpec dataSpec) {
+        if (firstTransfer) {
+            logger.error(String.format(Locale.ENGLISH, "%d, %d",
+                    clock.elapsedRealtime(), totalBytesConsumed));
+            firstTransfer = false;
+        }
+    }
+
+    @Override
+    public void onBytesTransferred(Object source, int bytesTransferred) {
+        totalBytesConsumed += bytesTransferred;
+        logger.error(String.format(Locale.ENGLISH, "%d, %d",
+                clock.elapsedRealtime(), totalBytesConsumed));
+    }
+
+    @Override
+    public void onTransferEnd(Object source) {
+
     }
 }

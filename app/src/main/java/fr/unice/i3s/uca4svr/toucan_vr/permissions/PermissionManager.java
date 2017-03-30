@@ -115,10 +115,13 @@ public class PermissionManager {
                 listeners = new ArrayList<>();
                 currentListeners.put(requestID, listeners);
             }
-            if (listeners.size() == 0) {
+
+            listeners.add(listener);
+
+            if (listeners.size() == 1) {
                 requestPermission(requestedPermissions, requestID);
             }
-            listeners.add(listener);
+
         }
 
         return requestID;
