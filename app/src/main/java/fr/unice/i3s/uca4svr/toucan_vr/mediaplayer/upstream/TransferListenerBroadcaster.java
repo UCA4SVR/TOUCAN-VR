@@ -28,11 +28,11 @@ import java.util.Set;
  * Exists because simple classes from exoplayer2 accept only one listener.
  * Allows the registration of any number of listeners.
  */
-public class TransfertListenerBroadcaster implements TransferListener<Object> {
+public class TransferListenerBroadcaster implements TransferListener<Object> {
 
     Set<TransferListener<Object>> listeners = new HashSet<>();
 
-    public TransfertListenerBroadcaster() {}
+    public TransferListenerBroadcaster() {}
 
     synchronized public boolean addListener(TransferListener<Object> listener) {
         return listeners.add(listener);

@@ -60,7 +60,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransfertListenerBroadcaster;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
@@ -68,12 +68,11 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
-    private static final TransfertListenerBroadcaster MASTER_TRANSFER_LISTENER =
-            new TransfertListenerBroadcaster();
+    private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
+            new TransferListenerBroadcaster();
 
     static {
         MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
-        MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker("karate"));
     }
 
     private PermissionManager permissionManager = null;
@@ -89,6 +88,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private int bufferForPlaybackAfterRebufferMs =
             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
+    private String logPrefix = "bitmovin105560";
 
     private String userAgent;
     private DefaultTrackSelector trackSelector;
@@ -107,11 +107,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
+        // Those must be retrieved from the intent instead in the future
         mediaUri = "file:///android_asset/videos_s_3.mp4";
+        logPrefix = "karate";
+        MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                permissionManager);
+                permissionManager, logPrefix);
         setMain(main, "gvr.xml");
     }
 
@@ -128,7 +131,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 if (event.getEventTime() - event.getDownTime() < 200) {
                     Minimal360Video main = (Minimal360Video) getMain();
                     main.displayVideo();
-                    final ExoPlayer exoPlayer = (ExoPlayer) videoSceneObjectPlayer.getPlayer();
+                    final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
                     if (exoPlayer != null) {
                         if (exoPlayer.getPlayWhenReady())
                             videoSceneObjectPlayer.pause();

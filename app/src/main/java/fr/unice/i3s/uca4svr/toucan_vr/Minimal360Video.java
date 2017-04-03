@@ -58,6 +58,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 public class Minimal360Video extends GVRMain implements RequestPermissionResultListener {
     // The associated android context
     private final PermissionManager permissionManager;
+    private final String logPrefix;
 
     // The GVRContext associated with the scene.
     // Needed by the headMotionTracker
@@ -75,9 +76,10 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private boolean videoEnded = false;
 
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
-                    PermissionManager permissionManager) {
+                    PermissionManager permissionManager, String logPrefix) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
+        this.logPrefix = logPrefix;
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -183,7 +185,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     private void initHeadMotionTracker() {
         // Give the context to the logger so that it has access to the camera
-        headMotionTracker = new HeadMotionTracker(gvrContext, "karate");
+        headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
     }
 
     private void createWaitForPermissionScene() {
@@ -201,8 +203,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
         // add a message to the scene asking the user to tap the TrackPad to start the video
         GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 0.3f,
-                "Permission are needed to read videos from the phone and store the logs.\n" +
-                        "Tap to start after accepting the permissions.");
+                "Tap to start after accepting the permissions.");
         textObject.setBackgroundColor(Color.TRANSPARENT);
         textObject.setTextColor(Color.RED);
         textObject.setGravity(Gravity.CENTER);
