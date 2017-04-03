@@ -24,6 +24,7 @@ import android.util.SparseArray;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -62,7 +63,7 @@ public class PermissionManager {
      * @param activity The activity for which this manager works
      */
     public PermissionManager(@NonNull Activity activity) {
-        this(activity, 3);
+        this(activity, 5);
     }
 
     /**
@@ -91,7 +92,7 @@ public class PermissionManager {
         int requestID = -1;
 
         // Checking if this exact set of permissions has already been asked and getting its
-        // callID (index in the array), else crate an entry in the array.
+        // callID (index in the array), else create an entry in the array.
         for (Set<String> permissions : permissionRequests) {
             if (permissions.containsAll(requestedPermissions) &&
                 requestedPermissions.containsAll(permissions)) {
@@ -114,11 +115,27 @@ public class PermissionManager {
                 listeners = new ArrayList<>();
                 currentListeners.put(requestID, listeners);
             }
+
             listeners.add(listener);
-            requestPermission(requestedPermissions.toArray(new String[0]), requestID);
+
+            if (listeners.size() == 1) {
+                requestPermission(requestedPermissions, requestID);
+            }
+
         }
 
         return requestID;
+    }
+
+    public boolean isPermissionGranted(Set<String> requestedPermissions) {
+        // Permission is already granted if all requested permissions are granted
+        boolean permissionGranted = true;
+        for (String permission : requestedPermissions) {
+            permissionGranted &= ContextCompat.checkSelfPermission(
+                    activity.getApplicationContext(), permission)
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        return permissionGranted;
     }
 
     /**
@@ -150,17 +167,10 @@ public class PermissionManager {
      * @param requestedPermissions The array of permission to be asked for.
      * @param requestID The callID for the request
      */
-    private void requestPermission(String[] requestedPermissions, int requestID) {
+    private void requestPermission(Set<String> requestedPermissions, int requestID) {
 
         // Permission is already granted if all requested permissions are granted
-        boolean permissionGranted = true;
-        for (String permission : requestedPermissions) {
-            permissionGranted &= ContextCompat.checkSelfPermission(
-                    activity.getApplicationContext(), permission)
-                    == PackageManager.PERMISSION_GRANTED;
-        }
-
-        if (!permissionGranted) {
+        if (!isPermissionGranted(requestedPermissions)) {
             // Permission are not granted, lets check how many times they have been asked already
             // We won't update the number of retries here because we may exit without asking them
             // if one has already been asked too much.
@@ -183,7 +193,8 @@ public class PermissionManager {
                 numRetries.put(permission, retries+1);
             }
             ActivityCompat.requestPermissions(activity,
-                    requestedPermissions, requestID);
+                    requestedPermissions.toArray(new String[requestedPermissions.size()]),
+                    requestID);
         } else {
             reportStatus(requestID, PackageManager.PERMISSION_GRANTED);
         }
