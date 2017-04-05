@@ -202,7 +202,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.addSceneObject(sphereObject);
 
         // add a message to the scene asking the user to tap the TrackPad to start the video
-        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2.0f,
+        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
                 "Tap to start after accepting the permissions.");
         textObject.setBackgroundColor(Color.TRANSPARENT);
         textObject.setTextColor(Color.RED);

@@ -24,6 +24,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -36,7 +37,6 @@ import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.dash.DashMediaSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
@@ -64,6 +64,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroad
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
@@ -108,8 +109,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mainHandler = new Handler();
 
         // Those must be retrieved from the intent instead in the future
-        mediaUri = "file:///android_asset/videos_s_3.mp4";
-        logPrefix = "karate";
+        mediaUri = "file:///android_asset/manifest.mpd";
+        //logPrefix = "karate";
         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
         videoSceneObjectPlayer = makeVideoSceneObject();
@@ -254,7 +255,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultSsChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_DASH:
-                return new DashMediaSource(uri, buildDataSourceFactory(false),
+                return new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_HLS:
