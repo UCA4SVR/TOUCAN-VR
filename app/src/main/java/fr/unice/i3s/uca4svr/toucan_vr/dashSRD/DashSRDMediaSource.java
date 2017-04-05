@@ -410,7 +410,6 @@ public final class DashSRDMediaSource implements MediaSource {
         synchronized (manifestUriLock) {
             manifestUri = this.manifestUri;
         }
-        Log.e("DashMediaSource","Start loading manifest");
         startLoading(new ParsingLoadable<>(dataSource, manifestUri, C.DATA_TYPE_MANIFEST,
                 manifestParser), manifestCallback, minLoadableRetryCount);
     }
@@ -457,7 +456,6 @@ public final class DashSRDMediaSource implements MediaSource {
     }
 
     private void processManifest(boolean scheduleRefresh) {
-        Log.e("DashMediaSource","Process method");
         // Update any periods.
         for (int i = 0; i < periodsById.size(); i++) {
             int id = periodsById.keyAt(i);

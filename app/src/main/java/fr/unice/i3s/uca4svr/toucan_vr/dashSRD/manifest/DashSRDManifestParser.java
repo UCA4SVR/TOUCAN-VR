@@ -21,6 +21,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.source.dash.manifest.Representation;
 import com.google.android.exoplayer2.source.dash.manifest.SchemeValuePair;
 import com.google.android.exoplayer2.util.XmlPullParserUtil;
@@ -28,31 +30,54 @@ import com.google.android.exoplayer2.util.XmlPullParserUtil;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class DashSRDManifestParser extends com.google.android.exoplayer2.source.dash.manifest.DashManifestParser {
 
-    /**
-     * Private attributes used to handle Supplemental property
-     */
-    private SchemeValuePair supplementalProperty;
+    //Private attributes used to handle different tags inside AdaptationSet
+    private List<SupplementalProperty> supplementalPropertyList;
 
+    /**
+     * Parses different tags not included in the standard parsing of the adaptationSet tag
+     * @param xpp parser object
+     * @throws XmlPullParserException
+     */
     @Override
     protected void parseAdaptationSetChild(XmlPullParser xpp) throws XmlPullParserException {
         if(XmlPullParserUtil.isStartTag(xpp, "SupplementalProperty")) {
-            parseSupplementalProperty(xpp);
+            if(this.supplementalPropertyList == null) {
+                this.supplementalPropertyList = new ArrayList<>();
+            }
+            supplementalPropertyList.add(parseSupplementalProperty(xpp));
         }
     }
 
-    private void parseSupplementalProperty(XmlPullParser xpp) throws XmlPullParserException {
+    /**
+     * Parses the Supplemental property tag to create a SupplementalProperty Object
+     * @param xpp
+     * @return Suppplemental property object
+     * @throws XmlPullParserException
+     */
+    private SupplementalProperty parseSupplementalProperty(XmlPullParser xpp) throws XmlPullParserException {
         String schemeIdUri = xpp.getAttributeValue(null,"schemeIdUri");
         String value = xpp.getAttributeValue(null,"value");
-        this.supplementalProperty = new SchemeValuePair(schemeIdUri,value);
+        return new SupplementalProperty(schemeIdUri,value);
     }
 
+    /**
+     * Build the AdaptationSetSRD with the supplemental property object list enclosed.
+     * @param id
+     * @param contentType
+     * @param representations
+     * @param accessibilityDescriptors
+     * @return adaptationSetSRD
+     */
     @Override
     protected AdaptationSetSRD buildAdaptationSet(int id, int contentType, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors) {
-        return new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalProperty);
+        AdaptationSetSRD adaptationSetSRD = new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalPropertyList);
+        this.supplementalPropertyList.clear();
+        return adaptationSetSRD;
     }
 
 }

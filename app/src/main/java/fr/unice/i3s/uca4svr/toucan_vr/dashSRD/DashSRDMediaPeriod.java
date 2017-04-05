@@ -21,6 +21,7 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
+import android.util.Log;
 import android.util.Pair;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -47,6 +48,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 
 /**
  * A DASH {@link MediaPeriod}.
