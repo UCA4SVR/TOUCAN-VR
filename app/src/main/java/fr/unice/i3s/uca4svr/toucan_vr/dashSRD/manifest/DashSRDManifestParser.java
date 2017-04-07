@@ -76,7 +76,7 @@ public class DashSRDManifestParser extends com.google.android.exoplayer2.source.
     @Override
     protected AdaptationSetSRD buildAdaptationSet(int id, int contentType, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors) {
         AdaptationSetSRD adaptationSetSRD = new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalPropertyList);
-        this.supplementalPropertyList.clear();
+        if(this.supplementalPropertyList != null) this.supplementalPropertyList.clear();
         return adaptationSetSRD;
     }
 

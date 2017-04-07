@@ -18,6 +18,7 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
@@ -109,8 +110,10 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mainHandler = new Handler();
 
         // Those must be retrieved from the intent instead in the future
-        mediaUri = "file:///android_asset/manifest.mpd";
-        //logPrefix = "karate";
+        Intent i = getIntent();
+        String videoLink = i.getStringExtra("videoLink");
+        //mediaUri = "file:///android_asset/"+videoLink;
+        //logPrefix = "ROI";
         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
         videoSceneObjectPlayer = makeVideoSceneObject();

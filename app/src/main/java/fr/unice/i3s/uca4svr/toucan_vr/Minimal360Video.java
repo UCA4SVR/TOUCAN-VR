@@ -275,9 +275,11 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                 videoSceneObjectPlayer != null &&
                 videoSceneObjectPlayer.getPlayer() != null &&
                 videoSceneObjectPlayer.getPlayer().getPlayWhenReady()) {
-            headMotionTracker.track(currentFrame);
+            //headMotionTracker.track(currentFrame);
+            //Use this instead of current frame
+            headMotionTracker.track(videoSceneObjectPlayer.getPlayer().getCurrentPosition());
         }
-        currentFrame++;
+        //currentFrame++;
     }
 
     @Override

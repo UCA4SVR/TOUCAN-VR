@@ -44,8 +44,10 @@ public class AdaptationSetSRD extends AdaptationSet {
     public AdaptationSetSRD(int id, int type, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, List<SupplementalProperty> supplementalPropertyList) {
         super(id, type, representations, accessibilityDescriptors);
         this.supplementalPropertyList = new ArrayList<>();
-        for(int i=0; i<supplementalPropertyList.size(); i++)
-            this.supplementalPropertyList.add(supplementalPropertyList.get(i));
+        if(supplementalPropertyList != null) {
+            for (int i = 0; i < supplementalPropertyList.size(); i++)
+                this.supplementalPropertyList.add(supplementalPropertyList.get(i));
+        }
     }
 
 
