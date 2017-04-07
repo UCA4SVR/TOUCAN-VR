@@ -116,6 +116,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         //logPrefix = "ROI";
         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
+        // overriding mediaUri just for testing. Manifest with tiles and SupplementalProperties
+        mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
                 permissionManager, logPrefix);

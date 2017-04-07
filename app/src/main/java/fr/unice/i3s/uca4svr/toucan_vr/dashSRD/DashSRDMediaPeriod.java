@@ -50,6 +50,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
 
 /**
  * A DASH {@link MediaPeriod}.
@@ -65,7 +66,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final Allocator allocator;
     private final TrackGroupArray trackGroups;
-    private final fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo[] embeddedTrackInfos;
 
     private Callback callback;
     private ChunkSampleStream<DashChunkSource>[] sampleStreams;
@@ -90,9 +90,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
-        Pair<TrackGroupArray, fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo[]> result = buildTrackGroups(adaptationSets);
-        trackGroups = result.first;
-        embeddedTrackInfos = result.second;
+        trackGroups = buildTrackGroups(adaptationSets);
     }
 
     public void updateManifest(DashManifest manifest, int periodIndex) {
@@ -134,7 +132,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
                              SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
         int adaptationSetCount = adaptationSets.size();
         HashMap<Integer, ChunkSampleStream<DashChunkSource>> primarySampleStreams = new HashMap<>();
-        // First pass for primary tracks.
+
         for (int i = 0; i < selections.length; i++) {
             if (streams[i] instanceof ChunkSampleStream) {
                 @SuppressWarnings("unchecked")
@@ -155,36 +153,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
                     primarySampleStreams.put(trackGroupIndex, stream);
                     streams[i] = stream;
                     streamResetFlags[i] = true;
-                }
-            }
-        }
-        // Second pass for embedded tracks.
-        for (int i = 0; i < selections.length; i++) {
-            if ((streams[i] instanceof EmbeddedSampleStream || streams[i] instanceof EmptySampleStream)
-                    && (selections[i] == null || !mayRetainStreamFlags[i])) {
-                // The stream is for an embedded track and is either no longer selected or needs replacing.
-                releaseIfEmbeddedSampleStream(streams[i]);
-                streams[i] = null;
-            }
-            // We need to consider replacing the stream even if it's non-null because the primary stream
-            // may have been replaced, selected or deselected.
-            if (selections[i] != null) {
-                int trackGroupIndex = trackGroups.indexOf(selections[i].getTrackGroup());
-                if (trackGroupIndex >= adaptationSetCount) {
-                    int embeddedTrackIndex = trackGroupIndex - adaptationSetCount;
-                    fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo embeddedTrackInfo = embeddedTrackInfos[embeddedTrackIndex];
-                    int adaptationSetIndex = embeddedTrackInfo.adaptationSetIndex;
-                    ChunkSampleStream<?> primaryStream = primarySampleStreams.get(adaptationSetIndex);
-                    SampleStream stream = streams[i];
-                    boolean mayRetainStream = primaryStream == null ? stream instanceof EmptySampleStream
-                            : (stream instanceof EmbeddedSampleStream
-                            && ((EmbeddedSampleStream) stream).parent == primaryStream);
-                    if (!mayRetainStream) {
-                        releaseIfEmbeddedSampleStream(stream);
-                        streams[i] = primaryStream == null ? new EmptySampleStream()
-                                : primaryStream.selectEmbeddedTrack(positionUs, embeddedTrackInfo.trackType);
-                        streamResetFlags[i] = true;
-                    }
                 }
             }
         }
@@ -245,121 +213,43 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 
     // Internal methods.
 
-    private static Pair<TrackGroupArray, fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo[]> buildTrackGroups(
-            List<AdaptationSet> adaptationSets) {
+    private static TrackGroupArray buildTrackGroups(List<AdaptationSet> adaptationSets) {
         int adaptationSetCount = adaptationSets.size();
-        int embeddedTrackCount = getEmbeddedTrackCount(adaptationSets);
-        TrackGroup[] trackGroupArray = new TrackGroup[adaptationSetCount + embeddedTrackCount];
-        fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo[] embeddedTrackInfos = new fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo[embeddedTrackCount];
+        TrackGroup[] trackGroupArray = new TrackGroup[adaptationSetCount];
 
-        int embeddedTrackIndex = 0;
         for (int i = 0; i < adaptationSetCount; i++) {
-            AdaptationSet adaptationSet = adaptationSets.get(i);
+            // casting to AdaptationSetSRD
+            AdaptationSetSRD adaptationSet = (AdaptationSetSRD)adaptationSets.get(i);
+            SupplementalProperty supplementalProperty = adaptationSet.supplementalPropertyList.get(0);
+
+            // TODO parse SupplementalProperty to build a proper object to attach to the TrackGroup
+
             List<Representation> representations = adaptationSet.representations;
             Format[] formats = new Format[representations.size()];
             for (int j = 0; j < formats.length; j++) {
                 formats[j] = representations.get(j).format;
             }
             trackGroupArray[i] = new TrackGroup(formats);
-            if (hasEventMessageTrack(adaptationSet)) {
-                Format format = Format.createSampleFormat(adaptationSet.id + ":emsg",
-                        MimeTypes.APPLICATION_EMSG, null, Format.NO_VALUE, null);
-                trackGroupArray[adaptationSetCount + embeddedTrackIndex] = new TrackGroup(format);
-                embeddedTrackInfos[embeddedTrackIndex++] = new fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo(i, C.TRACK_TYPE_METADATA);
-            }
-            if (hasCea608Track(adaptationSet)) {
-                Format format = Format.createTextSampleFormat(adaptationSet.id + ":cea608",
-                        MimeTypes.APPLICATION_CEA608, null, Format.NO_VALUE, 0, null, null);
-                trackGroupArray[adaptationSetCount + embeddedTrackIndex] = new TrackGroup(format);
-                embeddedTrackInfos[embeddedTrackIndex++] = new fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaPeriod.EmbeddedTrackInfo(i, C.TRACK_TYPE_TEXT);
-            }
         }
 
-        return Pair.create(new TrackGroupArray(trackGroupArray), embeddedTrackInfos);
+        return new TrackGroupArray(trackGroupArray);
     }
 
     private ChunkSampleStream<DashChunkSource> buildSampleStream(int adaptationSetIndex,
                                                                  TrackSelection selection, long positionUs) {
         AdaptationSet adaptationSet = adaptationSets.get(adaptationSetIndex);
-        int embeddedTrackCount = 0;
-        int[] embeddedTrackTypes = new int[2];
-        boolean enableEventMessageTrack = hasEventMessageTrack(adaptationSet);
-        if (enableEventMessageTrack) {
-            embeddedTrackTypes[embeddedTrackCount++] = C.TRACK_TYPE_METADATA;
-        }
-        boolean enableCea608Track = hasCea608Track(adaptationSet);
-        if (enableCea608Track) {
-            embeddedTrackTypes[embeddedTrackCount++] = C.TRACK_TYPE_TEXT;
-        }
-        if (embeddedTrackCount < embeddedTrackTypes.length) {
-            embeddedTrackTypes = Arrays.copyOf(embeddedTrackTypes, embeddedTrackCount);
-        }
+
         DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
                 manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
-                elapsedRealtimeOffset, enableEventMessageTrack, enableCea608Track);
+                elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
         ChunkSampleStream<DashChunkSource> stream = new ChunkSampleStream<>(adaptationSet.type,
-                embeddedTrackTypes, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
+                /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
                 eventDispatcher);
         return stream;
-    }
-
-    private static int getEmbeddedTrackCount(List<AdaptationSet> adaptationSets) {
-        int embeddedTrackCount = 0;
-        for (int i = 0; i < adaptationSets.size(); i++) {
-            AdaptationSet adaptationSet = adaptationSets.get(i);
-            if (hasEventMessageTrack(adaptationSet)) {
-                embeddedTrackCount++;
-            }
-            if (hasCea608Track(adaptationSet)) {
-                embeddedTrackCount++;
-            }
-        }
-        return embeddedTrackCount;
-    }
-
-    private static boolean hasEventMessageTrack(AdaptationSet adaptationSet) {
-        List<Representation> representations = adaptationSet.representations;
-        for (int i = 0; i < representations.size(); i++) {
-            Representation representation = representations.get(i);
-            if (!representation.inbandEventStreams.isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean hasCea608Track(AdaptationSet adaptationSet) {
-        List<SchemeValuePair> descriptors = adaptationSet.accessibilityDescriptors;
-        for (int i = 0; i < descriptors.size(); i++) {
-            SchemeValuePair descriptor = descriptors.get(i);
-            if ("urn:scte:dash:cc:cea-608:2015".equals(descriptor.schemeIdUri)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     @SuppressWarnings("unchecked")
     private static ChunkSampleStream<DashChunkSource>[] newSampleStreamArray(int length) {
         return new ChunkSampleStream[length];
     }
-
-    private static void releaseIfEmbeddedSampleStream(SampleStream sampleStream) {
-        if (sampleStream instanceof EmbeddedSampleStream) {
-            ((EmbeddedSampleStream) sampleStream).release();
-        }
-    }
-
-    private static final class EmbeddedTrackInfo {
-
-        public final int adaptationSetIndex;
-        public final int trackType;
-
-        public EmbeddedTrackInfo(int adaptationSetIndex, int trackType) {
-            this.adaptationSetIndex = adaptationSetIndex;
-            this.trackType = trackType;
-        }
-
-    }
-
 }
