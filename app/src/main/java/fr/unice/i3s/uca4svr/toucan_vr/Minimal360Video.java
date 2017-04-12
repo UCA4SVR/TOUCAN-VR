@@ -170,7 +170,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             scene.removeAllSceneObjects();
 
             // create sphere / mesh
-            GVRSphereSceneObject sphere = new GVRSphereSceneObject(gvrContext, 72, 144, false);
+            /*GVRSphereSceneObject sphere = new GVRSphereSceneObject(gvrContext, 72, 144, false);
             GVRMesh mesh = sphere.getRenderData().getMesh();
             sphere.getTransform().setScale(100f, 100f, 100f);
 
@@ -179,7 +179,37 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                     videoSceneObjectPlayer, GVRVideoType.MONO);
             video.setName("video");
             // apply video to scene
-            scene.addSceneObject(video);
+            scene.addSceneObject(video);*/
+
+            // Testing display of tiles in the scene
+            int videoRendererCount = 4;
+            GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
+
+            for (int i=0; i<videoRendererCount; i++) {
+                videos[i] = new GVRVideoSceneObject( gvrContext, 4, 2, videoSceneObjectPlayer, GVRVideoType.MONO );
+                videos[i].getTransform().setPositionZ(-4);
+                if (i==0)
+                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
+                if (i==1)
+                    videos[i].getTransform().rotateByAxisWithPivot(-53, 0, 1, 0, 0, 0, 0);
+                if (i==2)
+                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
+                if (i==3) {
+                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(-54, 0, 1, 0, 0, 0, 0);
+                }
+                videos[i].setName( "video_" + i );
+                scene.addSceneObject( videos[i] );
+            }
+
+            /*float angle = 0;
+            for (int i=0; i < videoRendererCount; i++) {
+                videos[i] = new GVRVideoSceneObject( gvrContext, 4, 2, videoSceneObjectPlayer, GVRVideoType.MONO );
+                videos[i].getTransform().setPositionZ(-4);
+                videos[i].getTransform().rotateByAxisWithPivot(angle-=53, 0, 1, 0, 0, 0, 0);
+                videos[i].setName( "video_" + i );
+                scene.addSceneObject( videos[i] );
+            }*/
         }
     }
 
@@ -191,7 +221,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private void createWaitForPermissionScene() {
         GVRScene scene = gvrContext.getMainScene();
 
-        // the initial scene contains the GearVRf logo, so we clean it
+        // clean the scene before adding objects
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
@@ -211,7 +241,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         textObject.getTransform().setPosition(0.0f, 0.0f, -2.0f);
         textObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
         scene.getMainCameraRig().addChildObject(textObject);
-        /* Alternative version: using image from < R.drawable.tap_text > as shown in createEndScene() */
     }
 
     private void createInitialScene()
@@ -229,15 +258,13 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.addSceneObject(sphereObject);
 
         // add a message to the scene asking the user to tap the TrackPad to start the video
-        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 0.3f, "Tap to play!");
-        textObject.setBackgroundColor(Color.TRANSPARENT);
-        textObject.setTextColor(Color.RED);
-        textObject.setGravity(Gravity.CENTER);
-        textObject.setTextSize(5.0f);
-        textObject.getTransform().setPosition(0.0f, 0.0f, -2.0f);
-        textObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
-        scene.getMainCameraRig().addChildObject(textObject);
-        /* Alternative version: using image from < R.drawable.tap_text > as shown in createEndScene() */
+        GVRAssetLoader gvrAssetLoader = new GVRAssetLoader(gvrContext);
+        GVRTexture texture = gvrAssetLoader.loadTexture(new GVRAndroidResource(
+                gvrContext, R.drawable.tap_text));
+        GVRSceneObject messageObject = new GVRSceneObject(gvrContext, 1.2f, 0.3f, texture);
+        messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
+        messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
+        scene.getMainCameraRig().addChildObject(messageObject);
     }
 
     public void createEndScene()
