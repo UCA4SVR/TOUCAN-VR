@@ -22,30 +22,24 @@
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
 import android.util.Log;
-import android.util.Pair;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
 import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
-import com.google.android.exoplayer2.source.EmptySampleStream;
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.source.chunk.ChunkSampleStream;
-import com.google.android.exoplayer2.source.chunk.ChunkSampleStream.EmbeddedSampleStream;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.source.dash.manifest.Representation;
-import com.google.android.exoplayer2.source.dash.manifest.SchemeValuePair;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
-import com.google.android.exoplayer2.util.MimeTypes;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -213,6 +207,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
 
     // Internal methods.
 
+    // N.B. this method creates a group of tracks from each of the adaptation sets
     private static TrackGroupArray buildTrackGroups(List<AdaptationSet> adaptationSets) {
         int adaptationSetCount = adaptationSets.size();
         TrackGroup[] trackGroupArray = new TrackGroup[adaptationSetCount];
@@ -220,9 +215,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
         for (int i = 0; i < adaptationSetCount; i++) {
             // casting to AdaptationSetSRD
             AdaptationSetSRD adaptationSet = (AdaptationSetSRD)adaptationSets.get(i);
-            SupplementalProperty supplementalProperty = adaptationSet.supplementalPropertyList.get(0);
 
-            // TODO parse SupplementalProperty to build a proper object to attach to the TrackGroup
+            if (adaptationSet.supplementalPropertyList.size()!=0) {
+                SupplementalProperty supplementalProperty = adaptationSet.supplementalPropertyList.get(0);
+
+                // TODO: parse SupplementalProperty to build a proper object to attach to the TrackGroup (?)
+            }
 
             List<Representation> representations = adaptationSet.representations;
             Format[] formats = new Format[representations.size()];
@@ -235,10 +233,11 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
         return new TrackGroupArray(trackGroupArray);
     }
 
+    // N.B. this method creates a stream of chunks for each of the renderer
+    //      (provided that each renderer has a group of exposed tracks and is enabled)
     private ChunkSampleStream<DashChunkSource> buildSampleStream(int adaptationSetIndex,
                                                                  TrackSelection selection, long positionUs) {
         AdaptationSet adaptationSet = adaptationSets.get(adaptationSetIndex);
-
         DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
                 manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);

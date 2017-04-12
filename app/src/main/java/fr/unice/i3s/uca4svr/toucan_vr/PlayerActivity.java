@@ -31,7 +31,6 @@ import android.view.MotionEvent;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.ExoPlayerFactory;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
@@ -60,6 +59,7 @@ import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 import java.util.HashSet;
 import java.util.Set;
 
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
@@ -80,7 +80,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private PermissionManager permissionManager = null;
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
-    private SimpleExoPlayer player;
+    private TiledExoPlayer player;
 
     // Player's parameters to fine tune as we need
     private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
@@ -117,14 +117,16 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         //logPrefix = "ROI";
         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
+        // Overriding mediaUri just for testing.
+
+        // the manifest here is stored locally together with the media segments and tiles
         mediaUri = "file:///android_asset/video_test/manifest.mpd";
 
-        // overriding mediaUri just for testing. Manifest with tiles and SupplementalProperties
+        // Manifest with tiles and SupplementalProperties
         //mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
 
-        // Manifest with two adaptation sets:
+        // Manifest with two adaptation sets
         //mediaUri = "http://www-itec.uni-klu.ac.at/ftp/datasets/DASHDataset2014/TearsOfSteel/2sec/TearsOfSteel_2s_onDemand_2014_05_09.mpd";
-
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
@@ -180,14 +182,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private GVRVideoSceneObjectPlayer<ExoPlayer> makeVideoSceneObject() {
         boolean needNewPlayer = player == null;
         if (needNewPlayer) {
-            // We are not using extensions right now (we use only the built in android media codec)
-            @SimpleExoPlayer.ExtensionRendererMode int extensionRendererMode =
-                    SimpleExoPlayer.EXTENSION_RENDERER_MODE_OFF;
             // The video track selection factory and the track selector.
-            // May be extended or replace by custom implementations to try different adaptive strategies.
+            // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
             trackSelector = new DefaultTrackSelector(videoTrackSelectionFactory);
+
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new DefaultLoadControl(
                     new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
@@ -196,10 +196,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     bufferForPlaybackMs,
                     bufferForPlaybackAfterRebufferMs
             );
-            // Instantiation of the exoplayer using the SimpleExoplayer provided by the library
-            // and injecting the components created above.
-            player = ExoPlayerFactory.newSimpleInstance(this, trackSelector, loadControl,
-                    /* drmSessionManager */ null, extensionRendererMode);
+
+            // Instantiation of the ExoPlayer using our custom implementation.
+            // The number of video renderers and the other components created above are given as parameters.
+            player = new TiledExoPlayer(this, /*videoRendererCount*/ 2, trackSelector, loadControl);
+
+            // TODO: extract the number of video renderers from the manifest
 
             player.setPlayWhenReady(shouldAutoPlay);
         }

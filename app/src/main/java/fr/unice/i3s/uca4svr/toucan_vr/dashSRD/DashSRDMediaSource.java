@@ -58,6 +58,10 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.DashSRDManifestParser;
 /**
  * A DASH {@link MediaSource}.
  */
+
+// N.B. this class has not been changed from the original DashMediaSource,
+//      except for the manifestParser
+
 public final class DashSRDMediaSource implements MediaSource {
 
     /**

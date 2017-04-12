@@ -19,18 +19,19 @@ import android.view.Surface;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
-import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
+
 public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer> {
 
-    private SimpleExoPlayer player;
+    private TiledExoPlayer player;
 
-    public ExoplayerSceneObject(SimpleExoPlayer player) {
+    public ExoplayerSceneObject(TiledExoPlayer player) {
         this.player = player;
     }
 
