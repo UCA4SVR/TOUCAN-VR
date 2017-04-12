@@ -32,7 +32,6 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
-import com.google.android.exoplayer2.SimpleExoPlayer;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
@@ -42,7 +41,6 @@ import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
-import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
@@ -59,6 +57,7 @@ import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 import java.util.HashSet;
 import java.util.Set;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
@@ -93,7 +92,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private String logPrefix = "bitmovin105560";
 
     private String userAgent;
-    private DefaultTrackSelector trackSelector;
+    private CustomTrackSelector trackSelector;
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
 
@@ -186,7 +185,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
-            trackSelector = new DefaultTrackSelector(videoTrackSelectionFactory);
+            trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new DefaultLoadControl(
@@ -199,7 +198,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
             // Instantiation of the ExoPlayer using our custom implementation.
             // The number of video renderers and the other components created above are given as parameters.
-            player = new TiledExoPlayer(this, /*videoRendererCount*/ 2, trackSelector, loadControl);
+            player = new TiledExoPlayer(this, /*videoRendererCount*/ 4, trackSelector, loadControl);
 
             // TODO: extract the number of video renderers from the manifest
 
