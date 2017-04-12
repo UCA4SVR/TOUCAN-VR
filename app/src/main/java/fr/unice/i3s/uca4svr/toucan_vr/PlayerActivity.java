@@ -109,15 +109,22 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
-        // Those must be retrieved from the intent instead in the future
+        // TODO: take parameters from the intent
+
         Intent i = getIntent();
         String videoLink = i.getStringExtra("videoLink");
         //mediaUri = "file:///android_asset/"+videoLink;
         //logPrefix = "ROI";
         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
+        mediaUri = "file:///android_asset/video_test/manifest.mpd";
+
         // overriding mediaUri just for testing. Manifest with tiles and SupplementalProperties
-        mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+        //mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+
+        // Manifest with two adaptation sets:
+        //mediaUri = "http://www-itec.uni-klu.ac.at/ftp/datasets/DASHDataset2014/TearsOfSteel/2sec/TearsOfSteel_2s_onDemand_2014_05_09.mpd";
+
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
