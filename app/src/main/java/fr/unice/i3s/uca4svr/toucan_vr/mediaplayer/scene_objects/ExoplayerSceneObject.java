@@ -86,10 +86,10 @@ public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer
 
     @Override
     public void release() {
-        // Release the player if the object is released
+        // Release the player if the video object is released
         player.release();
         canReleaseSurfaceImmediately();
-        player = null;
+        //player = null;
     }
 
     @Override

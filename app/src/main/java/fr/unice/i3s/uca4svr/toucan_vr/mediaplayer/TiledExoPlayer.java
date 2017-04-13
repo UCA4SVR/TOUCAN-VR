@@ -50,6 +50,7 @@ import java.util.List;
  * It allows to build a specified number of video renderers, overcoming the limitation of the default class.
  * The number of video renderers can be passed as a parameter to the class constructor.
  * The method setVideoSurface is called from the ExoPlayerSceneObject to provide the surface(s) for the player.
+ * The method release() is also called from ExoPlayerSceneObject to release the player.
  *
  * Created by Giuseppe Samela on 12/04/17.
  */
@@ -494,16 +495,20 @@ public class TiledExoPlayer implements ExoPlayer {
         player.stop();
     }
 
+    // This method releases the player, but first checks if there are surfaces assigned to renderers.
+    // The method is called multiple times: every time a GVRVideoSceneObject is released.
     @Override
     public void release() {
-        player.release();
-        removeSurfaceCallbacks();
-        for (int i=0; i < surfaceCount; i++) {
+        if(surfaceCount>0) {
+            surfaceCount--;
             if (ownsSurfaces)
-                surfaces[i].release();
-            surfaces[i] = null;
+                surfaces[surfaceCount].release();
+            surfaces[surfaceCount]=null;
         }
-        surfaceCount = 0;
+        if(surfaceCount==0) {
+            player.release();
+            removeSurfaceCallbacks();
+        }
     }
 
     @Override

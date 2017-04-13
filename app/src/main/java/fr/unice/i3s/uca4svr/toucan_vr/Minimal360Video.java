@@ -269,6 +269,9 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     public void createEndScene()
     {
+        // the player has been released at this point, we can put it to null
+        videoSceneObjectPlayer = null;
+
         // clean the old scene to build the new one
         // N.B. getNextMainScene() can be used but it's going to become deprecated soon
         GVRScene scene = gvrContext.getMainScene();
