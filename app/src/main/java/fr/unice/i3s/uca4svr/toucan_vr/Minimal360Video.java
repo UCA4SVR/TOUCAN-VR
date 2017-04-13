@@ -181,8 +181,48 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             // apply video to scene
             scene.addSceneObject(video);*/
 
+            int videoRendererCount = 9;
+            GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
+
+            for (int i=0; i<videoRendererCount; i++) {
+                videos[i] = new GVRVideoSceneObject(gvrContext, 4, 2, videoSceneObjectPlayer, GVRVideoType.MONO);
+                videos[i].getTransform().setPositionZ(-4);
+                if (i==0) {
+                    videos[i].getTransform().rotateByAxisWithPivot(+28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(+53, 0, 1, 0, 0, 0, 0);
+                }
+                if (i==1) {
+                    videos[i].getTransform().rotateByAxisWithPivot(+28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
+                }
+                if (i==2) {
+                    videos[i].getTransform().rotateByAxisWithPivot(+28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(-53, 0, 1, 0, 0, 0, 0);
+                }
+                if (i==3)
+                    videos[i].getTransform().rotateByAxisWithPivot(+53, 0, 1, 0, 0, 0, 0);
+                if (i==4)
+                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
+                if (i==5)
+                    videos[i].getTransform().rotateByAxisWithPivot(-53, 0, 1, 0, 0, 0, 0);
+                if (i==6) {
+                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(+54, 0, 1, 0, 0, 0, 0);
+                }
+                if (i==7) {
+                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
+                }
+                if (i==8) {
+                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
+                    videos[i].getTransform().rotateByAxisWithPivot(-54, 0, 1, 0, 0, 0, 0);
+                }
+                videos[i].setName( "video_" + i );
+                scene.addSceneObject( videos[i] );
+            }
+
             // Testing display of tiles in the scene
-            int videoRendererCount = 4;
+            /*int videoRendererCount = 4;
             GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
 
             for (int i=0; i<videoRendererCount; i++) {
@@ -200,7 +240,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                 }
                 videos[i].setName( "video_" + i );
                 scene.addSceneObject( videos[i] );
-            }
+            }*/
 
             /*float angle = 0;
             for (int i=0; i < videoRendererCount; i++) {

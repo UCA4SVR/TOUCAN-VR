@@ -122,7 +122,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mediaUri = "file:///android_asset/video_test/manifest.mpd";
 
         // Manifest with SupplementalProperties and 9 tiles
-        //mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+        mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
 
         // Manifest with two adaptation sets
         //mediaUri = "http://www-itec.uni-klu.ac.at/ftp/datasets/DASHDataset2014/TearsOfSteel/2sec/TearsOfSteel_2s_onDemand_2014_05_09.mpd";
@@ -198,7 +198,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
             // Instantiation of the ExoPlayer using our custom implementation.
             // The number of video renderers and the other components created above are given as parameters.
-            player = new TiledExoPlayer(this, /*videoRendererCount*/ 4, trackSelector, loadControl);
+            player = new TiledExoPlayer(this, /*videoRendererCount*/ 9, trackSelector, loadControl);
 
             // TODO: extract the number of video renderers from the manifest
 
