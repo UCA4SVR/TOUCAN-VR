@@ -216,11 +216,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
             // casting to AdaptationSetSRD
             AdaptationSetSRD adaptationSet = (AdaptationSetSRD)adaptationSets.get(i);
 
-            if (adaptationSet.supplementalPropertyList.size()!=0) {
-                SupplementalProperty supplementalProperty = adaptationSet.supplementalPropertyList.get(0);
-
-                // TODO: parse SupplementalProperty to build a proper object to attach to the TrackGroup (?)
-            }
+            // TODO: parse SupplementalProperty to build a proper object to attach to the TrackGroup (?)
 
             List<Representation> representations = adaptationSet.representations;
             Format[] formats = new Format[representations.size()];
