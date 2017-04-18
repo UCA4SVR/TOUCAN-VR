@@ -122,6 +122,16 @@ public class TiledExoPlayer implements ExoPlayer {
     private float audioVolume;
     private PlaybackParamsHolder playbackParamsHolder;
 
+    /**
+     * The player's main constructor.
+     *
+     * @param context The {@link Context} associated with the player.
+     * @param videoRendererCount The number of video renderers to be built.
+     * @param trackSelector The {@link TrackSelector} that will be used by the player
+     *                      to select the tracks consumed by each of the available renderers.
+     * @param loadControl The {@link LoadControl} that controls when the MediaSource buffers
+     *                    more media, and how much media is buffered.
+     */
     public TiledExoPlayer(Context context, int videoRendererCount, TrackSelector trackSelector, LoadControl loadControl) {
         mainHandler = new Handler();
         componentListener = new ComponentListener();
