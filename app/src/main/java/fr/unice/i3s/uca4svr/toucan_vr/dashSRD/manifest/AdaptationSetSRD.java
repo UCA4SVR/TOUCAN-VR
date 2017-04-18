@@ -30,7 +30,7 @@ import java.util.List;
 
 public class AdaptationSetSRD extends AdaptationSet {
 
-    public final List<SupplementalProperty> supplementalPropertyList;
+    public final ArrayList<SupplementalProperty> supplementalProperties;
 
     /**
      * @param id                       A non-negative identifier for the adaptation set that's unique in the scope of its
@@ -39,15 +39,11 @@ public class AdaptationSetSRD extends AdaptationSet {
      *                                 {@code TRACK_TYPE_*} constants.
      * @param representations          The {@link Representation}s in the adaptation set.
      * @param accessibilityDescriptors The accessibility descriptors in the adaptation set.
-     * @param supplementalPropertyList A list of supplemental properties
+     * @param supplementalProperties   A list of supplemental properties
      */
-    public AdaptationSetSRD(int id, int type, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, List<SupplementalProperty> supplementalPropertyList) {
+    public AdaptationSetSRD(int id, int type, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, ArrayList<SupplementalProperty> supplementalProperties) {
         super(id, type, representations, accessibilityDescriptors);
-        this.supplementalPropertyList = new ArrayList<>();
-        if(supplementalPropertyList != null) {
-            for (int i = 0; i < supplementalPropertyList.size(); i++)
-                this.supplementalPropertyList.add(supplementalPropertyList.get(i));
-        }
+        this.supplementalProperties = supplementalProperties;
     }
 
 

@@ -21,36 +21,99 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest;
 
-import android.util.Log;
-
+import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.Format;
+import com.google.android.exoplayer2.drm.DrmInitData;
+import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.Representation;
 import com.google.android.exoplayer2.source.dash.manifest.SchemeValuePair;
+import com.google.android.exoplayer2.source.dash.manifest.SegmentBase;
 import com.google.android.exoplayer2.util.XmlPullParserUtil;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class DashSRDManifestParser extends com.google.android.exoplayer2.source.dash.manifest.DashManifestParser {
 
-    //Private attributes used to handle different tags inside AdaptationSet
-    private List<SupplementalProperty> supplementalPropertyList;
-
-    /**
-     * Parses different tags not included in the standard parsing of the adaptationSet tag
-     * @param xpp parser object
-     * @throws XmlPullParserException
-     */
     @Override
-    protected void parseAdaptationSetChild(XmlPullParser xpp) throws XmlPullParserException {
-        if(XmlPullParserUtil.isStartTag(xpp, "SupplementalProperty")) {
-            if(this.supplementalPropertyList == null) {
-                this.supplementalPropertyList = new ArrayList<>();
+    protected AdaptationSet parseAdaptationSet(XmlPullParser xpp, String baseUrl,
+                                               SegmentBase segmentBase) throws XmlPullParserException, IOException {
+        int id = parseInt(xpp, "id", AdaptationSet.ID_UNSET);
+        int contentType = parseContentType(xpp);
+
+        String mimeType = xpp.getAttributeValue(null, "mimeType");
+        String codecs = xpp.getAttributeValue(null, "codecs");
+        int width = parseInt(xpp, "width", Format.NO_VALUE);
+        int height = parseInt(xpp, "height", Format.NO_VALUE);
+        float frameRate = parseFrameRate(xpp, Format.NO_VALUE);
+        int audioChannels = Format.NO_VALUE;
+        int audioSamplingRate = parseInt(xpp, "audioSamplingRate", Format.NO_VALUE);
+        String language = xpp.getAttributeValue(null, "lang");
+        ArrayList<DrmInitData.SchemeData> drmSchemeDatas = new ArrayList<>();
+        ArrayList<SchemeValuePair> inbandEventStreams = new ArrayList<>();
+        ArrayList<SchemeValuePair> accessibilityDescriptors = new ArrayList<>();
+        List<RepresentationInfo> representationInfos = new ArrayList<>();
+        ArrayList<SupplementalProperty> supplementalProperties = new ArrayList<>();
+        @C.SelectionFlags int selectionFlags = 0;
+
+        boolean seenFirstBaseUrl = false;
+        do {
+            xpp.next();
+            if (XmlPullParserUtil.isStartTag(xpp, "BaseURL")) {
+                if (!seenFirstBaseUrl) {
+                    baseUrl = parseBaseUrl(xpp, baseUrl);
+                    seenFirstBaseUrl = true;
+                }
+            } else if (XmlPullParserUtil.isStartTag(xpp, "ContentProtection")) {
+                DrmInitData.SchemeData contentProtection = parseContentProtection(xpp);
+                if (contentProtection != null) {
+                    drmSchemeDatas.add(contentProtection);
+                }
+            } else if (XmlPullParserUtil.isStartTag(xpp, "ContentComponent")) {
+                language = checkLanguageConsistency(language, xpp.getAttributeValue(null, "lang"));
+                contentType = checkContentTypeConsistency(contentType, parseContentType(xpp));
+            } else if (XmlPullParserUtil.isStartTag(xpp, "Role")) {
+                selectionFlags |= parseRole(xpp);
+            } else if (XmlPullParserUtil.isStartTag(xpp, "AudioChannelConfiguration")) {
+                audioChannels = parseAudioChannelConfiguration(xpp);
+            } else if (XmlPullParserUtil.isStartTag(xpp, "Accessibility")) {
+                accessibilityDescriptors.add(parseAccessibility(xpp));
+            } else if (XmlPullParserUtil.isStartTag(xpp, "Representation")) {
+                RepresentationInfo representationInfo = parseRepresentation(xpp, baseUrl, mimeType, codecs,
+                        width, height, frameRate, audioChannels, audioSamplingRate, language,
+                        selectionFlags, accessibilityDescriptors, segmentBase);
+                contentType = checkContentTypeConsistency(contentType,
+                        getContentType(representationInfo.format));
+                representationInfos.add(representationInfo);
+            } else if (XmlPullParserUtil.isStartTag(xpp, "SegmentBase")) {
+                segmentBase = parseSegmentBase(xpp, (SegmentBase.SingleSegmentBase) segmentBase);
+            } else if (XmlPullParserUtil.isStartTag(xpp, "SegmentList")) {
+                segmentBase = parseSegmentList(xpp, (SegmentBase.SegmentList) segmentBase);
+            } else if (XmlPullParserUtil.isStartTag(xpp, "SegmentTemplate")) {
+                segmentBase = parseSegmentTemplate(xpp, (SegmentBase.SegmentTemplate) segmentBase);
+            } else if (XmlPullParserUtil.isStartTag(xpp, "InbandEventStream")) {
+                inbandEventStreams.add(parseInbandEventStream(xpp));
+                //Add-ons
+            } else if (XmlPullParserUtil.isStartTag(xpp, "SupplementalProperty")) {
+                supplementalProperties.add(parseSupplementalProperty(xpp));
+                //End Add-ons
+            } else if (XmlPullParserUtil.isStartTag(xpp)) {
+                parseAdaptationSetChild(xpp);
             }
-            supplementalPropertyList.add(parseSupplementalProperty(xpp));
+        } while (!XmlPullParserUtil.isEndTag(xpp, "AdaptationSet"));
+
+        // Build the representations.
+        List<Representation> representations = new ArrayList<>(representationInfos.size());
+        for (int i = 0; i < representationInfos.size(); i++) {
+            representations.add(buildRepresentation(representationInfos.get(i), contentId,
+                    drmSchemeDatas, inbandEventStreams));
         }
+
+        return buildAdaptationSet(id, contentType, representations, accessibilityDescriptors, supplementalProperties);
     }
 
     /**
@@ -59,7 +122,7 @@ public class DashSRDManifestParser extends com.google.android.exoplayer2.source.
      * @return Suppplemental property object
      * @throws XmlPullParserException
      */
-    private SupplementalProperty parseSupplementalProperty(XmlPullParser xpp) throws XmlPullParserException {
+    protected SupplementalProperty parseSupplementalProperty(XmlPullParser xpp) throws XmlPullParserException {
         String schemeIdUri = xpp.getAttributeValue(null,"schemeIdUri");
         String value = xpp.getAttributeValue(null,"value");
         return new SupplementalProperty(schemeIdUri,value);
@@ -73,11 +136,9 @@ public class DashSRDManifestParser extends com.google.android.exoplayer2.source.
      * @param accessibilityDescriptors
      * @return adaptationSetSRD
      */
-    @Override
-    protected AdaptationSetSRD buildAdaptationSet(int id, int contentType, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors) {
-        AdaptationSetSRD adaptationSetSRD = new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalPropertyList);
-        if(this.supplementalPropertyList != null) this.supplementalPropertyList.clear();
+
+    protected AdaptationSetSRD buildAdaptationSet(int id, int contentType, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, ArrayList<SupplementalProperty> supplementalProperties) {
+        AdaptationSetSRD adaptationSetSRD = new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalProperties);
         return adaptationSetSRD;
     }
-
 }
