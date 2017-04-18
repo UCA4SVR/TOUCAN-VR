@@ -48,10 +48,13 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
+
 /**
  * A parser of media presentation description files.
  */
-public class DashManifestParser extends DefaultHandler
+public class DashSRDManifestParser extends DefaultHandler
         implements ParsingLoadable.Parser<DashManifest> {
 
     private static final String TAG = "MpdParser";
@@ -68,14 +71,14 @@ public class DashManifestParser extends DefaultHandler
     /**
      * Equivalent to calling {@code new DashManifestParser(null)}.
      */
-    public DashManifestParser() {
+    public DashSRDManifestParser() {
         this(null);
     }
 
     /**
      * @param contentId An optional content identifier to include in the parsed manifest.
      */
-    public DashManifestParser(String contentId) {
+    public DashSRDManifestParser(String contentId) {
         this.contentId = contentId;
         try {
             xmlParserFactory = XmlPullParserFactory.newInstance();
@@ -242,6 +245,7 @@ public class DashManifestParser extends DefaultHandler
         ArrayList<SchemeValuePair> inbandEventStreams = new ArrayList<>();
         ArrayList<SchemeValuePair> accessibilityDescriptors = new ArrayList<>();
         List<RepresentationInfo> representationInfos = new ArrayList<>();
+        ArrayList<SupplementalProperty> supplementalProperties = new ArrayList<>();
         @C.SelectionFlags int selectionFlags = 0;
 
         boolean seenFirstBaseUrl = false;
@@ -281,6 +285,10 @@ public class DashManifestParser extends DefaultHandler
                 segmentBase = parseSegmentTemplate(xpp, (SegmentTemplate) segmentBase);
             } else if (XmlPullParserUtil.isStartTag(xpp, "InbandEventStream")) {
                 inbandEventStreams.add(parseInbandEventStream(xpp));
+                //Add-ons
+            } else if (XmlPullParserUtil.isStartTag(xpp, "SupplementalProperty")) {
+                supplementalProperties.add(parseSupplementalProperty(xpp));
+                //End Add-ons
             } else if (XmlPullParserUtil.isStartTag(xpp)) {
                 parseAdaptationSetChild(xpp);
             }
@@ -293,12 +301,12 @@ public class DashManifestParser extends DefaultHandler
                     drmSchemeDatas, inbandEventStreams));
         }
 
-        return buildAdaptationSet(id, contentType, representations, accessibilityDescriptors);
+        return buildAdaptationSet(id, contentType, representations, accessibilityDescriptors, supplementalProperties);
     }
 
     protected AdaptationSet buildAdaptationSet(int id, int contentType,
-                                               List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors) {
-        return new AdaptationSet(id, contentType, representations, accessibilityDescriptors);
+                                               List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, ArrayList<SupplementalProperty> supplementalProperties) {
+        return new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalProperties);
     }
 
     protected int parseContentType(XmlPullParser xpp) {
@@ -408,6 +416,18 @@ public class DashManifestParser extends DefaultHandler
         } while (!XmlPullParserUtil.isEndTag(xpp, "Role"));
         return "urn:mpeg:dash:role:2011".equals(schemeIdUri) && "main".equals(value)
                 ? C.SELECTION_FLAG_DEFAULT : 0;
+    }
+
+    /**
+     * Parses the Supplemental property tag to create a SupplementalProperty Object
+     * @param xpp
+     * @return Suppplemental property object
+     * @throws XmlPullParserException
+     */
+    protected SupplementalProperty parseSupplementalProperty(XmlPullParser xpp) throws XmlPullParserException {
+        String schemeIdUri = xpp.getAttributeValue(null,"schemeIdUri");
+        String value = xpp.getAttributeValue(null,"value");
+        return new SupplementalProperty(schemeIdUri,value);
     }
 
     /**

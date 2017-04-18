@@ -53,7 +53,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.TimeZone;
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.DashSRDManifestParser;
+import com.google.android.exoplayer2.source.dash.manifest.DashSRDManifestParser;
 
 /**
  * A DASH {@link MediaSource}.
