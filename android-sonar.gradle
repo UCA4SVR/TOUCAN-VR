@@ -1,0 +1,94 @@
+task consolidateJunitXml {
+    description 'Copies JUnit XML reports into a single directory so SonarQube can import them all'
+    doLast {
+        def dest = file("${project.buildDir}/allJunit")
+        delete dest
+        fileTree(dir: "${project.buildDir}", include: "**/TEST-*.xml").collect { it.parentFile }.unique().each { dir ->
+            copy {
+                from dir.absolutePath
+                into dest
+            }
+        }
+    }
+}
+
+// or LibraryPlugin
+//def getAppPlugin() {
+//    plugins.getPlugin(AppPlugin)
+//}
+
+def static getVariantData(String fullName) {
+    android.applicationVariants.find { it.name == fullName }
+}
+
+//apply plugin: 'org.sonarqube'
+
+sonarqube {
+    properties {
+        property 'sonar.projectName', 'My Super Cool Project'
+        property 'sonar.projectVersion', System.getenv('BUILD_NUMBER') ?: 'DEV'
+        property 'sonar.branch', System.getenv('SONAR_BRANCH') ?: 'DEV'
+
+        property 'sonar.java.source', JavaVersion.VERSION_1_7
+        property 'sonar.java.target', JavaVersion.VERSION_1_7
+        property 'sonar.sourceEncoding', 'UTF-8'
+
+        Set<File> sources = []
+        Set<File> binaries = []
+        Set<File> libraries = []
+        Set<File> testSources = []
+
+        def debugVariantData = getVariantData('debug')
+        debugVariantData.variantConfiguration.sortedSourceProviders.each { sourceProvider ->
+            sources += sourceProvider.assetsDirectories
+            sources += sourceProvider.javaDirectories
+            sources += sourceProvider.resDirectories
+            sources += sourceProvider.resourcesDirectories
+        }
+        // Replace javaCompileTask with javacTask if upgraded to Android Gradle Plugin 1.3.x
+        binaries += debugVariantData.javaCompileTask.outputs.files.files
+        libraries += debugVariantData.javaCompileTask.classpath.files
+        libraries += getAppPlugin().androidBuilder.bootClasspath
+
+        getVariantData('debugUnitTest').variantConfiguration.sortedSourceProviders.each { sourceProvider ->
+            // Only care about the java sources for test variant
+            testSources += sourceProvider.javaDirectories
+        }
+        getVariantData('debugAndroidTest').variantConfiguration.sortedSourceProviders.each { sourceProvider ->
+            // Only care about the java sources for androidTest variant
+            testSources += sourceProvider.javaDirectories
+        }
+
+        property 'sonar.sources', sources.findAll { it.exists() }
+        property 'sonar.exclusions', '**/*.js,**/*.css,**/*.html'
+        property 'sonar.tests', testSources.findAll { it.exists() }
+        property 'sonar.java.binaries', binaries.findAll { it.exists() }
+        property 'sonar.java.libraries', libraries.findAll { it.exists() }
+
+        property 'sonar.junit.reportsPath', "${buildDir}/allJunit"
+        property 'sonar.jacoco.reportMissing.force.zero', true
+        property 'sonar.jacoco.reportPath', "${buildDir}/jacoco/testDebug.exec"
+        property 'sonar.jacoco.itReportPath', "${buildDir}/outputs/code-coverage/connected/coverage.ec"
+    }
+}
+
+//afterEvaluate {
+//    tasks.sonarqube.dependsOn tasks.consolidateJunitXml
+//}
+
+task printVariables {
+    doLast {
+        def variantData = getVariantData('fullDebug')
+        println(variantData.name)
+        android.applicationVariants.all { variant ->
+            println(variant.name)
+            variant.sourceSets.each{sourceSet ->
+                println(sourceSet.java)
+            }
+            variant.javaCompile.classpath.each{File file ->
+                println(file.path)
+            }
+        }
+        configurations.compile.each { File file -> println file.path }
+    }
+}

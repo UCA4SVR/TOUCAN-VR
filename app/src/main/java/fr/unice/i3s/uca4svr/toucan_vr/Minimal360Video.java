@@ -36,7 +36,6 @@ import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRAssetLoader;
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRMain;
-import org.gearvrf.GVRMesh;
 import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
@@ -47,10 +46,12 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Future;
 
+import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
@@ -68,9 +69,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
-    // stores the current number of times onStep has been called, used as the frame number for the
-    // head motion logging for now.
-    private float currentFrame;
 
     private boolean videoStarted = false;
     private boolean videoEnded = false;
@@ -90,7 +88,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     @Override
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
-        currentFrame = 0;
 
         // The HeadMotionTracker needs permission to write to external storage.
         // Lets check that now or ask for it if necessary
@@ -169,87 +166,33 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             // Start with a clean scene to add only the video
             scene.removeAllSceneObjects();
 
-            // create sphere / mesh
-            /*GVRSphereSceneObject sphere = new GVRSphereSceneObject(gvrContext, 72, 144, false);
-            GVRMesh mesh = sphere.getRenderData().getMesh();
-            sphere.getTransform().setScale(100f, 100f, 100f);
-
-            // create video scene
-            GVRVideoSceneObject video = new GVRVideoSceneObject(gvrContext, mesh,
-                    videoSceneObjectPlayer, GVRVideoType.MONO);
-            video.setName("video");
-            // apply video to scene
-            scene.addSceneObject(video);*/
-
+            // Create the meshes on which video tiles are rendered (portions of sphere right now)
             int videoRendererCount = 9;
             GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
 
-            for (int i=0; i<videoRendererCount; i++) {
-                videos[i] = new GVRVideoSceneObject(gvrContext, 4, 2, videoSceneObjectPlayer, GVRVideoType.MONO);
-                videos[i].getTransform().setPositionZ(-4);
-                if (i==0) {
-                    videos[i].getTransform().rotateByAxisWithPivot(+28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(+53, 0, 1, 0, 0, 0, 0);
+            // TODO: Replace this to build the array of tiles form the intent or the manifest
+            ArrayList<int[]> tiles = new ArrayList<>();
+
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    tiles.add(new int[]{i, j, 1, 1});
                 }
-                if (i==1) {
-                    videos[i].getTransform().rotateByAxisWithPivot(+28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
-                }
-                if (i==2) {
-                    videos[i].getTransform().rotateByAxisWithPivot(+28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(-53, 0, 1, 0, 0, 0, 0);
-                }
-                if (i==3)
-                    videos[i].getTransform().rotateByAxisWithPivot(+53, 0, 1, 0, 0, 0, 0);
-                if (i==4)
-                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
-                if (i==5)
-                    videos[i].getTransform().rotateByAxisWithPivot(-53, 0, 1, 0, 0, 0, 0);
-                if (i==6) {
-                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(+54, 0, 1, 0, 0, 0, 0);
-                }
-                if (i==7) {
-                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
-                }
-                if (i==8) {
-                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(-54, 0, 1, 0, 0, 0, 0);
-                }
-                videos[i].setName( "video_" + i );
-                scene.addSceneObject( videos[i] );
             }
+            // END_TODO
 
-            // Testing display of tiles in the scene
-            /*int videoRendererCount = 4;
-            GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
+            PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
+                    72, 144, 3, 3, tiles, false);
 
-            for (int i=0; i<videoRendererCount; i++) {
-                videos[i] = new GVRVideoSceneObject( gvrContext, 4, 2, videoSceneObjectPlayer, GVRVideoType.MONO );
-                videos[i].getTransform().setPositionZ(-4);
-                if (i==0)
-                    videos[i].getTransform().rotateByAxisWithPivot(0, 0, 1, 0, 0, 0, 0);
-                if (i==1)
-                    videos[i].getTransform().rotateByAxisWithPivot(-53, 0, 1, 0, 0, 0, 0);
-                if (i==2)
-                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
-                if (i==3) {
-                    videos[i].getTransform().rotateByAxisWithPivot(-28, 1, 0, 0, 0, 0, 0);
-                    videos[i].getTransform().rotateByAxisWithPivot(-54, 0, 1, 0, 0, 0, 0);
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    videos[i*3+j] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshAt(j,i),
+                            videoSceneObjectPlayer, GVRVideoType.MONO);
+                    // FIXME: Is this really necessary ?
+                    videos[i*3+j].getTransform().setScale(100f, 100f, 100f);
+                    videos[i*3+j].setName( "video_" + i*3+j );
+                    scene.addSceneObject( videos[i*3+j] );
                 }
-                videos[i].setName( "video_" + i );
-                scene.addSceneObject( videos[i] );
-            }*/
-
-            /*float angle = 0;
-            for (int i=0; i < videoRendererCount; i++) {
-                videos[i] = new GVRVideoSceneObject( gvrContext, 4, 2, videoSceneObjectPlayer, GVRVideoType.MONO );
-                videos[i].getTransform().setPositionZ(-4);
-                videos[i].getTransform().rotateByAxisWithPivot(angle-=53, 0, 1, 0, 0, 0, 0);
-                videos[i].setName( "video_" + i );
-                scene.addSceneObject( videos[i] );
-            }*/
+            }
         }
     }
 
@@ -307,7 +250,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.getMainCameraRig().addChildObject(messageObject);
     }
 
-    public void createEndScene()
+    private void createEndScene()
     {
         // the player has been released at this point, we can put it to null
         videoSceneObjectPlayer = null;
@@ -345,11 +288,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                 videoSceneObjectPlayer != null &&
                 videoSceneObjectPlayer.getPlayer() != null &&
                 videoSceneObjectPlayer.getPlayer().getPlayWhenReady()) {
-            //headMotionTracker.track(currentFrame);
-            //Use this instead of current frame
             headMotionTracker.track(videoSceneObjectPlayer.getPlayer().getCurrentPosition());
         }
-        //currentFrame++;
     }
 
     @Override

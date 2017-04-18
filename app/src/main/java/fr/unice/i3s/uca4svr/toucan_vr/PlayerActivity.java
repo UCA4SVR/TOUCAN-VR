@@ -25,7 +25,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -119,7 +118,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         // Overriding mediaUri just for testing.
 
         // the manifest here is stored locally together with the media segments and tiles
-        mediaUri = "file:///android_asset/video_test/manifest.mpd";
+        //mediaUri = "file:///android_asset/romaric2/manifest.mpd";
 
         // Manifest with SupplementalProperties and 9 tiles
         mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
@@ -200,7 +199,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // The number of video renderers and the other components created above are given as parameters.
             player = new TiledExoPlayer(this, /*videoRendererCount*/ 9, trackSelector, loadControl);
 
-            // TODO: extract the number of video renderers from the manifest
+            // TODO: extract the number of video renderers from the manifest or the intent
 
             player.setPlayWhenReady(shouldAutoPlay);
         }
