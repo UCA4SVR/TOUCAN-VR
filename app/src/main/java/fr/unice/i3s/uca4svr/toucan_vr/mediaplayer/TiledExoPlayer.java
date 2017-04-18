@@ -126,9 +126,14 @@ public class TiledExoPlayer implements ExoPlayer {
         mainHandler = new Handler();
         componentListener = new ComponentListener();
 
+        // The number of video renderers should be provided to the class constructor.
         this.videoRendererCount = videoRendererCount;
-        this.surfaceCount = 0;
+
+        // We expect to have a different surface for each of the video tracks
         this.surfaces = new Surface[videoRendererCount];
+
+        // There are no surfaces set at first.
+        this.surfaceCount = 0;
 
         // Build the renderers.
         ArrayList<Renderer> renderersList = new ArrayList<>();
@@ -182,14 +187,6 @@ public class TiledExoPlayer implements ExoPlayer {
      */
     public @C.VideoScalingMode int getVideoScalingMode() {
         return videoScalingMode;
-    }
-
-    /**
-     * Clears any {@link Surface}, {@link SurfaceHolder}, {@link SurfaceView} or {@link TextureView}
-     * currently set on the player.
-     */
-    public void clearVideoSurface() {
-        setVideoSurface(null);
     }
 
     /**
@@ -495,12 +492,18 @@ public class TiledExoPlayer implements ExoPlayer {
         player.stop();
     }
 
-    // This method releases the player, but first checks if there are surfaces assigned to renderers.
-    // The method is called multiple times: every time a GVRVideoSceneObject is released.
+    /**
+     * Release the player.
+     *
+     * It can be called multiple times (every time a GVRVideoSceneObject is released), so before
+     * releasing the player, the method checks whether surfaces are still assigned to renderers,
+     * to avoid calling release() to a player already released.
+     */
     @Override
     public void release() {
         if(surfaceCount>0) {
             surfaceCount--;
+            // We are responsible for releasing the surfaces only if we created them.
             if (ownsSurfaces)
                 surfaces[surfaceCount].release();
             surfaces[surfaceCount]=null;
@@ -628,8 +631,6 @@ public class TiledExoPlayer implements ExoPlayer {
                     allowedVideoJoiningTimeMs, drmSessionManager, false, mainHandler, eventListener,
                     MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY));
 
-
-        // N.B. the rest of the code can likely be removed since we are not using extensions
         if (extensionRendererMode == EXTENSION_RENDERER_MODE_OFF) {
             return;
         }
@@ -794,8 +795,14 @@ public class TiledExoPlayer implements ExoPlayer {
         }
     }
 
-    // N.B. this method is now called multiple times, and provides a different Surface every time.
-    //      The surfaceCount is incremented when a surface is set for a specific renderer.
+    /**
+     * Sets the {@link Surface} onto which video will be rendered.
+     * This method can be now called multiple times, providing a different Surface every time.
+     * Each new surface should be correctly given to the proper video renderer.
+     * The surfaceCount is incremented when a surface is set for a specific renderer,
+     * to keep track of the number of surfaces provided to the player.
+     */
+    //
     private void setVideoSurfaceInternal(Surface surface, boolean ownsSurface) {
         int count = 0;
         for (Renderer renderer : renderers) {
@@ -809,21 +816,6 @@ public class TiledExoPlayer implements ExoPlayer {
             }
         }
         this.ownsSurfaces = ownsSurface;
-
-        // N.B. not sure about the following code that handles the case when a surface already exist
-
-        /*if (this.surface != null && this.surface != surface) {
-            // If we created this surface, we are responsible for releasing it.
-            if (this.ownsSurface) {
-                this.surface.release();
-            }
-            // We're replacing a surface. Block to ensure that it's not accessed after the method returns.
-            player.blockingSendMessages(messages);
-        } else {
-            player.sendMessages(messages);
-        }
-        this.surface = surface;
-        this.ownsSurface = ownsSurface;*/
     }
 
     private final class ComponentListener implements VideoRendererEventListener,

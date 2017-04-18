@@ -38,7 +38,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * {@link TrackSelector} class based on MappingTrackSelector.
+ * A {@link TrackSelector} class based on MappingTrackSelector.
  * It first establishes a mapping between {@link TrackGroup}s and renderers,
  * and then from that mapping create a {@link TrackSelection} for each renderer.
  *
@@ -258,10 +258,13 @@ public abstract class MapTrackSelection extends TrackSelector {
     }
   }
 
-  // TrackSelector implementation.
-
-  // N.B. modifications: introduced selectedIndexes to keep track of the renderers already assigned
-  //      and avoid having the same video renderer assigned to all the video track groups.
+  /**
+   * Implementation of the TrackSelector. It maps TrackGroups to renderers, and then
+   * it creates a {@link TrackSelection} for each renderer.
+   *
+   * N.B. modifications: introduced selectedIndexes to keep track of the renderers already assigned
+   *      and avoid having the same video renderer assigned to all the video track groups.
+   */
 
   @Override
   public final TrackSelectorResult selectTracks(RendererCapabilities[] rendererCapabilities,
@@ -280,7 +283,7 @@ public abstract class MapTrackSelection extends TrackSelector {
     // Determine the extent to which each renderer supports mixed mimeType adaptation.
     int[] mixedMimeTypeAdaptationSupport = getMixedMimeTypeAdaptationSupport(rendererCapabilities);
 
-    // Keep track of the renderers already assigned.
+    // An array of boolean to keep track of the renderers already assigned.
     boolean[] selectedIndexes =  new boolean[rendererCapabilities.length];
     for (int i=0; i<rendererCapabilities.length; i++ )
       selectedIndexes[i] = false;
@@ -372,25 +375,26 @@ public abstract class MapTrackSelection extends TrackSelector {
    * @throws ExoPlaybackException If an error occurs while selecting the tracks.
    */
   protected abstract TrackSelection[] selectTracks(RendererCapabilities[] rendererCapabilities,
-                                                   TrackGroupArray[] rendererTrackGroupArrays, int[][][] rendererFormatSupports)
+                                                   TrackGroupArray[] rendererTrackGroupArrays,
+                                                   int[][][] rendererFormatSupports)
       throws ExoPlaybackException;
 
   /**
    * Finds the renderer to which the provided {@link TrackGroup} should be associated.
-   * <p>
+   *
    * A {@link TrackGroup} is associated to a renderer that reports
    * {@link RendererCapabilities#FORMAT_HANDLED} support for one or more of the tracks in the group,
    * or {@link RendererCapabilities#FORMAT_EXCEEDS_CAPABILITIES} if no such renderer exists, or
-   * {@link RendererCapabilities#FORMAT_UNSUPPORTED_SUBTYPE} if again no such renderer exists. In
-   * the case that two or more renderers report the same level of support, the renderer with the
-   * lowest index is associated.
-   * <p>
+   * {@link RendererCapabilities#FORMAT_UNSUPPORTED_SUBTYPE} if again no such renderer exists.
+   * In the case that two or more renderers report the same level of support, the renderer with the
+   * lowest index is associated. Only one track group can be assigned to a renderer.
    * If all renderers report {@link RendererCapabilities#FORMAT_UNSUPPORTED_TYPE} for all of the
    * tracks in the group, then {@code renderers.length} is returned to indicate that no association
    * was made.
    *
    * @param rendererCapabilities The {@link RendererCapabilities} of the renderers.
    * @param group The {@link TrackGroup} whose associated renderer is to be found.
+   * @param selectedIndexes An array of booleans to keep track of the renderers already assigned.
    * @return The index of the associated renderer, or {@code renderers.length} if no
    *     association was made.
    * @throws ExoPlaybackException If an error occurs finding a renderer.
