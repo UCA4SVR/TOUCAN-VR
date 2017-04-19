@@ -12,6 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Modifications:
+ * Package name
+ * Added SRD support (selecting one track per adaptation set dedicated to video)
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Author: Giuseppe Samela
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
@@ -31,8 +37,6 @@ import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.trackselection.TrackSelectorResult;
 import com.google.android.exoplayer2.util.Util;
 
-import org.gearvrf.utility.Log;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,9 +49,9 @@ import java.util.Map;
  * The class is extended to handle the case in which there are multiple video renderers
  * and each should be exposed to a different TrackGroup.
  *
- * N.B. modifications are made in selectTracks and findRenderer.
  */
-public abstract class MapTrackSelection extends TrackSelector {
+public abstract class TiledVideoMappingTrackSelector extends TrackSelector {
+  // N.B. modifications are made in selectTracks and findRenderer.
 
   /**
    * A track selection override.
@@ -101,7 +105,7 @@ public abstract class MapTrackSelection extends TrackSelector {
 
   private MappedTrackInfo currentMappedTrackInfo;
 
-  public MapTrackSelection() {
+  public TiledVideoMappingTrackSelector() {
     selectionOverrides = new SparseArray<>();
     rendererDisabledFlags = new SparseBooleanArray();
     tunnelingAudioSessionId = C.AUDIO_SESSION_ID_UNSET;

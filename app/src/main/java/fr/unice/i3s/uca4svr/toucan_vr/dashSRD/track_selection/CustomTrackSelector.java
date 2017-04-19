@@ -12,6 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Modifications:
+ * Package name
+ * Added SRD support (selecting one track per adaptation set dedicated to video)
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Author: Giuseppe Samela
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
@@ -36,14 +42,14 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * A {@link MapTrackSelection} that allows configuration of common parameters. It is safe to call
+ * A {@link TiledVideoMappingTrackSelector} that allows configuration of common parameters. It is safe to call
  * the methods of this class from the application thread. See {@link Parameters#Parameters()} for
  * default selection parameters.
  *
  * The class is the same as DefaultTrackSelector (for now), except that it extends a modified version
  * of MappingTrackSelector.
  */
-public class CustomTrackSelector extends MapTrackSelection {
+public class CustomTrackSelector extends TiledVideoMappingTrackSelector {
 
   /**
    * Holder for available configurations for the {@link com.google.android.exoplayer2.trackselection.DefaultTrackSelector}.
@@ -421,7 +427,7 @@ public class CustomTrackSelector extends MapTrackSelection {
     return paramsReference.get();
   }
 
-  // MapTrackSelection implementation.
+  // TiledVideoMappingTrackSelector implementation.
 
   @Override
   protected TrackSelection[] selectTracks(RendererCapabilities[] rendererCapabilities,

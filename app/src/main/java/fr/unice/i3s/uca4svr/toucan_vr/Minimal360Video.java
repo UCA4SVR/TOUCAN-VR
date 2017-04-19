@@ -51,6 +51,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Future;
 
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
@@ -118,9 +119,9 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         if (!videoStarted) {
             videoStarted = true;
 
-            GVRScene scene = gvrContext.getMainScene();
+            final GVRScene scene = gvrContext.getMainScene();
             // Add a listener to the player to catch the end of the playback
-            ExoPlayer player = videoSceneObjectPlayer.getPlayer();
+            final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             player.addListener(new ExoPlayer.EventListener() {
                 @Override
                 public void onTimelineChanged(Timeline timeline, Object manifest) {
@@ -168,11 +169,13 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
             // Create the meshes on which video tiles are rendered (portions of sphere right now)
             int videoRendererCount = 9;
-            GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
+            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
 
             // TODO: Replace this to build the array of tiles form the intent or the manifest
             ArrayList<int[]> tiles = new ArrayList<>();
 
+            int gridHeight = 3;
+            int gridWidth = 3;
             for (int i = 0; i < 3; i++) {
                 for (int j = 0; j < 3; j++) {
                     tiles.add(new int[]{i, j, 1, 1});
@@ -180,17 +183,31 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             }
             // END_TODO
 
-            PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
-                    72, 144, 3, 3, tiles, false);
+            final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
+                    72, 144, gridHeight, gridWidth, tiles, false);
 
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 3; j++) {
-                    videos[i*3+j] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshAt(j,i),
-                            videoSceneObjectPlayer, GVRVideoType.MONO);
-                    // FIXME: Is this really necessary ?
-                    videos[i*3+j].getTransform().setScale(100f, 100f, 100f);
-                    videos[i*3+j].setName( "video_" + i*3+j );
-                    scene.addSceneObject( videos[i*3+j] );
+            final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
+            for (int i = 0; i < gridHeight; i++) {
+                for (int j = 0; j < gridWidth; j++) {
+                    final int x = j;
+                    final int y = i;
+
+                    /* Using Threads here to ensure that the UI thread is not blocked while
+                     * waiting in the setNextSurfaceTileId method for earlier initialization to
+                     * end.
+                     */
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            tiledPlayer.setNextSurfaceTileId(y*3+x);
+                            videos[y*3+x] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshAt(x,y),
+                                    videoSceneObjectPlayer, GVRVideoType.MONO);
+                            // FIXME: Is this really necessary ?
+                            videos[y*3+x].getTransform().setScale(100f, 100f, 100f);
+                            videos[y*3+x].setName( "video_" + y*3+x );
+                            scene.addSceneObject( videos[y*3+x] );
+                        }
+                    }).start();
                 }
             }
         }

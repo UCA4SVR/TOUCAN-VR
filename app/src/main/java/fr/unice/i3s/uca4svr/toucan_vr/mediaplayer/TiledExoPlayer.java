@@ -44,6 +44,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 
 /**
  * This class is based on SimpleExoPlayer, and provides an {@link ExoPlayer} implementation.
@@ -97,13 +98,15 @@ public class TiledExoPlayer implements ExoPlayer {
     private final Handler mainHandler;
     private final int videoRendererCount;
     private final int audioRendererCount;
+    private final Semaphore surfaceInitSemaphore = new Semaphore(1, true);
 
     private Format videoFormat;
     private Format audioFormat;
 
     private Surface[] surfaces;
-    private int surfaceCount;
+    private int nextSurfaceTileId;
     private boolean ownsSurfaces;
+    private boolean released = false;
 
     @C.VideoScalingMode
     private int videoScalingMode;
@@ -143,7 +146,7 @@ public class TiledExoPlayer implements ExoPlayer {
         this.surfaces = new Surface[videoRendererCount];
 
         // There are no surfaces set at first.
-        this.surfaceCount = 0;
+        this.nextSurfaceTileId = 0;
 
         // Build the renderers.
         ArrayList<Renderer> renderersList = new ArrayList<>();
@@ -435,6 +438,24 @@ public class TiledExoPlayer implements ExoPlayer {
         metadataOutput = output;
     }
 
+    /**
+     * Sets the Id of the tile renderer to which the surface will be handed out when next calling
+     * setVideoSurface.
+     * Ensure a call to setVideoSurface is done before calling this method again, subsequent calls
+     * will be blocked waiting until setVideoSurface is called.
+     *
+     * @param nextSurfaceTileId
+     *      The Id of the tile renderer to which the next provided surface is given.
+     */
+    public void setNextSurfaceTileId(int nextSurfaceTileId) {
+        try {
+            surfaceInitSemaphore.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        this.nextSurfaceTileId = nextSurfaceTileId;
+    }
+
     // ExoPlayer implementation
 
     @Override
@@ -511,16 +532,18 @@ public class TiledExoPlayer implements ExoPlayer {
      */
     @Override
     public void release() {
-        if(surfaceCount>0) {
-            surfaceCount--;
-            // We are responsible for releasing the surfaces only if we created them.
-            if (ownsSurfaces)
-                surfaces[surfaceCount].release();
-            surfaces[surfaceCount]=null;
-        }
-        if(surfaceCount==0) {
+        if (!released) {
+            for (int i = 0; i < surfaces.length; i++) {
+                Surface surface = surfaces[i];
+                if (ownsSurfaces && surface != null) {
+                    surface.release();
+                }
+                surfaces[i] = null;
+            }
+
             player.release();
             removeSurfaceCallbacks();
+            released = true;
         }
     }
 
@@ -809,23 +832,22 @@ public class TiledExoPlayer implements ExoPlayer {
      * Sets the {@link Surface} onto which video will be rendered.
      * This method can be now called multiple times, providing a different Surface every time.
      * Each new surface should be correctly given to the proper video renderer.
-     * The surfaceCount is incremented when a surface is set for a specific renderer,
-     * to keep track of the number of surfaces provided to the player.
+     * Use {@link #setNextSurfaceTileId(int)} to set the id of the tile corresponding to the given
+     * surface before calling this method (or any method that subsequently calls this method)
      */
-    //
     private void setVideoSurfaceInternal(Surface surface, boolean ownsSurface) {
         int count = 0;
         for (Renderer renderer : renderers) {
-            if (renderer.getTrackType() == C.TRACK_TYPE_VIDEO && count == surfaceCount) {
+            if (renderer.getTrackType() == C.TRACK_TYPE_VIDEO && count == nextSurfaceTileId) {
                 player.sendMessages(new ExoPlayer.ExoPlayerMessage(renderer, C.MSG_SET_SURFACE, surface));
-                surfaces[surfaceCount]=surface;
-                surfaceCount++;
+                surfaces[nextSurfaceTileId]=surface;
                 break;
             } else {
                 count++;
             }
         }
         this.ownsSurfaces = ownsSurface;
+        surfaceInitSemaphore.release();
     }
 
     private final class ComponentListener implements VideoRendererEventListener,
