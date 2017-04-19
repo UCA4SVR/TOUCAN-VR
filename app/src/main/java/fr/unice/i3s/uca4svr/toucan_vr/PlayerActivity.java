@@ -118,7 +118,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         // Overriding mediaUri just for testing.
 
         // the manifest here is stored locally together with the media segments and tiles
-        //mediaUri = "file:///android_asset/romaric2/manifest.mpd";
+        //mediaUri = "file:///android_asset/tos_srd_4K.mpd";
 
         // Manifest with SupplementalProperties and 9 tiles
         mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";

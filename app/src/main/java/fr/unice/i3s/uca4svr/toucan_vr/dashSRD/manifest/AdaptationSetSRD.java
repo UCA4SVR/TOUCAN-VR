@@ -18,7 +18,7 @@
 
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest;
 
-import android.util.Log;
+import android.support.annotation.NonNull;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
@@ -28,9 +28,11 @@ import com.google.android.exoplayer2.source.dash.manifest.SchemeValuePair;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AdaptationSetSRD extends AdaptationSet {
+public class AdaptationSetSRD extends AdaptationSet implements Comparable<AdaptationSetSRD>{
 
     public final ArrayList<SupplementalProperty> supplementalProperties;
+    public boolean isSRDRelated = false;
+    public int SRDIndex = -1;
 
     /**
      * @param id                       A non-negative identifier for the adaptation set that's unique in the scope of its
@@ -44,7 +46,35 @@ public class AdaptationSetSRD extends AdaptationSet {
     public AdaptationSetSRD(int id, int type, List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, ArrayList<SupplementalProperty> supplementalProperties) {
         super(id, type, representations, accessibilityDescriptors);
         this.supplementalProperties = supplementalProperties;
+        for(int i=0; i<supplementalProperties.size();i++) {
+            if(supplementalProperties.get(i).isSRDRelated) {
+                SRDIndex = i;
+                isSRDRelated = true;
+            }
+        }
     }
 
+    @Override
+    public int compareTo(@NonNull AdaptationSetSRD compareObject) {
+        final int BEFORE = -1;
+        final int EQUAL = 0;
+        final int AFTER = 1;
+
+        //TODO: REMOVE INTEGER CASTING AFTER FIXING THE PRE-PROCESSING SCRIPT THAT IS NOW WORKING WITH PERCENTAGE
+
+        //ComputingObjectScores
+        int currentObjectScore = 100;
+        int compareObjectScore = 100;
+
+        if(this.SRDIndex>=0)
+            currentObjectScore = (int)this.supplementalProperties.get(this.SRDIndex).getObjectX() + 8*(int)this.supplementalProperties.get(this.SRDIndex).getObjectY();
+        if(compareObject.SRDIndex>=0)
+            compareObjectScore = (int)compareObject.supplementalProperties.get(compareObject.SRDIndex).getObjectX() + 8*(int)compareObject.supplementalProperties.get(compareObject.SRDIndex).getObjectY();
+
+        //Computing result
+        if(currentObjectScore < compareObjectScore) return BEFORE;
+        else if(currentObjectScore > compareObjectScore) return AFTER;
+        else return EQUAL;
+    }
 
 }

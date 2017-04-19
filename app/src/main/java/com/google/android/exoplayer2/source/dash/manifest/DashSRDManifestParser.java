@@ -12,7 +12,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * Modifications:
+ * Package name
+ * Added SRD support to the parser
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Author: Savino Dambra
  */
+
 package com.google.android.exoplayer2.source.dash.manifest;
 
 import android.net.Uri;
@@ -39,6 +46,7 @@ import com.google.android.exoplayer2.util.XmlPullParserUtil;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -65,7 +73,7 @@ public class DashSRDManifestParser extends DefaultHandler
     private static final Pattern CEA_708_ACCESSIBILITY_PATTERN =
             Pattern.compile("([1-9]|[1-5][0-9]|6[0-3])=.*");
 
-    protected final String contentId;
+    private final String contentId;
     private final XmlPullParserFactory xmlParserFactory;
 
     /**
@@ -200,6 +208,7 @@ public class DashSRDManifestParser extends DefaultHandler
         long durationMs = parseDuration(xpp, "duration", C.TIME_UNSET);
         SegmentBase segmentBase = null;
         List<AdaptationSet> adaptationSets = new ArrayList<>();
+        List<AdaptationSetSRD> adaptationSetsSRD = new ArrayList<>();
         boolean seenFirstBaseUrl = false;
         do {
             xpp.next();
@@ -209,7 +218,7 @@ public class DashSRDManifestParser extends DefaultHandler
                     seenFirstBaseUrl = true;
                 }
             } else if (XmlPullParserUtil.isStartTag(xpp, "AdaptationSet")) {
-                adaptationSets.add(parseAdaptationSet(xpp, baseUrl, segmentBase));
+                adaptationSetsSRD.add(parseAdaptationSet(xpp, baseUrl, segmentBase));
             } else if (XmlPullParserUtil.isStartTag(xpp, "SegmentBase")) {
                 segmentBase = parseSegmentBase(xpp, null);
             } else if (XmlPullParserUtil.isStartTag(xpp, "SegmentList")) {
@@ -218,7 +227,17 @@ public class DashSRDManifestParser extends DefaultHandler
                 segmentBase = parseSegmentTemplate(xpp, null);
             }
         } while (!XmlPullParserUtil.isEndTag(xpp, "Period"));
-
+        /* Sorting Adaptation sets
+        The sorting operation is thought to have firstly adaptation sets with SRD description
+        and then all the others (audio, text, etc).
+        Adaptation sets with SRD description (that represent tiles) are sorted keeping
+        as major the y of the tile and as minor the x of the tile
+         */
+       Collections.sort(adaptationSetsSRD);
+        //copying the array into the standard Adaptation Set
+        for(AdaptationSetSRD adaptationSetSRD : adaptationSetsSRD)
+            adaptationSets.add(adaptationSetSRD);
+        //END Sorting Adaptation sets
         return Pair.create(buildPeriod(id, startMs, adaptationSets), durationMs);
     }
 
@@ -228,7 +247,7 @@ public class DashSRDManifestParser extends DefaultHandler
 
     // AdaptationSet parsing.
 
-    protected AdaptationSet parseAdaptationSet(XmlPullParser xpp, String baseUrl,
+    protected AdaptationSetSRD parseAdaptationSet(XmlPullParser xpp, String baseUrl,
                                                SegmentBase segmentBase) throws XmlPullParserException, IOException {
         int id = parseInt(xpp, "id", AdaptationSet.ID_UNSET);
         int contentType = parseContentType(xpp);
@@ -304,7 +323,7 @@ public class DashSRDManifestParser extends DefaultHandler
         return buildAdaptationSet(id, contentType, representations, accessibilityDescriptors, supplementalProperties);
     }
 
-    protected AdaptationSet buildAdaptationSet(int id, int contentType,
+    protected AdaptationSetSRD buildAdaptationSet(int id, int contentType,
                                                List<Representation> representations, List<SchemeValuePair> accessibilityDescriptors, ArrayList<SupplementalProperty> supplementalProperties) {
         return new AdaptationSetSRD(id, contentType, representations, accessibilityDescriptors, supplementalProperties);
     }
@@ -939,7 +958,7 @@ public class DashSRDManifestParser extends DefaultHandler
         return value == null ? defaultValue : value;
     }
 
-    protected static final class RepresentationInfo {
+    private static final class RepresentationInfo {
 
         public final Format format;
         public final String baseUrl;
