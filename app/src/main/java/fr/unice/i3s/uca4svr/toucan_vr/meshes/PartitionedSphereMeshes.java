@@ -18,6 +18,8 @@
 
 package fr.unice.i3s.uca4svr.toucan_vr.meshes;
 
+import android.util.SparseArray;
+
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRMesh;
 import org.gearvrf.utility.Log;
@@ -34,6 +36,7 @@ public class PartitionedSphereMeshes {
     private static final int SLICE_NUMBER = 36;
 
     private HashMap<int[], GVRMesh> sphereMeshes = new HashMap<>();
+    private ArrayList<int[]> meshesIds = new ArrayList<>();
 
     /**
      * Constructs a sphere scene object with a radius of 1.
@@ -97,6 +100,22 @@ public class PartitionedSphereMeshes {
         }
 
         for(int[] tile : tiles) {
+            // Insert the tile at the right position in the ids array.
+            int index = 0;
+            boolean continues = true;
+            while (index < meshesIds.size() && continues) {
+                int[] tileAtIndex = meshesIds.get(index);
+                if (tile[0] < tileAtIndex[0] ||
+                        (tile[0] == tileAtIndex[0] && tile[1] < tileAtIndex[1])) {
+                    continues = false;
+                }
+                if (continues) {
+                    index++;
+                }
+            }
+            meshesIds.add(index < 0 ? 0 : index, tile);
+
+            // Build the mesh and add it to the mesh set.
             sphereMeshes.put(tile, createTile(gvrContext, tile, minSphereStack, minSphereSlice,
                     gridStackNumber, gridSliceNumber, facingOut));
         }
@@ -127,10 +146,10 @@ public class PartitionedSphereMeshes {
                                int stacksInGrid, int slicesInGrid, boolean facingOut) {
         int gridUnitSliceNumber = sliceNumber / slicesInGrid;
         int gridUnitStackNumber = stackNumber / stacksInGrid;
-        int startingSlice = tile[0] * gridUnitSliceNumber;
-        int startingStack = tile[1] * gridUnitStackNumber;
-        int tileSliceNumber = tile[2] * gridUnitSliceNumber;
-        int tileStackNumber = tile[3] * gridUnitStackNumber;
+        int startingSlice = tile[1] * gridUnitSliceNumber;
+        int startingStack = tile[0] * gridUnitStackNumber;
+        int tileSliceNumber = tile[3] * gridUnitSliceNumber;
+        int tileStackNumber = tile[2] * gridUnitStackNumber;
 
         float[] vertices;
         float[] normals;
@@ -441,5 +460,17 @@ public class PartitionedSphereMeshes {
             }
         }
         return null;
+    }
+
+    public int getNumberOfTiles() {
+        return this.sphereMeshes.size();
+    }
+
+    public GVRMesh getMeshById(int id) {
+        if (meshesIds.get(id) != null) {
+            return this.sphereMeshes.get(meshesIds.get(id));
+        } else {
+            return null;
+        }
     }
 }

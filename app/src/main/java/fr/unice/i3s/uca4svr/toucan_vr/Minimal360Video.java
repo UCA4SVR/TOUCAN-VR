@@ -187,28 +187,24 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                     72, 144, gridHeight, gridWidth, tiles, false);
 
             final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
-            for (int i = 0; i < gridHeight; i++) {
-                for (int j = 0; j < gridWidth; j++) {
-                    final int x = j;
-                    final int y = i;
-
-                    /* Using Threads here to ensure that the UI thread is not blocked while
-                     * waiting in the setNextSurfaceTileId method for earlier initialization to
-                     * end.
-                     */
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            tiledPlayer.setNextSurfaceTileId(y*3+x);
-                            videos[y*3+x] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshAt(x,y),
-                                    videoSceneObjectPlayer, GVRVideoType.MONO);
-                            // FIXME: Is this really necessary ?
-                            videos[y*3+x].getTransform().setScale(100f, 100f, 100f);
-                            videos[y*3+x].setName( "video_" + y*3+x );
-                            scene.addSceneObject( videos[y*3+x] );
-                        }
-                    }).start();
-                }
+            for (int i = 0; i < sphereMeshes.getNumberOfTiles(); i++) {
+                final int id = i;
+                /* Using Threads here to ensure that the UI thread is not blocked while
+                 * waiting in the setNextSurfaceTileId method for earlier initialization to
+                 * end.
+                 */
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        tiledPlayer.setNextSurfaceTileId(id);
+                        videos[id] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshById(id),
+                                videoSceneObjectPlayer, GVRVideoType.MONO);
+                        // FIXME: Is this really necessary ?
+                        videos[id].getTransform().setScale(100f, 100f, 100f);
+                        videos[id].setName( "video_" + id );
+                        scene.addSceneObject( videos[id] );
+                    }
+                }).start();
             }
         }
     }
