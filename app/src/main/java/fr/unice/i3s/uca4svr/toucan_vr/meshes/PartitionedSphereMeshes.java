@@ -193,6 +193,13 @@ public class PartitionedSphereMeshes {
             float t0 = ((float) (stack - startingStack) / tileStackNumber);
             float t1 = ((float)(stack - startingStack + 1) / tileStackNumber);
 
+            if (stack == 0) {
+                stackPercentage0 = 1f / tileStackNumber;
+                stackPercentage1 = 0;
+                t0 = stackPercentage0;
+                t1 = stackPercentage1;
+            }
+
             double theta0 = stackPercentage0 * Math.PI;
             double theta1 = stackPercentage1 * Math.PI;
             double cosTheta0 = Math.cos(theta0);
@@ -210,8 +217,8 @@ public class PartitionedSphereMeshes {
                     double phi1 = slicePercentage1 * 2.0 * Math.PI;
                     float s0, s1;
                     if (facingOut) {
-                        s0 = 1 - ((float) (slice - startingSlice) / tileSliceNumber);
-                        s1 = 1 - ((float) (slice - startingSlice + 1) / tileSliceNumber);
+                        s0 = 1.0f - ((float) (slice - startingSlice) / tileSliceNumber);
+                        s1 = 1.0f - ((float) (slice - startingSlice + 1) / tileSliceNumber);
                     } else {
                         s0 = ((float) (slice - startingSlice) / tileSliceNumber);
                         s1 = ((float) (slice - startingSlice + 1) / tileSliceNumber);
