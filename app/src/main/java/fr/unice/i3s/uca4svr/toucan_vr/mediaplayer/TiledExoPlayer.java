@@ -524,11 +524,11 @@ public class TiledExoPlayer implements ExoPlayer {
     }
 
     /**
-     * Release the player.
+     * Releases the player.
      *
-     * It can be called multiple times (every time a GVRVideoSceneObject is released), so before
-     * releasing the player, the method checks whether surfaces are still assigned to renderers,
-     * to avoid calling release() to a player already released.
+     * All the surfaces are released before releasing the player itself if the player is responsible
+     * for the surfaces.
+     *
      */
     @Override
     public void release() {

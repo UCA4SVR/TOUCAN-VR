@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## V 0.3.0
++ Now handling dash SRD
++ One renderer is used for each tile
++ Can create a tiled sphere object to display the video
+
 ## V 0.2.0
 + Now uses exoplayer 2
 + Logging with logback
