@@ -36,7 +36,6 @@ import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRAssetLoader;
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRMain;
-import org.gearvrf.GVRMesh;
 import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
@@ -47,10 +46,13 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Future;
 
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
+import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
@@ -68,9 +70,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
-    // stores the current number of times onStep has been called, used as the frame number for the
-    // head motion logging for now.
-    private float currentFrame;
 
     private boolean videoStarted = false;
     private boolean videoEnded = false;
@@ -90,7 +89,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     @Override
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
-        currentFrame = 0;
 
         // The HeadMotionTracker needs permission to write to external storage.
         // Lets check that now or ask for it if necessary
@@ -121,9 +119,9 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         if (!videoStarted) {
             videoStarted = true;
 
-            GVRScene scene = gvrContext.getMainScene();
+            final GVRScene scene = gvrContext.getMainScene();
             // Add a listener to the player to catch the end of the playback
-            ExoPlayer player = videoSceneObjectPlayer.getPlayer();
+            final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             player.addListener(new ExoPlayer.EventListener() {
                 @Override
                 public void onTimelineChanged(Timeline timeline, Object manifest) {
@@ -169,17 +167,45 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             // Start with a clean scene to add only the video
             scene.removeAllSceneObjects();
 
-            // create sphere / mesh
-            GVRSphereSceneObject sphere = new GVRSphereSceneObject(gvrContext, 72, 144, false);
-            GVRMesh mesh = sphere.getRenderData().getMesh();
-            sphere.getTransform().setScale(100f, 100f, 100f);
+            // Create the meshes on which video tiles are rendered (portions of sphere right now)
+            int videoRendererCount = 9;
+            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
 
-            // create video scene
-            GVRVideoSceneObject video = new GVRVideoSceneObject(gvrContext, mesh,
-                    videoSceneObjectPlayer, GVRVideoType.MONO);
-            video.setName("video");
-            // apply video to scene
-            scene.addSceneObject(video);
+            // TODO: Replace this to build the array of tiles form the intent or the manifest
+            ArrayList<int[]> tiles = new ArrayList<>();
+
+            int gridHeight = 3;
+            int gridWidth = 3;
+            for (int i = 0; i < 3; i++) {
+                for (int j = 0; j < 3; j++) {
+                    tiles.add(new int[]{i, j, 1, 1});
+                }
+            }
+            // END_TODO
+
+            final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
+                    72, 144, gridHeight, gridWidth, tiles, false);
+
+            final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
+            for (int i = 0; i < sphereMeshes.getNumberOfTiles(); i++) {
+                final int id = i;
+                /* Using Threads here to ensure that the UI thread is not blocked while
+                 * waiting in the setNextSurfaceTileId method for earlier initialization to
+                 * end.
+                 */
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        tiledPlayer.setNextSurfaceTileId(id);
+                        videos[id] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshById(id),
+                                videoSceneObjectPlayer, GVRVideoType.MONO);
+                        // FIXME: Is this really necessary ?
+                        videos[id].getTransform().setScale(100f, 100f, 100f);
+                        videos[id].setName( "video_" + id );
+                        scene.addSceneObject( videos[id] );
+                    }
+                }).start();
+            }
         }
     }
 
@@ -191,7 +217,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private void createWaitForPermissionScene() {
         GVRScene scene = gvrContext.getMainScene();
 
-        // the initial scene contains the GearVRf logo, so we clean it
+        // clean the scene before adding objects
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
@@ -202,7 +228,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.addSceneObject(sphereObject);
 
         // add a message to the scene asking the user to tap the TrackPad to start the video
-        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2.0f,
+        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
                 "Tap to start after accepting the permissions.");
         textObject.setBackgroundColor(Color.TRANSPARENT);
         textObject.setTextColor(Color.RED);
@@ -211,7 +237,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         textObject.getTransform().setPosition(0.0f, 0.0f, -2.0f);
         textObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
         scene.getMainCameraRig().addChildObject(textObject);
-        /* Alternative version: using image from < R.drawable.tap_text > as shown in createEndScene() */
     }
 
     private void createInitialScene()
@@ -229,19 +254,20 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.addSceneObject(sphereObject);
 
         // add a message to the scene asking the user to tap the TrackPad to start the video
-        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 0.3f, "Tap to play!");
-        textObject.setBackgroundColor(Color.TRANSPARENT);
-        textObject.setTextColor(Color.RED);
-        textObject.setGravity(Gravity.CENTER);
-        textObject.setTextSize(5.0f);
-        textObject.getTransform().setPosition(0.0f, 0.0f, -2.0f);
-        textObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
-        scene.getMainCameraRig().addChildObject(textObject);
-        /* Alternative version: using image from < R.drawable.tap_text > as shown in createEndScene() */
+        GVRAssetLoader gvrAssetLoader = new GVRAssetLoader(gvrContext);
+        GVRTexture texture = gvrAssetLoader.loadTexture(new GVRAndroidResource(
+                gvrContext, R.drawable.tap_text));
+        GVRSceneObject messageObject = new GVRSceneObject(gvrContext, 1.2f, 0.3f, texture);
+        messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
+        messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
+        scene.getMainCameraRig().addChildObject(messageObject);
     }
 
-    public void createEndScene()
+    private void createEndScene()
     {
+        // the player has been released at this point, we can put it to null
+        videoSceneObjectPlayer = null;
+
         // clean the old scene to build the new one
         // N.B. getNextMainScene() can be used but it's going to become deprecated soon
         GVRScene scene = gvrContext.getMainScene();
@@ -268,16 +294,14 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     @Override
     public void onStep() {
-        // logging with frame number for now
         if (headMotionTracker != null &&
                 videoStarted &&
                 !videoEnded &&
                 videoSceneObjectPlayer != null &&
                 videoSceneObjectPlayer.getPlayer() != null &&
                 videoSceneObjectPlayer.getPlayer().getPlayWhenReady()) {
-            headMotionTracker.track(currentFrame);
+            headMotionTracker.track(videoSceneObjectPlayer.getPlayer().getCurrentPosition());
         }
-        currentFrame++;
     }
 
     @Override
