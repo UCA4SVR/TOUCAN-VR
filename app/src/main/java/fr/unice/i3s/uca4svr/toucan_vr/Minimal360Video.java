@@ -32,8 +32,11 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 
 import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRAssetLoader;
+import org.gearvrf.GVRBoxCollider;
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRMain;
+import org.gearvrf.GVRMeshCollider;
+import org.gearvrf.GVRPicker;
 import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
@@ -53,9 +56,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
 public class Minimal360Video extends GVRMain implements RequestPermissionResultListener {
+
+    private TilesPicker tilesPicker;
 
     // The associated GVR context
     private GVRContext gvrContext;
@@ -133,6 +139,12 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             videoStarted = true;
 
             final GVRScene scene = gvrContext.getMainScene();
+
+            //Building the tiles picker
+            tilesPicker = new TilesPicker(gvrContext,scene);
+
+
+
             // Add a listener to the player to catch the end of the playback
             final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             player.addListener(new ExoPlayer.EventListener() {
@@ -209,8 +221,10 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                         videos[id] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshById(id),
                                 videoSceneObjectPlayer, GVRVideoType.MONO);
                         // FIXME: Is this really necessary ?
-                        videos[id].getTransform().setScale(100f, 100f, 100f);
+                        videos[id].getTransform().setScale(50f, 50f, 50f);
                         videos[id].setName( "video_" + id );
+                        videos[id].setTag("vd"+(id));
+                        videos[id].attachCollider(new GVRMeshCollider(gvrContext, true));
                         scene.addSceneObject( videos[id] );
                     }
                 }).start();

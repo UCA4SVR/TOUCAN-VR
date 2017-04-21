@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -34,6 +35,7 @@ import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
+import com.google.android.exoplayer2.source.dash.DefaultDashSRDChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
@@ -56,11 +58,13 @@ import java.util.HashSet;
 import java.util.Set;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
@@ -142,15 +146,15 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         }
 
         // TODO: Check if mediaUri is actually reachable.
-
         // Check whether we should log the bandwidth or not
         if(loggingBandwidth)
             MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
         videoSceneObjectPlayer = makeVideoSceneObject();
-        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
+        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer, permissionManager,
+                logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
         setMain(main, "gvr.xml");
+
     }
 
     /**
@@ -204,9 +208,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // The video track selection factory and the track selector.
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
-                    new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
+                    new PyramidalTrackSelection.Factory(BANDWIDTH_METER);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
-
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new DefaultLoadControl(
                     new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
@@ -287,7 +290,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         /* eventListener */ null);
             case C.TYPE_DASH:
                 return new DashSRDMediaSource(uri, buildDataSourceFactory(false),
-                        new DefaultDashChunkSource.Factory(mediaDataSourceFactory), mainHandler,
+                        new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,
