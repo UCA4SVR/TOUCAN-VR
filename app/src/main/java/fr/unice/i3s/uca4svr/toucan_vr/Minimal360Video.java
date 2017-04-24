@@ -35,16 +35,11 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRAssetLoader;
 import org.gearvrf.GVRContext;
-import org.gearvrf.GVRDirectLight;
 import org.gearvrf.GVRMain;
-import org.gearvrf.GVRMaterial;
-import org.gearvrf.GVRMesh;
-import org.gearvrf.GVRPhongShader;
 import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
 import org.gearvrf.GVRTexture;
-import org.gearvrf.scene_objects.GVRCubeSceneObject;
 import org.gearvrf.scene_objects.GVRSphereSceneObject;
 import org.gearvrf.scene_objects.GVRTextViewSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
@@ -181,8 +176,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
             int gridHeight = 3;
             int gridWidth = 3;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 3; j++) {
+            for (int i = 0; i < gridHeight; i++) {
+                for (int j = 0; j < gridWidth; j++) {
                     tiles.add(new int[]{i, j, 1, 1});
                 }
             }
@@ -249,40 +244,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     {
         GVRScene scene = gvrContext.getMainScene();
         scene.removeAllSceneObjects();
-        /*
-        ArrayList<int[]> tiles = new ArrayList<>();
-
-        int gridHeight = 3;
-        int gridWidth = 3;
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                tiles.add(new int[]{i, j, 1, 1});
-            }
-        }
-        // END_TODO
-
-        final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
-                72, 144, gridHeight, gridWidth, tiles, false);
-
-        final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
-        for (int id = 0; id < 2; id++) {
-            GVRMesh mesh = sphereMeshes.getMeshById(id);
-            GVRSceneObject object = new GVRSceneObject(gvrContext, mesh);
-            GVRRenderData renderData = object.getRenderData();
-            GVRMaterial material = new GVRMaterial(gvrContext);
-            material.setDiffuseColor(1, 0, 0, 1);
-            renderData.setShaderTemplate(GVRPhongShader.class);
-            renderData.setMaterial(material);
-            renderData.setMesh(mesh);
-            renderData.setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
-            object.getTransform().rotateByAxis(180,0,0,1);
-            //object.getTransform().setScale(100f, 100f, 100f);
-            //object.getTransform().translate(0,0,-200f);
-            scene.addSceneObject( object );
-        }
-        //*/
-        //*
-        // the initial scene contains the GearVRf logo, so we clean it
 
         // add a 360-photo as background, taken from resources
         Future<GVRTexture> textureSphere  = gvrContext.loadFutureTexture(

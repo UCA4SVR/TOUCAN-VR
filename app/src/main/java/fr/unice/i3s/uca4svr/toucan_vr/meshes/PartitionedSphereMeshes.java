@@ -194,9 +194,9 @@ public class PartitionedSphereMeshes {
             float t1 = ((float)(stack - startingStack + 1) / tileStackNumber);
 
             if (stack == 0) {
-                stackPercentage0 = 1f / tileStackNumber;
-                stackPercentage1 = 0;
-                t0 = stackPercentage0;
+                stackPercentage0 = 1f / stackNumber;
+                stackPercentage1 = 0f;
+                t0 = 1f / tileStackNumber;
                 t1 = stackPercentage1;
             }
 
