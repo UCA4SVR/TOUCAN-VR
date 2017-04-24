@@ -333,7 +333,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     @Override
     public void onStep() {
-        // logging with frame number for now
         if (headMotionTracker != null &&
                 videoStarted &&
                 !videoEnded &&
