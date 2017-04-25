@@ -78,16 +78,22 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private boolean videoStarted = false;
     private boolean videoEnded = false;
 
-    // The number of tiles needed when building the sphere
-    private int numberOfTiles;
+    // Info about the tiles, needed to properly build the sphere
+    private int videoHeight;
+    private int videoWidth;
+    private String[] tiles;
+
 
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
                     PermissionManager permissionManager, String logPrefix,
-                    int numberOfTiles, boolean loggingHeadMotion) {
+                    String [] tiles, int videoWidth, int videoHeight,
+                    boolean loggingHeadMotion) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
         this.logPrefix = logPrefix;
-        this.numberOfTiles = numberOfTiles;
+        this.tiles = tiles;
+        this.videoWidth = videoWidth;
+        this.videoHeight = videoHeight;
         this.loggingHeadMotion = loggingHeadMotion;
     }
 
@@ -177,23 +183,18 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             // Start with a clean scene to add only the video
             scene.removeAllSceneObjects();
 
+            ArrayList<int[]> listOfTiles = new ArrayList<>();
+            for (int i=0; i < tiles.length-3; i=i+4)
+                listOfTiles.add(new int[]{Integer.parseInt(tiles[i]),
+                        Integer.parseInt(tiles[i+1]),
+                        Integer.parseInt(tiles[i+2]),
+                        Integer.parseInt(tiles[i+3])});
+
             // Create the meshes on which video tiles are rendered (portions of sphere right now)
-            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[numberOfTiles];
-
-            // TODO: Replace this to build the array of tiles form the intent or the manifest
-            ArrayList<int[]> tiles = new ArrayList<>();
-
-            int gridHeight = 3;
-            int gridWidth = 3;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 3; j++) {
-                    tiles.add(new int[]{i, j, 1, 1});
-                }
-            }
-            // END_TODO
-
             final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
-                    72, 144, gridHeight, gridWidth, tiles, false);
+                    72, 144, videoHeight, videoWidth, listOfTiles, false);
+
+            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[tiles.length/4];
 
             final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
             for (int i = 0; i < sphereMeshes.getNumberOfTiles(); i++) {
@@ -219,7 +220,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     }
 
     private void initHeadMotionTracker() {
-        // Check whether we should log the head motions or not
+        // Check whether we should log the head motions or not.
         if (loggingHeadMotion)
             // Give the context to the logger so that it has access to the camera
             headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
