@@ -176,8 +176,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
             int gridHeight = 3;
             int gridWidth = 3;
-            for (int i = 0; i < 3; i++) {
-                for (int j = 0; j < 3; j++) {
+            for (int i = 0; i < gridHeight; i++) {
+                for (int j = 0; j < gridWidth; j++) {
                     tiles.add(new int[]{i, j, 1, 1});
                 }
             }
@@ -221,6 +221,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
+        //*
         Future<GVRTexture> textureSphere  = gvrContext.loadFutureTexture(
                 new GVRAndroidResource(gvrContext, R.drawable.prague));
         GVRSphereSceneObject sphereObject = new GVRSphereSceneObject(gvrContext, false, textureSphere);
@@ -242,8 +243,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private void createInitialScene()
     {
         GVRScene scene = gvrContext.getMainScene();
-
-        // the initial scene contains the GearVRf logo, so we clean it
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
@@ -261,6 +260,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
         messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
         scene.getMainCameraRig().addChildObject(messageObject);
+        //*/
     }
 
     private void createEndScene()

@@ -41,6 +41,7 @@ import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
+import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
@@ -78,7 +79,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private PermissionManager permissionManager = null;
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
-    private TiledExoPlayer player;
+    private ExoPlayer player;
 
     // Player's parameters to fine tune as we need
     private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
@@ -91,7 +92,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private String logPrefix = "bitmovin105560";
 
     private String userAgent;
-    private CustomTrackSelector trackSelector;
+    private TrackSelector trackSelector;
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
 
@@ -118,7 +119,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         // Overriding mediaUri just for testing.
 
         // the manifest here is stored locally together with the media segments and tiles
-        //mediaUri = "file:///android_asset/tos_srd_4K.mpd";
+        // mediaUri = "file:///android_asset/romaric2/manifest.mpd";
+        //mediaUri = "file:///android_asset/full.mp4";
 
         // Manifest with SupplementalProperties and 9 tiles
         mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
