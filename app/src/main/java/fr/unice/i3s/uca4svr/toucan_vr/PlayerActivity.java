@@ -18,13 +18,17 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -65,6 +69,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
+import static android.webkit.URLUtil.isNetworkUrl;
+
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
@@ -89,6 +95,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
     private String logPrefix = "bitmovin105560";
+    private boolean loggingBandwidth = false;
+    private boolean loggingHeadMotion = false;
+
+    private int videoWidth = 1920;
+    private int videoHeight = 1080;
+    private int numberOfTiles = 1;
 
     private String userAgent;
     private CustomTrackSelector trackSelector;
@@ -107,29 +119,57 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
-        // TODO: take parameters from the intent
+        // Extract parameters from the intent
+        if(getIntent()!=null && getIntent().getExtras()!=null) {
+            Intent intent = getIntent();
+            mediaUri = intent.getStringExtra("videoLink");
+            logPrefix = intent.getStringExtra("videoName");
+            minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
+            maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
+            bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback", DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+            bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR", DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
+            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
+            videoWidth = intent.getIntExtra("W", 1920);
+            videoHeight = intent.getIntExtra("H", 1080);
+            String[] tiles = intent.getStringExtra("tilesCSV").split(",");
+            numberOfTiles = tiles.length / 4;
+        } else {
 
-        Intent i = getIntent();
-        String videoLink = i.getStringExtra("videoLink");
-        //mediaUri = "file:///android_asset/"+videoLink;
-        //logPrefix = "ROI";
-        MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+            // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
 
-        // Overriding mediaUri just for testing.
+            // Overriding the number of tiles, so that we can keep testing the application without the parametrizer
+            numberOfTiles = 9;
 
-        // the manifest here is stored locally together with the media segments and tiles
-        //mediaUri = "file:///android_asset/tos_srd_4K.mpd";
+            // Overriding mediaUri just for testing.
+            if (numberOfTiles == 1)
+                mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
+            else if (numberOfTiles == 9)
+                mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+            else
+                mediaUri = "file:///android_asset/video_test/manifest.mpd";
+        }
 
-        // Manifest with SupplementalProperties and 9 tiles
-        mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+        // If the mediaUri is of a remote file, it checks the internet connection
+        if(isNetworkUrl(mediaUri))
+            if(!isNetworkAvailable())
+                Log.e("SRD", "There is internet connection");
 
-        // Manifest with two adaptation sets
-        //mediaUri = "http://www-itec.uni-klu.ac.at/ftp/datasets/DASHDataset2014/TearsOfSteel/2sec/TearsOfSteel_2s_onDemand_2014_05_09.mpd";
+        if(loggingBandwidth)
+            MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                permissionManager, logPrefix);
+                permissionManager, logPrefix, numberOfTiles, loggingHeadMotion);
         setMain(main, "gvr.xml");
+    }
+
+    // A method to check whether the internet is accessible
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 
     /**
@@ -197,7 +237,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
             // Instantiation of the ExoPlayer using our custom implementation.
             // The number of video renderers and the other components created above are given as parameters.
-            player = new TiledExoPlayer(this, /*videoRendererCount*/ 9, trackSelector, loadControl);
+            player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
 
             // TODO: extract the number of video renderers from the manifest or the intent
 

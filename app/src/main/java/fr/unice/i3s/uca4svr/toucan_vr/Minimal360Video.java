@@ -58,27 +58,37 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
 public class Minimal360Video extends GVRMain implements RequestPermissionResultListener {
-    // The associated android context
-    private final PermissionManager permissionManager;
-    private final String logPrefix;
 
-    // The GVRContext associated with the scene.
-    // Needed by the headMotionTracker
+    // The associated GVR context
     private GVRContext gvrContext;
-
-    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
 
+    // Whether we should track the head motions or not
+    private boolean loggingHeadMotion;
+
+    // The prefix to give to the log file
+    private final String logPrefix;
+
+    private final PermissionManager permissionManager;
+
+    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
+
     private boolean videoStarted = false;
     private boolean videoEnded = false;
 
+    // The number of tiles needed when building the sphere
+    private int numberOfTiles;
+
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
-                    PermissionManager permissionManager, String logPrefix) {
+                    PermissionManager permissionManager, String logPrefix,
+                    int numberOfTiles, boolean loggingHeadMotion) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
         this.logPrefix = logPrefix;
+        this.numberOfTiles = numberOfTiles;
+        this.loggingHeadMotion = loggingHeadMotion;
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -168,8 +178,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             scene.removeAllSceneObjects();
 
             // Create the meshes on which video tiles are rendered (portions of sphere right now)
-            int videoRendererCount = 9;
-            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
+            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[numberOfTiles];
 
             // TODO: Replace this to build the array of tiles form the intent or the manifest
             ArrayList<int[]> tiles = new ArrayList<>();
@@ -210,8 +219,10 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     }
 
     private void initHeadMotionTracker() {
-        // Give the context to the logger so that it has access to the camera
-        headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
+        // Check whether we should log the head motions or not
+        if (loggingHeadMotion)
+            // Give the context to the logger so that it has access to the camera
+            headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
     }
 
     private void createWaitForPermissionScene() {
