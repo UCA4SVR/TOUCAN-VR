@@ -34,12 +34,10 @@ import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
 import com.google.android.exoplayer2.source.dash.DefaultDashSRDChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
-import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -64,7 +62,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneOb
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
-import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
@@ -84,12 +81,20 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private ExoPlayer player;
 
     // Player's parameters to fine tune as we need
-    private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
-    private int maxBufferMs = DefaultLoadControl.DEFAULT_MAX_BUFFER_MS;
+    //First section
+    private int minBufferMs = 1500;
+    private int maxBufferMs = 3000;
     private int bufferForPlaybackMs =
-            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS;
+            2000;
     private int bufferForPlaybackAfterRebufferMs =
-            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
+            2000;
+    //Second section
+    private int maxInitialBitrate = PyramidalTrackSelection.DEFAULT_MAX_INITIAL_BITRATE;
+    private int minDurationForQualityIncreaseUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
+    private int maxDurationForQualityDecreaseUs = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
+    private int minDurationToRetainAfterDiscardUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
+    private float bandwidthFraction = PyramidalTrackSelection.DEFAULT_BANDWIDTH_FRACTION;
+
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
     private String logPrefix = "bitmovin105560";
     private boolean loggingBandwidth = false;
@@ -154,7 +159,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer, permissionManager,
                 logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
         setMain(main, "gvr.xml");
-
     }
 
     /**
@@ -208,8 +212,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // The video track selection factory and the track selector.
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
-                    new PyramidalTrackSelection.Factory(BANDWIDTH_METER);
+                    new PyramidalTrackSelection.Factory(
+                            BANDWIDTH_METER, maxInitialBitrate, minDurationForQualityIncreaseUs,
+                            maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
+                            bandwidthFraction);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
+
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new DefaultLoadControl(
                     new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),

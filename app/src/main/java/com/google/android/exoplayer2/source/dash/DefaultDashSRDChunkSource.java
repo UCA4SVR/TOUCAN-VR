@@ -18,6 +18,8 @@ package com.google.android.exoplayer2.source.dash;
 
 import android.net.Uri;
 import android.os.SystemClock;
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.extractor.ChunkIndex;
@@ -182,7 +184,12 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         }
 
         long bufferedDurationUs = previous != null ? (previous.endTimeUs - playbackPositionUs) : 0;
-        PyramidalTrackSelection.setIndice(adaptationSetIndex);
+
+        //Update the number of the track
+        if(PyramidalTrackSelection.class.isInstance(trackSelection))
+            ((PyramidalTrackSelection)trackSelection).updateIndex(adaptationSetIndex);
+
+        //Then call the method to choose the track
         trackSelection.updateSelectedTrack(bufferedDurationUs);
 
         RepresentationHolder representationHolder =

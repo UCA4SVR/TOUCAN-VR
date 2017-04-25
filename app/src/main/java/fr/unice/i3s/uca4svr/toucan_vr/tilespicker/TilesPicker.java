@@ -1,39 +1,59 @@
 package fr.unice.i3s.uca4svr.toucan_vr.tilespicker;
 
-import android.util.Log;
-
-import org.gearvrf.GVRContext;
-import org.gearvrf.GVRFrustumPicker;
 import org.gearvrf.GVRPicker;
-import org.gearvrf.GVRScene;
+import org.gearvrf.GVRSceneObject;
+import org.gearvrf.IPickEvents;
 
-public class TilesPicker {
+public class TilesPicker implements IPickEvents {
 
-    public static GVRFrustumPicker picker;
-    private static int[] picked = new int[9];
+    private static TilesPicker tilesPicker = null;
+    private boolean[] pickedTiles;
 
-    public TilesPicker(GVRContext context, GVRScene scene) {
-        this.picker = new GVRFrustumPicker(context,scene);
-        this.picker.setFrustum(60,1,49,50);
+    private TilesPicker() {
     }
 
-    public static void tilesPicked() {
-        if(picker!=null) {
-            GVRPicker.GVRPickedObject[] pickedObjects = picker.getPicked();
-            if(pickedObjects!=null) {
-                for (GVRPicker.GVRPickedObject pickedObject : pickedObjects) {
-                    if(pickedObject!=null) {
-                        Log.e("SRD", (String) pickedObject.getHitObject().getTag());
+    public static TilesPicker getPicker() {
+        if(tilesPicker==null) tilesPicker = new TilesPicker();
+        return tilesPicker;
+    }
 
-                    }
-                }
-            } else {
-                Log.e("SRD","null list");
+    public synchronized boolean isPicked(int index) {
+        if(pickedTiles!=null)
+            return pickedTiles[index];
+        else
+            return true;
+    }
+
+
+
+    @Override
+    public synchronized void onPick(GVRPicker picker) {
+        GVRPicker.GVRPickedObject[] pickedObjects = picker.getPicked();
+        pickedTiles = new boolean[pickedObjects.length];
+        if(pickedObjects!=null) {
+            for (int i=0; i<pickedObjects.length; i++) {
+                pickedTiles[i] = pickedObjects[i]==null ? false : true;
             }
-        } else {
-            Log.e("SRD","null picker");
         }
     }
 
+    @Override
+    public void onNoPick(GVRPicker picker) {
 
+    }
+
+    @Override
+    public void onEnter(GVRSceneObject sceneObj, GVRPicker.GVRPickedObject collision) {
+
+    }
+
+    @Override
+    public void onExit(GVRSceneObject sceneObj) {
+
+    }
+
+    @Override
+    public void onInside(GVRSceneObject sceneObj, GVRPicker.GVRPickedObject collision) {
+
+    }
 }

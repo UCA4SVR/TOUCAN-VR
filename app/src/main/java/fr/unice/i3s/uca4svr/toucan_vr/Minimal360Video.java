@@ -34,6 +34,7 @@ import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRAssetLoader;
 import org.gearvrf.GVRBoxCollider;
 import org.gearvrf.GVRContext;
+import org.gearvrf.GVRFrustumPicker;
 import org.gearvrf.GVRMain;
 import org.gearvrf.GVRMeshCollider;
 import org.gearvrf.GVRPicker;
@@ -140,8 +141,11 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
             final GVRScene scene = gvrContext.getMainScene();
 
-            //Building the tiles picker
-            tilesPicker = new TilesPicker(gvrContext,scene);
+            GVRFrustumPicker frustumPicker = new GVRFrustumPicker(gvrContext,scene);
+            frustumPicker.setFrustum(60,1,49,50);
+
+            //Attaching the tiles picker
+            scene.getEventReceiver().addListener(TilesPicker.getPicker());
 
 
 

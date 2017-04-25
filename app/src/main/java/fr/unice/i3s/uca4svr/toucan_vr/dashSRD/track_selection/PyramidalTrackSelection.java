@@ -39,6 +39,24 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
 
+    public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
+    public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
+    public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 25000;
+    public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
+
+    private final BandwidthMeter bandwidthMeter;
+    private final int maxInitialBitrate;
+    private final long minDurationForQualityIncreaseUs;
+    private final long maxDurationForQualityDecreaseUs;
+    private final long minDurationToRetainAfterDiscardUs;
+    private final float bandwidthFraction;
+
+    private int selectedIndex;
+    private int reason;
+    private int adaptationSetIndex;
+    private int counter;
+
     /**
      * Factory for {@link AdaptiveTrackSelection} instances.
      */
@@ -97,22 +115,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
 
     }
 
-    public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
-    public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
-    public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 25000;
-    public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
-
-    private final BandwidthMeter bandwidthMeter;
-    private final int maxInitialBitrate;
-    private final long minDurationForQualityIncreaseUs;
-    private final long maxDurationForQualityDecreaseUs;
-    private final long minDurationToRetainAfterDiscardUs;
-    private final float bandwidthFraction;
-
-    private int selectedIndex;
-    private int reason;
-
     /**
      * @param group The {@link TrackGroup}.
      * @param tracks The indices of the selected tracks within the {@link TrackGroup}. Must not be
@@ -151,6 +153,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                                   long maxDurationForQualityDecreaseMs, long minDurationToRetainAfterDiscardMs,
                                   float bandwidthFraction) {
         super(group, tracks);
+
         this.bandwidthMeter = bandwidthMeter;
         this.maxInitialBitrate = maxInitialBitrate;
         this.minDurationForQualityIncreaseUs = minDurationForQualityIncreaseMs * 1000L;
@@ -159,19 +162,18 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.bandwidthFraction = bandwidthFraction;
         selectedIndex = determineIdealSelectedIndex(Long.MIN_VALUE);
         reason = C.SELECTION_REASON_INITIAL;
+        counter = 0;
     }
 
-    static int indice = 0;
-
-    public static void setIndice(int indic) {
-        indice = indic;
+    public void updateIndex(int adaptationSetIndex) {
+        this.adaptationSetIndex = adaptationSetIndex;
     }
 
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
-        TilesPicker.tilesPicked();
-        Log.e("SRD","end of call");
-
+        Log.e("SRD "+counter,"Method called for the adaptation set "+adaptationSetIndex);
+        counter++;
+        boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         long nowMs = SystemClock.elapsedRealtime();
         // Get the current and ideal selections.
         int currentSelectedIndex = selectedIndex;
@@ -180,6 +182,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         Format idealFormat = getFormat(idealSelectedIndex);
         // Assume we can switch to the ideal selection.
         selectedIndex = idealSelectedIndex;
+
         // Revert back to the current selection if conditions are not suitable for switching.
         if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
             if (idealFormat.bitrate > currentFormat.bitrate
@@ -198,7 +201,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
-
     }
 
     @Override
@@ -249,8 +251,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     /**
      * Computes the ideal selected index ignoring buffer health.
      *
-     * @param nowMs The current time in the timebase of {@link SystemClock#elapsedRealtime()}, or
-     *     {@link Long#MIN_VALUE} to ignore blacklisting.
+     *
      */
     private int determineIdealSelectedIndex(long nowMs) {
         long bitrateEstimate = bandwidthMeter.getBitrateEstimate();
