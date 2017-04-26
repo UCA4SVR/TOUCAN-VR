@@ -83,7 +83,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private int videoWidth;
     private String[] tiles;
 
-
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
                     PermissionManager permissionManager, String logPrefix,
                     String [] tiles, int videoWidth, int videoHeight,
@@ -183,6 +182,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             // Start with a clean scene to add only the video
             scene.removeAllSceneObjects();
 
+            // Create a list of tiles to provide to the sphere constructor
             ArrayList<int[]> listOfTiles = new ArrayList<>();
             for (int i=0; i < tiles.length-3; i=i+4)
                 listOfTiles.add(new int[]{Integer.parseInt(tiles[i]),
@@ -254,8 +254,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private void createInitialScene()
     {
         GVRScene scene = gvrContext.getMainScene();
-
-        // the initial scene contains the GearVRf logo, so we clean it
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
@@ -273,6 +271,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
         messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
         scene.getMainCameraRig().addChildObject(messageObject);
+        //*/
     }
 
     private void createEndScene()
@@ -292,9 +291,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         sphereObject.getTransform().setScale(100, 100, 100);
         scene.addSceneObject(sphereObject);
 
-        /* add message with request to remove the headset
-         * N.B. the message here is an image remove.png taken from the resources;
-         * an alternative would be creating a text object as shown above. */
+        // add message with request to remove the headset
         GVRAssetLoader gvrAssetLoader = new GVRAssetLoader(gvrContext);
         GVRTexture texture = gvrAssetLoader.loadTexture(new GVRAndroidResource(
                 gvrContext, R.drawable.remove));

@@ -18,11 +18,8 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -44,6 +41,7 @@ import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
+import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
@@ -83,7 +81,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private PermissionManager permissionManager = null;
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
-    private TiledExoPlayer player;
+    private ExoPlayer player;
 
     // Player's parameters to fine tune as we need
     private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
@@ -125,8 +123,10 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             logPrefix = intent.getStringExtra("videoName");
             minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
             maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
-            bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback", DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
-            bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR", DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+            bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
+                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+            bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
+                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
             loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
             loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
             videoWidth = intent.getIntExtra("W", 3);
@@ -134,7 +134,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             tiles = intent.getStringExtra("tilesCSV").split(",");
             numberOfTiles = tiles.length / 4;
         } else {
-
             // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
 
             // Overriding some variables so that we can keep testing the application without the parametrizer
@@ -148,6 +147,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // TODO: Check if mediaUri is actually reachable.
 
+        // Check whether we should log the bandwidth or not
         if(loggingBandwidth)
             MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
@@ -209,7 +209,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
-            CustomTrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
+            TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new DefaultLoadControl(

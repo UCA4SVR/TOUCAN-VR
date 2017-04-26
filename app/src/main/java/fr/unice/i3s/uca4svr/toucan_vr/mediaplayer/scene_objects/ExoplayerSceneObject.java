@@ -29,9 +29,9 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 
 public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer> {
 
-    private TiledExoPlayer player;
+    private ExoPlayer player;
 
-    public ExoplayerSceneObject(TiledExoPlayer player) {
+    public ExoplayerSceneObject(ExoPlayer player) {
         this.player = player;
     }
 
@@ -81,7 +81,7 @@ public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer
             }
         });
         // Set the surface on which the video will be displayed
-        player.setVideoSurface(surface);
+        ((TiledExoPlayer) player).setVideoSurface(surface);
     }
 
     @Override
