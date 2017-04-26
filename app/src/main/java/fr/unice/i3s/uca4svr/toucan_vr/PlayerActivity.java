@@ -83,16 +83,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     // Player's parameters to fine tune as we need
     //First section
-    private int minBufferMs = 3000;
-    private int maxBufferMs = 6000;
-    private int bufferForPlaybackMs =
-            100;
-    private int bufferForPlaybackAfterRebufferMs =
-            100;
+    private int minBufferMs = SRDLoadControl.DEFAULT_MIN_BUFFER_MS;
+    private int maxBufferMs = SRDLoadControl.DEFAULT_MAX_BUFFER_MS;
+    private int bufferForPlaybackMs = SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS;
+    private int bufferForPlaybackAfterRebufferMs = SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     //Second section
     private int maxInitialBitrate = PyramidalTrackSelection.DEFAULT_MAX_INITIAL_BITRATE;
-    private int minDurationForQualityIncreaseUs = 100;
-    private int maxDurationForQualityDecreaseUs = 100;
+    private int minDurationForQualityIncreaseUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
+    private int maxDurationForQualityDecreaseUs = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
     private int minDurationToRetainAfterDiscardUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
     private float bandwidthFraction = PyramidalTrackSelection.DEFAULT_BANDWIDTH_FRACTION;
 
@@ -150,7 +148,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             tiles = tilesCSV.split(",");
             mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
         }
-
+        
         // TODO: Check if mediaUri is actually reachable.
         // Check whether we should log the bandwidth or not
         if(loggingBandwidth)
