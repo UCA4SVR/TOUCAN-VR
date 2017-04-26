@@ -1,8 +1,6 @@
 /*
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
- * Author: Romaric Pighetti
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -90,9 +88,15 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
     private String logPrefix = "bitmovin105560";
+    private boolean loggingBandwidth = false;
+    private boolean loggingHeadMotion = false;
+
+    private String[] tiles;
+    private int gridWidth = 3;
+    private int gridHeight = 3;
+    private int numberOfTiles = 1;
 
     private String userAgent;
-    private TrackSelector trackSelector;
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
 
@@ -108,29 +112,44 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
-        // TODO: take parameters from the intent
+        // Extract parameters from the intent
+        if(getIntent()!=null && getIntent().getExtras()!=null) {
+            Intent intent = getIntent();
+            mediaUri = intent.getStringExtra("videoLink");
+            logPrefix = intent.getStringExtra("videoName");
+            minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
+            maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
+            bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
+                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+            bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
+                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
+            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
+            gridWidth = intent.getIntExtra("W", 3);
+            gridHeight = intent.getIntExtra("H", 3);
+            tiles = intent.getStringExtra("tilesCSV").split(",");
+            numberOfTiles = tiles.length / 4;
+        } else {
+            // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
 
-        Intent i = getIntent();
-        String videoLink = i.getStringExtra("videoLink");
-        //mediaUri = "file:///android_asset/"+videoLink;
-        //logPrefix = "ROI";
-        MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+            // Overriding some variables so that we can keep testing the application without the parametrizer
+            numberOfTiles = 9;
+            gridWidth = 3;
+            gridHeight = 3;
+            String tilesCSV = "0,0,1,1,1,0,1,1,2,0,1,1,0,1,1,1,1,1,1,1,2,1,1,1,0,2,1,1,1,2,1,1,2,2,1,1";
+            tiles = tilesCSV.split(",");
+            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+        }
 
-        // Overriding mediaUri just for testing.
+        // TODO: Check if mediaUri is actually reachable.
 
-        // the manifest here is stored locally together with the media segments and tiles
-        // mediaUri = "file:///android_asset/romaric2/manifest.mpd";
-        //mediaUri = "file:///android_asset/full.mp4";
-
-        // Manifest with SupplementalProperties and 9 tiles
-        mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
-
-        // Manifest with two adaptation sets
-        //mediaUri = "http://www-itec.uni-klu.ac.at/ftp/datasets/DASHDataset2014/TearsOfSteel/2sec/TearsOfSteel_2s_onDemand_2014_05_09.mpd";
+        // Check whether we should log the bandwidth or not
+        if(loggingBandwidth)
+            MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                permissionManager, logPrefix);
+                permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
         setMain(main, "gvr.xml");
     }
 
@@ -186,7 +205,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
-            trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
+            TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new DefaultLoadControl(
@@ -198,11 +217,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             );
 
             // Instantiation of the ExoPlayer using our custom implementation.
-            // The number of video renderers and the other components created above are given as parameters.
-            player = new TiledExoPlayer(this, /*videoRendererCount*/ 9, trackSelector, loadControl);
-
-            // TODO: extract the number of video renderers from the manifest or the intent
-
+            // The number of tiles and the other components created above are given as parameters.
+            player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
             player.setPlayWhenReady(shouldAutoPlay);
         }
 
