@@ -66,6 +66,13 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
+    public static final int STATUS_OK = 0;
+    public static final int NO_INTENT = 1;
+    public static final int NO_INTERNET = 2;
+    public static final int NO_PERMISSION = 3;
+
+    private int statusCode = STATUS_OK;
+
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
             new TransferListenerBroadcaster();
@@ -88,8 +95,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
     private String logPrefix = "bitmovin105560";
-    private boolean loggingBandwidth = false;
-    private boolean loggingHeadMotion = false;
+    private boolean loggingBandwidth = true;
+    private boolean loggingHeadMotion = true;
 
     private String[] tiles;
     private int gridWidth = 3;
@@ -132,6 +139,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         } else {
             // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
 
+            // statusCode = NO_INTENT;
+
             // Overriding some variables so that we can keep testing the application without the parametrizer
             numberOfTiles = 9;
             gridWidth = 3;
@@ -141,16 +150,45 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
         }
 
-        // TODO: Check if mediaUri is actually reachable.
-
         // Check whether we should log the bandwidth or not
         if(loggingBandwidth)
             MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
 
-        videoSceneObjectPlayer = makeVideoSceneObject();
-        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
+        // We avoid creating the player at first
+        videoSceneObjectPlayer = null;
+        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer, statusCode,
                 permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
         setMain(main, "gvr.xml");
+
+        if (statusCode != NO_INTENT)
+            checkMediaUri();
+    }
+
+    // Dummy example (to replace with the actual method that checks the url's reachability
+    private void checkMediaUri() {
+        if(Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
+            Set<String> permissions = new HashSet<>();
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            if (permissionManager.isPermissionGranted(permissions))
+                permissionManager.requestPermissions(permissions, this);
+        }
+        if(!Util.isLocalFileUri(Uri.parse(mediaUri))) {
+            /*CheckConnection checkConnection = new CheckConnection(this);
+            checkConnection.response = this;
+            checkConnection.execute(mediaUri);*/
+        }
+    }
+
+    /*@Override
+    public void urlChecked(boolean exists) {
+        if (exists) {
+            videoSceneObjectPlayer = makeVideoSceneObject();
+            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+        } else {
+            statusCode = NO_INTERNET;
+            ((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
+        }
     }
 
     /**
@@ -161,23 +199,34 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         super.onTouchEvent(event);
-        if (null != videoSceneObjectPlayer) {
-            if (event.getActionMasked() == MotionEvent.ACTION_UP) {
-                if (event.getEventTime() - event.getDownTime() < 200) {
-                    Minimal360Video main = (Minimal360Video) getMain();
-                    main.displayVideo();
-                    final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
-                    if (exoPlayer != null) {
-                        if (exoPlayer.getPlayWhenReady())
-                            videoSceneObjectPlayer.pause();
-                        else
-                            videoSceneObjectPlayer.start();
+        if (event.getActionMasked() == MotionEvent.ACTION_UP &&
+                event.getEventTime() - event.getDownTime() < 200) {
+            switch (statusCode) {
+                case NO_INTENT:
+                    break;
+                case NO_INTERNET:
+                    ((Minimal360Video) getMain()).sceneDispatcher();
+                    break;
+                case NO_PERMISSION:
+                    ((Minimal360Video) getMain()).sceneDispatcher();
+                    // TODO: Ask for permission again ?
+                    break;
+                case STATUS_OK:
+                    if (videoSceneObjectPlayer != null) {
+                        final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
+                        if (exoPlayer != null) {
+                            if (exoPlayer.getPlayWhenReady())
+                                videoSceneObjectPlayer.pause();
+                            else
+                                videoSceneObjectPlayer.start();
+                        }
                     }
-                }
+                    ((Minimal360Video) getMain()).sceneDispatcher();
+                    break;
+                default:
+                    ((Minimal360Video) getMain()).sceneDispatcher();
+                    break;
             }
-        } else {
-            videoSceneObjectPlayer = makeVideoSceneObject();
-            ((Minimal360Video)getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
         }
         return true;
     }
@@ -230,7 +279,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             uris = new Uri[] {Uri.parse(mediaUri)};
             extensions = new String[1];
 
-            boolean isAUriLocal = false;
+            /*boolean isAUriLocal = false;
             for (Uri uri : uris) {
                 if (Util.isLocalFileUri(uri)) {
                     isAUriLocal = true;
@@ -243,7 +292,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 // The player will be reinitialized if the permission is granted.
                 permissionManager.requestPermissions(permissions, this);
                 return null;
-            }
+            }*/
             MediaSource[] mediaSources = new MediaSource[uris.length];
             for (int i = 0; i < uris.length; i++) {
                 mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
@@ -260,9 +309,18 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     @Override
     public void onPermissionRequestDone(int requestID, int result) {
-        if (result == PackageManager.PERMISSION_GRANTED) {
-            videoSceneObjectPlayer = makeVideoSceneObject();
-            ((Minimal360Video)getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+        // Make sure that we have internet access, otherwise it is not safe to overwrite the Status
+        if (statusCode != NO_INTERNET) {
+            if (result == PackageManager.PERMISSION_GRANTED) {
+                videoSceneObjectPlayer = makeVideoSceneObject();
+                ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+                statusCode = STATUS_OK;
+                ((Minimal360Video) getMain()).setStatusCode(NO_PERMISSION);
+            }
+            if (result == PackageManager.PERMISSION_DENIED) {
+                statusCode = NO_PERMISSION;
+                ((Minimal360Video) getMain()).setStatusCode(NO_PERMISSION);
+            }
         }
     }
 

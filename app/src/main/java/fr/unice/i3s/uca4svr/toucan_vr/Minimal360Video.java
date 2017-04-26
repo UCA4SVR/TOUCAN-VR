@@ -71,6 +71,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     private final PermissionManager permissionManager;
 
+    private int statusCode = 0;
+
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
 
     private boolean videoStarted = false;
@@ -81,11 +83,12 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private int gridWidth;
     private String[] tiles;
 
-    Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
+    Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer, int statusCode,
                     PermissionManager permissionManager, String logPrefix,
                     String [] tiles, int gridWidth, int gridHeight,
                     boolean loggingHeadMotion) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
+        this.statusCode = statusCode;
         this.permissionManager = permissionManager;
         this.logPrefix = logPrefix;
         this.tiles = tiles;
@@ -96,6 +99,10 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
+    }
+
+    public void setStatusCode(int statusCode) {
+        this.statusCode = statusCode;
     }
 
     /** Called when the activity is first created. */
@@ -114,9 +121,12 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         // particular permissions only.
         permissionManager.requestPermissions(permissions, this);
 
+        // Testing
+        sceneDispatcher();
+
         // N.B. permissions need to be granted before playing the video
-        if (videoSceneObjectPlayer == null) {
-            createWaitForPermissionScene();
+        /*if (videoSceneObjectPlayer == null) {
+            dispatchAppStatus();
         } else {
 
             // create the initial scene as waiting screen
@@ -124,6 +134,30 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
             // pause the player from automatically starting
             videoSceneObjectPlayer.pause();
+        }*/
+    }
+
+    public void sceneDispatcher() {
+        // TODO: introduce a single method createScene(...) to handle each case and change just the message
+        switch (statusCode) {
+            case PlayerActivity.NO_INTENT:
+                createWaitForPermissionScene();
+                break;
+            case PlayerActivity.NO_INTERNET:
+                createWaitForPermissionScene();
+                break;
+            case PlayerActivity.NO_PERMISSION:
+                createWaitForPermissionScene();
+                break;
+            case PlayerActivity.STATUS_OK:
+                if (!videoStarted && !videoEnded)
+                    if(videoSceneObjectPlayer==null) {
+                        createInitialScene();
+                    } else
+                        displayVideo();
+                if (videoEnded /* && videoSceneObjectPlayer.getPlayer()!=null*/)
+                    createEndScene();
+                break;
         }
     }
 
@@ -157,7 +191,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                         case ExoPlayer.STATE_ENDED:
                             videoEnded = true;
                             // handle the event in order to rebuild the scene
-                            createEndScene();
+                            sceneDispatcher();
                             break;
                         default:
                             break;
@@ -270,7 +304,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
         messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
         scene.getMainCameraRig().addChildObject(messageObject);
-        //*/
     }
 
     private void createEndScene()
@@ -317,5 +350,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         if (result == PackageManager.PERMISSION_GRANTED && headMotionTracker == null) {
             initHeadMotionTracker();
         }
+        // FIXME: should we handle this differently
+        if (result == PackageManager.PERMISSION_DENIED && loggingHeadMotion && statusCode!=PlayerActivity.NO_INTERNET)
+            statusCode = PlayerActivity.NO_PERMISSION;
     }
 }
