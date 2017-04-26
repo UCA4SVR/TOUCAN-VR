@@ -1,8 +1,6 @@
 /*
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
- * Author: Romaric Pighetti
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -66,8 +64,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
-import static android.webkit.URLUtil.isNetworkUrl;
-
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
     private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
@@ -96,8 +92,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingHeadMotion = false;
 
     private String[] tiles;
-    private int videoWidth = 3;
-    private int videoHeight = 3;
+    private int gridWidth = 3;
+    private int gridHeight = 3;
     private int numberOfTiles = 1;
 
     private String userAgent;
@@ -129,8 +125,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
             loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
             loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
-            videoWidth = intent.getIntExtra("W", 3);
-            videoHeight = intent.getIntExtra("H", 3);
+            gridWidth = intent.getIntExtra("W", 3);
+            gridHeight = intent.getIntExtra("H", 3);
             tiles = intent.getStringExtra("tilesCSV").split(",");
             numberOfTiles = tiles.length / 4;
         } else {
@@ -138,8 +134,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
             // Overriding some variables so that we can keep testing the application without the parametrizer
             numberOfTiles = 9;
-            videoWidth = 3;
-            videoHeight = 3;
+            gridWidth = 3;
+            gridHeight = 3;
             String tilesCSV = "0,0,1,1,1,0,1,1,2,0,1,1,0,1,1,1,1,1,1,1,2,1,1,1,0,2,1,1,1,2,1,1,2,2,1,1";
             tiles = tilesCSV.split(",");
             mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
@@ -153,7 +149,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                permissionManager, logPrefix, tiles, videoWidth, videoHeight, loggingHeadMotion);
+                permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
         setMain(main, "gvr.xml");
     }
 

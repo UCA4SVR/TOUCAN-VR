@@ -13,10 +13,8 @@
  * limitations under the License.
  *
  * Modifications:
- * Package name
- * Displaying head rotations in the debug log
+ * Several adaptations to use Exoplayer2 to display tiles videos.
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
- * Author: Romaric Pighetti
  */
 
 package fr.unice.i3s.uca4svr.toucan_vr;
@@ -79,20 +77,20 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     private boolean videoEnded = false;
 
     // Info about the tiles, needed to properly build the sphere
-    private int videoHeight;
-    private int videoWidth;
+    private int gridHeight;
+    private int gridWidth;
     private String[] tiles;
 
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
                     PermissionManager permissionManager, String logPrefix,
-                    String [] tiles, int videoWidth, int videoHeight,
+                    String [] tiles, int gridWidth, int gridHeight,
                     boolean loggingHeadMotion) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
         this.logPrefix = logPrefix;
         this.tiles = tiles;
-        this.videoWidth = videoWidth;
-        this.videoHeight = videoHeight;
+        this.gridWidth = gridWidth;
+        this.gridHeight = gridHeight;
         this.loggingHeadMotion = loggingHeadMotion;
     }
 
@@ -184,15 +182,16 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
 
             // Create a list of tiles to provide to the sphere constructor
             ArrayList<int[]> listOfTiles = new ArrayList<>();
-            for (int i=0; i < tiles.length-3; i=i+4)
+            for (int i=0; i < tiles.length-3; i=i+4) {
                 listOfTiles.add(new int[]{Integer.parseInt(tiles[i]),
-                        Integer.parseInt(tiles[i+1]),
-                        Integer.parseInt(tiles[i+2]),
-                        Integer.parseInt(tiles[i+3])});
+                        Integer.parseInt(tiles[i + 1]),
+                        Integer.parseInt(tiles[i + 2]),
+                        Integer.parseInt(tiles[i + 3])});
+            }
 
             // Create the meshes on which video tiles are rendered (portions of sphere right now)
             final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
-                    72, 144, videoHeight, videoWidth, listOfTiles, false);
+                    72, 144, gridHeight, gridWidth, listOfTiles, false);
 
             final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[tiles.length/4];
 

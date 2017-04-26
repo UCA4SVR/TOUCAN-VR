@@ -17,7 +17,6 @@
  * Package name
  * Added SRD support to the parser
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
- * Author: Savino Dambra
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 

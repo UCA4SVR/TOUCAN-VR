@@ -17,7 +17,6 @@
  * Package name
  * Added SRD support to the parser
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
- * Author: Savino Dambra
  */
 
 package com.google.android.exoplayer2.source.dash.manifest;
