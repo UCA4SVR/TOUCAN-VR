@@ -174,33 +174,35 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         Log.e("SRD "+counter,"Method called for the adaptation set "+adaptationSetIndex);
         counter++;
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
-        long nowMs = SystemClock.elapsedRealtime();
+        Log.e("SRD",adaptationSetIndex + "Picked? "+isPicked);
+        //long nowMs = SystemClock.elapsedRealtime();
         // Get the current and ideal selections.
         int currentSelectedIndex = selectedIndex;
-        Format currentFormat = getSelectedFormat();
-        int idealSelectedIndex = determineIdealSelectedIndex(nowMs);
-        Format idealFormat = getFormat(idealSelectedIndex);
+        //Format currentFormat = getSelectedFormat();
+        int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
+        //Format idealFormat = getFormat(idealSelectedIndex);
         // Assume we can switch to the ideal selection.
         selectedIndex = idealSelectedIndex;
 
         // Revert back to the current selection if conditions are not suitable for switching.
-        if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
-            if (idealFormat.bitrate > currentFormat.bitrate
-                    && bufferedDurationUs < minDurationForQualityIncreaseUs) {
+        //if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
+            //if (idealFormat.bitrate > currentFormat.bitrate
+                    //&& bufferedDurationUs < minDurationForQualityIncreaseUs) {
                 // The ideal track is a higher quality, but we have insufficient buffer to safely switch
                 // up. Defer switching up for now.
-                selectedIndex = currentSelectedIndex;
-            } else if (idealFormat.bitrate < currentFormat.bitrate
-                    && bufferedDurationUs >= maxDurationForQualityDecreaseUs) {
+                //selectedIndex = currentSelectedIndex;
+            //} else if (idealFormat.bitrate < currentFormat.bitrate
+                    //&& bufferedDurationUs >= maxDurationForQualityDecreaseUs) {
                 // The ideal track is a lower quality, but we have sufficient buffer to defer switching
                 // down for now.
-                selectedIndex = currentSelectedIndex;
-            }
-        }
+                //selectedIndex = currentSelectedIndex;
+            //}
+        //}
         // If we adapted, update the trigger.
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
+        Log.e("SRD","Selection for tile "+adaptationSetIndex + " is " + selectedIndex);
     }
 
     @Override
@@ -248,10 +250,17 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         return queueSize;
     }
 
-    /**
+    /*
+    Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
+     */
+    private int determineIdealSelectedIndex(boolean isPicked) {
+        if(!isPicked) return 0;
+        else return (length-1);
+    }
+
+    /*
+     * Original method
      * Computes the ideal selected index ignoring buffer health.
-     *
-     *
      */
     private int determineIdealSelectedIndex(long nowMs) {
         long bitrateEstimate = bandwidthMeter.getBitrateEstimate();

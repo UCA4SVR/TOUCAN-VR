@@ -30,6 +30,7 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
+import com.google.android.exoplayer2.SRDLoadControl;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
@@ -82,16 +83,16 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     // Player's parameters to fine tune as we need
     //First section
-    private int minBufferMs = 1500;
-    private int maxBufferMs = 3000;
+    private int minBufferMs = 3000;
+    private int maxBufferMs = 6000;
     private int bufferForPlaybackMs =
-            2000;
+            100;
     private int bufferForPlaybackAfterRebufferMs =
-            2000;
+            100;
     //Second section
     private int maxInitialBitrate = PyramidalTrackSelection.DEFAULT_MAX_INITIAL_BITRATE;
-    private int minDurationForQualityIncreaseUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
-    private int maxDurationForQualityDecreaseUs = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
+    private int minDurationForQualityIncreaseUs = 100;
+    private int maxDurationForQualityDecreaseUs = 100;
     private int minDurationToRetainAfterDiscardUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
     private float bandwidthFraction = PyramidalTrackSelection.DEFAULT_BANDWIDTH_FRACTION;
 
@@ -120,7 +121,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         userAgent = Util.getUserAgent(this, "Toucan_VR");
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
-
+        
         // Extract parameters from the intent
         if(getIntent()!=null && getIntent().getExtras()!=null) {
             Intent intent = getIntent();
@@ -219,7 +220,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
-            LoadControl loadControl = new DefaultLoadControl(
+            LoadControl loadControl = new SRDLoadControl(
                     new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
                     minBufferMs,
                     maxBufferMs,
