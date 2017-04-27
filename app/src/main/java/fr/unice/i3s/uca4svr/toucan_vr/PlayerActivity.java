@@ -113,8 +113,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mainHandler = new Handler();
 
         // Extract parameters from the intent
-        if(getIntent()!=null && getIntent().getExtras()!=null && getIntent().getStringExtra("videoLink")!=null) {
-            Intent intent = getIntent();
+        Intent intent = getIntent();
+        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
             mediaUri = intent.getStringExtra("videoLink");
             logPrefix = intent.getStringExtra("videoName");
             minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
@@ -123,8 +123,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
             bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
-            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
-            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
+            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
+            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
             gridWidth = intent.getIntExtra("W", 3);
             gridHeight = intent.getIntExtra("H", 3);
             tiles = intent.getStringExtra("tilesCSV").split(",");
