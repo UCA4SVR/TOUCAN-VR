@@ -1,0 +1,111 @@
+apply plugin: 'com.android.application'
+apply from: '../jacoco.gradle'
+
+sonarqube {
+    properties {
+        androidVariant 'fullDebug'
+        property "sonar.java.coveragePlugin", "jacoco"
+        property "sonar.jacoco.reportPath", "build/jacoco/testFullDebugUnitTest.exec"
+
+        property "sonar.junit.reportsPath", "build/test-results/fullDebug"
+        property "sonar.surefire.reportsPath", "build/test-results/fullDebug"
+
+        property "sonar.android.lint.report", "build/outputs/lint-results-fullDebug.xml"
+        property "sonar.import_unknown_files", "true"
+        property "sonar.exclusions", "**/*.mp4"
+    }
+}
+
+allprojects {
+    repositories {
+        jcenter()
+        maven {
+            url "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+        maven {
+            url "http://google.bintray.com/googlevr"
+        }
+    }
+}
+
+android {
+
+    lintOptions {
+        // Set invalid package to warning to compile with logback.
+        // It includes javax.mail which we don't use.
+        warning 'InvalidPackage'
+    }
+
+    compileSdkVersion 25
+    buildToolsVersion "25.0.2"
+    defaultConfig {
+        applicationId "fr.unice.i3s.uca4svr.toucan_vr"
+        minSdkVersion 23
+        targetSdkVersion 25
+        // version code = major * 10 000 + minor * 100 + patch
+        versionCode 200
+        versionName "0.2.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+
+        debug {
+            applicationIdSuffix ".debug"
+        }
+    }
+
+    productFlavors {
+        full {
+            applicationIdSuffix ".full"
+            versionNameSuffix "-full"
+        }
+    }
+
+    // ignore the x86 and arm-v8 files from the google vr libraries
+    packagingOptions {
+        exclude 'lib/x86/libgvr.so'
+        exclude 'lib/arm64-v8a/libgvr.so'
+    }
+    compileOptions {
+        targetCompatibility 1.7
+        sourceCompatibility 1.7
+    }
+}
+
+// Versions vars
+ext.gearvrfVersion = '3.1.1'
+//project.ext.jomlVersion = "1.9.1-SNAPSHOT"
+
+dependencies {
+    // App Compat
+    compile 'com.android.support:appcompat-v7:25.2.0'
+
+    // VR dependencies
+    // compile "org.joml:joml-android:${jomlVersion}"
+    compile "org.gearvrf:framework:$gearvrfVersion"
+    compile "org.gearvrf:backend_daydream:$gearvrfVersion"
+    compile "org.gearvrf:backend_oculus:$gearvrfVersion"
+    compile 'com.google.vr:sdk-base:1.10.0'
+    compile 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'
+
+    // App dependencies
+    compile 'com.google.android.exoplayer:exoplayer:r2.3.0'
+    compile 'com.android.support.constraint:constraint-layout:1.0.0-beta5'
+
+    // Log dependencies
+    compile group: 'com.github.tony19', name: 'logback-android-core', version: '1.1.1-6'
+    compile group: 'com.github.tony19', name: 'logback-android-classic', version: '1.1.1-6'
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
+
+    //compile fileTree(dir: 'libs', include: ['*.jar'])
+
+    // Tests dependencies
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    testCompile 'junit:junit:4.12'
+}
