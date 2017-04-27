@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -139,7 +140,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         } else {
             // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
 
-            // statusCode = NO_INTENT;
+            //statusCode = NO_INTENT;
 
             // Overriding some variables so that we can keep testing the application without the parametrizer
             numberOfTiles = 9;
@@ -150,16 +151,13 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
         }
 
-        // Check whether we should log the bandwidth or not
-        if(loggingBandwidth)
-            MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
-
         // We avoid creating the player at first
         videoSceneObjectPlayer = null;
         final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer, statusCode,
                 permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
         setMain(main, "gvr.xml");
 
+        // If there is no intent, we don't try to create the player or ask for permissions etc.
         if (statusCode != NO_INTENT)
             checkMediaUri();
     }
@@ -170,24 +168,33 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             Set<String> permissions = new HashSet<>();
             permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
             permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            if (permissionManager.isPermissionGranted(permissions))
+            //if (permissionManager.isPermissionGranted(permissions))
                 permissionManager.requestPermissions(permissions, this);
         }
         if(!Util.isLocalFileUri(Uri.parse(mediaUri))) {
             /*CheckConnection checkConnection = new CheckConnection(this);
             checkConnection.response = this;
             checkConnection.execute(mediaUri);*/
+
+            // Testing no internet situation
+            //statusCode = NO_INTERNET;
+            //((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
+
         }
     }
 
     /*@Override
     public void urlChecked(boolean exists) {
         if (exists) {
+            // Check whether we should log the bandwidth or not
+            if(loggingBandwidth)
+                MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
             videoSceneObjectPlayer = makeVideoSceneObject();
             ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
         } else {
             statusCode = NO_INTERNET;
             ((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
+            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(null);
         }
     }
 
@@ -210,6 +217,10 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 case NO_PERMISSION:
                     ((Minimal360Video) getMain()).sceneDispatcher();
                     // TODO: Ask for permission again ?
+                    Set<String> permissions = new HashSet<>();
+                    permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                    permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                    permissionManager.requestPermissions(permissions, this);
                     break;
                 case STATUS_OK:
                     if (videoSceneObjectPlayer != null) {
@@ -309,13 +320,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     @Override
     public void onPermissionRequestDone(int requestID, int result) {
+
         // Make sure that we have internet access, otherwise it is not safe to overwrite the Status
         if (statusCode != NO_INTERNET) {
             if (result == PackageManager.PERMISSION_GRANTED) {
                 videoSceneObjectPlayer = makeVideoSceneObject();
                 ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
                 statusCode = STATUS_OK;
-                ((Minimal360Video) getMain()).setStatusCode(NO_PERMISSION);
+                ((Minimal360Video) getMain()).setStatusCode(STATUS_OK);
             }
             if (result == PackageManager.PERMISSION_DENIED) {
                 statusCode = NO_PERMISSION;
