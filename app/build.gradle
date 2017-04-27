@@ -43,8 +43,8 @@ android {
         minSdkVersion 23
         targetSdkVersion 25
         // version code = major * 10 000 + minor * 100 + patch
-        versionCode 300
-        versionName "0.3.0"
+        versionCode 301
+        versionName "0.3.1"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
