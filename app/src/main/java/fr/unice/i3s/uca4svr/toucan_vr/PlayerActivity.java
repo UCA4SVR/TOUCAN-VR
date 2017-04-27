@@ -23,7 +23,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
@@ -56,6 +55,8 @@ import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 import java.util.HashSet;
 import java.util.Set;
 
+import fr.unice.i3s.uca4svr.toucan_vr.connection_checker.CheckConnection;
+import fr.unice.i3s.uca4svr.toucan_vr.connection_checker.CheckConnectionResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
@@ -65,7 +66,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
-public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
+public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
 
     public static final int STATUS_OK = 0;
     public static final int NO_INTENT = 1;
@@ -95,9 +96,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private int bufferForPlaybackAfterRebufferMs =
             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
-    private String logPrefix = "bitmovin105560";
-    private boolean loggingBandwidth = true;
-    private boolean loggingHeadMotion = true;
+    private String logPrefix = "Log";
+    private boolean loggingBandwidth = false;
+    private boolean loggingHeadMotion = false;
 
     private String[] tiles;
     private int gridWidth = 3;
@@ -121,8 +122,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mainHandler = new Handler();
 
         // Extract parameters from the intent
-        if(getIntent()!=null && getIntent().getExtras()!=null) {
-            Intent intent = getIntent();
+        Intent intent = getIntent();
+        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
             mediaUri = intent.getStringExtra("videoLink");
             logPrefix = intent.getStringExtra("videoName");
             minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
@@ -131,15 +132,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
             bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
-            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
-            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
+            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
+            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
             gridWidth = intent.getIntExtra("W", 3);
             gridHeight = intent.getIntExtra("H", 3);
             tiles = intent.getStringExtra("tilesCSV").split(",");
             numberOfTiles = tiles.length / 4;
         } else {
-            // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
-
+            // N.B. uncommenting the following line should prevent the player from being created
             //statusCode = NO_INTENT;
 
             // Overriding some variables so that we can keep testing the application without the parametrizer
@@ -151,57 +151,39 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
         }
 
-        // We avoid creating the player at first
-        videoSceneObjectPlayer = null;
-        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer, statusCode,
-                permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
+        // We avoid creating the player at first. We will create it only if the source is accessible.
+        final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
+                statusCode, logPrefix, tiles, gridWidth, gridHeight);
         setMain(main, "gvr.xml");
 
         // If there is no intent, we don't try to create the player or ask for permissions etc.
         if (statusCode != NO_INTENT)
-            checkMediaUri();
+            checkInternetAndPermissions();
     }
 
-    // Dummy example (to replace with the actual method that checks the url's reachability
-    private void checkMediaUri() {
+    /**
+     *  Permissions for accessing the storage are now requested upfront (if necessary).
+     *  Also, we check the internet connectivity and whether the link is actually accessible.
+     *  Such requests lead to callbacks that are handled later in the code.
+     */
+    private void checkInternetAndPermissions() {
         if(Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
             Set<String> permissions = new HashSet<>();
             permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
             permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            //if (permissionManager.isPermissionGranted(permissions))
-                permissionManager.requestPermissions(permissions, this);
+            permissionManager.requestPermissions(permissions, this);
         }
         if(!Util.isLocalFileUri(Uri.parse(mediaUri))) {
-            /*CheckConnection checkConnection = new CheckConnection(this);
+            CheckConnection checkConnection = new CheckConnection(this);
             checkConnection.response = this;
-            checkConnection.execute(mediaUri);*/
-
-            // Testing no internet situation
-            //statusCode = NO_INTERNET;
-            //((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
-
-        }
-    }
-
-    /*@Override
-    public void urlChecked(boolean exists) {
-        if (exists) {
-            // Check whether we should log the bandwidth or not
-            if(loggingBandwidth)
-                MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
-            videoSceneObjectPlayer = makeVideoSceneObject();
-            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
-        } else {
-            statusCode = NO_INTERNET;
-            ((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
-            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(null);
+            checkConnection.execute(mediaUri);
         }
     }
 
     /**
      * The event is triggered every time the user touches the GearVR trackpad.
-     * If the touch event lasts less than 200 ms it is recognized as a "Tap"
-     * and the playback is paused or restarted according to the current state.
+     * If the touch event lasts less than 200 ms it is recognized as a "Tap".
+     * The tap che be used to play/pause the playback or to trigger a change of scene.
      */
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -216,13 +198,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     break;
                 case NO_PERMISSION:
                     ((Minimal360Video) getMain()).sceneDispatcher();
-                    // TODO: Ask for permission again ?
+                    // Permissions can be requested up to three times
                     Set<String> permissions = new HashSet<>();
                     permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                     permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
                     permissionManager.requestPermissions(permissions, this);
                     break;
                 case STATUS_OK:
+                    ((Minimal360Video) getMain()).sceneDispatcher();
                     if (videoSceneObjectPlayer != null) {
                         final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
                         if (exoPlayer != null) {
@@ -232,10 +215,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                                 videoSceneObjectPlayer.start();
                         }
                     }
-                    ((Minimal360Video) getMain()).sceneDispatcher();
-                    break;
-                default:
-                    ((Minimal360Video) getMain()).sceneDispatcher();
                     break;
             }
         }
@@ -290,20 +269,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             uris = new Uri[] {Uri.parse(mediaUri)};
             extensions = new String[1];
 
-            /*boolean isAUriLocal = false;
-            for (Uri uri : uris) {
-                if (Util.isLocalFileUri(uri)) {
-                    isAUriLocal = true;
-                }
-            }
-            Set<String> permissions = new HashSet<>();
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            if (isAUriLocal && !permissionManager.isPermissionGranted(permissions)) {
-                // The player will be reinitialized if the permission is granted.
-                permissionManager.requestPermissions(permissions, this);
-                return null;
-            }*/
             MediaSource[] mediaSources = new MediaSource[uris.length];
             for (int i = 0; i < uris.length; i++) {
                 mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
@@ -318,21 +283,38 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         return new ExoplayerSceneObject(player);
     }
 
+    // Callback for the permission requests
     @Override
     public void onPermissionRequestDone(int requestID, int result) {
-
-        // Make sure that we have internet access, otherwise it is not safe to overwrite the Status
+        // If there is no internet, it's not safe to overwrite the status
         if (statusCode != NO_INTERNET) {
             if (result == PackageManager.PERMISSION_GRANTED) {
                 videoSceneObjectPlayer = makeVideoSceneObject();
                 ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
                 statusCode = STATUS_OK;
                 ((Minimal360Video) getMain()).setStatusCode(STATUS_OK);
+                if (loggingHeadMotion)
+                    ((Minimal360Video) getMain()).initHeadMotionTracker();
+                if(loggingBandwidth)
+                    MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
             }
             if (result == PackageManager.PERMISSION_DENIED) {
                 statusCode = NO_PERMISSION;
                 ((Minimal360Video) getMain()).setStatusCode(NO_PERMISSION);
             }
+        }
+    }
+
+    // Callback for the internet connectivity check. If okay, the remote link is reachable.
+    @Override
+    public void urlChecked(boolean exists) {
+        if (exists) {
+            videoSceneObjectPlayer = makeVideoSceneObject();
+            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+        } else {
+            statusCode = NO_INTERNET;
+            ((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
+            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(null);
         }
     }
 
