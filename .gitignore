@@ -42,3 +42,8 @@ captures/
 
 # Oculus signature files
 oculussig_*
+
+# Forget about video files
+*.mp4*
+*.mpd*
+*.m4s*
