@@ -13,10 +13,8 @@
  * limitations under the License.
  *
  * Modifications:
- * Package name
- * Displaying head rotations in the debug log
+ * Several adaptations to use Exoplayer2 to display tiles videos.
  * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
- * Author: Romaric Pighetti
  */
 
 package fr.unice.i3s.uca4svr.toucan_vr;
@@ -58,27 +56,42 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
 public class Minimal360Video extends GVRMain implements RequestPermissionResultListener {
-    // The associated android context
-    private final PermissionManager permissionManager;
-    private final String logPrefix;
 
-    // The GVRContext associated with the scene.
-    // Needed by the headMotionTracker
+    // The associated GVR context
     private GVRContext gvrContext;
-
-    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker;
 
+    // Whether we should track the head motions or not
+    private boolean loggingHeadMotion;
+
+    // The prefix to give to the log file
+    private final String logPrefix;
+
+    private final PermissionManager permissionManager;
+
+    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
+
     private boolean videoStarted = false;
     private boolean videoEnded = false;
 
+    // Info about the tiles, needed to properly build the sphere
+    private int gridHeight;
+    private int gridWidth;
+    private String[] tiles;
+
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
-                    PermissionManager permissionManager, String logPrefix) {
+                    PermissionManager permissionManager, String logPrefix,
+                    String [] tiles, int gridWidth, int gridHeight,
+                    boolean loggingHeadMotion) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.permissionManager = permissionManager;
         this.logPrefix = logPrefix;
+        this.tiles = tiles;
+        this.gridWidth = gridWidth;
+        this.gridHeight = gridHeight;
+        this.loggingHeadMotion = loggingHeadMotion;
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -167,24 +180,20 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             // Start with a clean scene to add only the video
             scene.removeAllSceneObjects();
 
-            // Create the meshes on which video tiles are rendered (portions of sphere right now)
-            int videoRendererCount = 9;
-            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[videoRendererCount];
-
-            // TODO: Replace this to build the array of tiles form the intent or the manifest
-            ArrayList<int[]> tiles = new ArrayList<>();
-
-            int gridHeight = 3;
-            int gridWidth = 3;
-            for (int i = 0; i < gridHeight; i++) {
-                for (int j = 0; j < gridWidth; j++) {
-                    tiles.add(new int[]{i, j, 1, 1});
-                }
+            // Create a list of tiles to provide to the sphere constructor
+            ArrayList<int[]> listOfTiles = new ArrayList<>();
+            for (int i=0; i < tiles.length-3; i=i+4) {
+                listOfTiles.add(new int[]{Integer.parseInt(tiles[i]),
+                        Integer.parseInt(tiles[i + 1]),
+                        Integer.parseInt(tiles[i + 2]),
+                        Integer.parseInt(tiles[i + 3])});
             }
-            // END_TODO
 
+            // Create the meshes on which video tiles are rendered (portions of sphere right now)
             final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
-                    72, 144, gridHeight, gridWidth, tiles, false);
+                    72, 144, gridHeight, gridWidth, listOfTiles, false);
+
+            final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[tiles.length/4];
 
             final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
             for (int i = 0; i < sphereMeshes.getNumberOfTiles(); i++) {
@@ -210,8 +219,10 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     }
 
     private void initHeadMotionTracker() {
-        // Give the context to the logger so that it has access to the camera
-        headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
+        // Check whether we should log the head motions or not.
+        if (loggingHeadMotion)
+            // Give the context to the logger so that it has access to the camera
+            headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
     }
 
     private void createWaitForPermissionScene() {
@@ -221,7 +232,6 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
-        //*
         Future<GVRTexture> textureSphere  = gvrContext.loadFutureTexture(
                 new GVRAndroidResource(gvrContext, R.drawable.prague));
         GVRSphereSceneObject sphereObject = new GVRSphereSceneObject(gvrContext, false, textureSphere);
@@ -280,9 +290,7 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         sphereObject.getTransform().setScale(100, 100, 100);
         scene.addSceneObject(sphereObject);
 
-        /* add message with request to remove the headset
-         * N.B. the message here is an image remove.png taken from the resources;
-         * an alternative would be creating a text object as shown above. */
+        // add message with request to remove the headset
         GVRAssetLoader gvrAssetLoader = new GVRAssetLoader(gvrContext);
         GVRTexture texture = gvrAssetLoader.loadTexture(new GVRAndroidResource(
                 gvrContext, R.drawable.remove));
