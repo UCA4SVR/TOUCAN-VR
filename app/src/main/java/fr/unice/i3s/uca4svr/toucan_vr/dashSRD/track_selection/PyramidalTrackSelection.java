@@ -55,7 +55,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int selectedIndex;
     private int reason;
     private int adaptationSetIndex;
-    private int counter;
+    private static int initCounter = -1;
 
     /**
      * Factory for {@link AdaptiveTrackSelection} instances.
@@ -153,38 +153,40 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                                   long maxDurationForQualityDecreaseMs, long minDurationToRetainAfterDiscardMs,
                                   float bandwidthFraction) {
         super(group, tracks);
-
         this.bandwidthMeter = bandwidthMeter;
         this.maxInitialBitrate = maxInitialBitrate;
         this.minDurationForQualityIncreaseUs = minDurationForQualityIncreaseMs * 1000L;
         this.maxDurationForQualityDecreaseUs = maxDurationForQualityDecreaseMs * 1000L;
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
-        selectedIndex = determineIdealSelectedIndex(Long.MIN_VALUE);
+        selectedIndex = determineIdealSelectedIndex(true);
+        adaptationSetIndex = ++initCounter;
         reason = C.SELECTION_REASON_INITIAL;
-        counter = 0;
     }
 
-    public void updateIndex(int adaptationSetIndex) {
-        this.adaptationSetIndex = adaptationSetIndex;
-    }
 
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
-        /*
-        Log.e("SRD "+counter,"Method called for the adaptation set "+adaptationSetIndex);
-        counter++;
+
+        Log.e("SRD","Method called for the adaptation set "+adaptationSetIndex);
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         Log.e("SRD",adaptationSetIndex + "Picked? "+isPicked);
-        long nowMs = SystemClock.elapsedRealtime();
+
+
+
+
+
+        //long nowMs = SystemClock.elapsedRealtime();
         // Get the current and ideal selections.
         int currentSelectedIndex = selectedIndex;
-        Format currentFormat = getSelectedFormat();
-        int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
-        Format idealFormat = getFormat(idealSelectedIndex);
+        selectedIndex = isPicked ? 0 : 1;
+        //Format currentFormat = getSelectedFormat();
+        //int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
+        //Format idealFormat = getFormat(idealSelectedIndex);
         // Assume we can switch to the ideal selection.
-        selectedIndex = idealSelectedIndex;
+        //selectedIndex = idealSelectedIndex;
 
+        /*
         // Revert back to the current selection if conditions are not suitable for switching.
         if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
             if (idealFormat.bitrate > currentFormat.bitrate
@@ -198,13 +200,11 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                 selectedIndex = currentSelectedIndex;
             }
         }
+        */
         // If we adapted, update the trigger.
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
-        */
-        selectedIndex = (adaptationSetIndex+counter)%2 == 0 ? 0 : 1;
-        counter++;
         Log.e("SRD","Selection for tile "+adaptationSetIndex + " is " + selectedIndex);
 
     }
@@ -234,7 +234,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         if (bufferedDurationUs < minDurationToRetainAfterDiscardUs) {
             return queueSize;
         }
-        int idealSelectedIndex = determineIdealSelectedIndex(SystemClock.elapsedRealtime());
+        int idealSelectedIndex = determineIdealSelectedIndex(true);
         Format idealFormat = getFormat(idealSelectedIndex);
         // If the chunks contain video, discard from the first SD chunk beyond
         // minDurationToRetainAfterDiscardUs whose resolution and bitrate are both lower than the ideal
@@ -257,15 +257,14 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     /*
     Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
      */
-    private int determineIdealSelectedIndex(boolean isPicked) {
-        if(isPicked) return 0;
-        else return (length-1);
+    private int determineIdealSelectedIndex(boolean isPicked) {;
+        if(isPicked) return 0; else return length-1;
     }
 
     /*
      * Original method
      * Computes the ideal selected index ignoring buffer health.
-     */
+
     private int determineIdealSelectedIndex(long nowMs) {
         long bitrateEstimate = bandwidthMeter.getBitrateEstimate();
         long effectiveBitrate = bitrateEstimate == BandwidthMeter.NO_ESTIMATE
@@ -283,5 +282,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
         return lowestBitrateNonBlacklistedIndex;
     }
+    */
 
 }

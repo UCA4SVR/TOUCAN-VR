@@ -185,11 +185,8 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
 
         long bufferedDurationUs = previous != null ? (previous.endTimeUs - playbackPositionUs) : 0;
 
-        //Update the number of the track
-        if(PyramidalTrackSelection.class.isInstance(trackSelection))
-            ((PyramidalTrackSelection)trackSelection).updateIndex(adaptationSetIndex);
-
-        //Then call the method to choose the track
+        //Call the method to choose the track
+        int a = adaptationSetIndex;
         trackSelection.updateSelectedTrack(bufferedDurationUs);
 
         RepresentationHolder representationHolder =
