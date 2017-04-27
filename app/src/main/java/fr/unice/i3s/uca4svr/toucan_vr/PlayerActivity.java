@@ -113,7 +113,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mainHandler = new Handler();
 
         // Extract parameters from the intent
-        if(getIntent()!=null && getIntent().getExtras()!=null) {
+        if(getIntent()!=null && getIntent().getExtras()!=null && getIntent().getStringExtra("videoLink")!=null) {
             Intent intent = getIntent();
             mediaUri = intent.getStringExtra("videoLink");
             logPrefix = intent.getStringExtra("videoName");
