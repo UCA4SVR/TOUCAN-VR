@@ -66,7 +66,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
-    private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
+    private static DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
             new TransferListenerBroadcaster();
 
@@ -92,8 +92,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingHeadMotion = false;
 
     private String[] tiles;
-    private int gridWidth = 3;
-    private int gridHeight = 3;
+    private int gridWidth = 1;
+    private int gridHeight = 1;
     private int numberOfTiles = 1;
 
     private String userAgent;
@@ -102,19 +102,34 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private final boolean shouldAutoPlay = false;
 
+    private Intent intent;
+    private boolean newIntent = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         permissionManager = new PermissionManager(this);
-
         userAgent = Util.getUserAgent(this, "Toucan_VR");
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
-        // Extract parameters from the intent
-        if(getIntent()!=null && getIntent().getExtras()!=null) {
-            Intent intent = getIntent();
+        intent = getIntent();
+        parseIntent();
+
+        // Check whether we should log the bandwidth or not
+        if(loggingBandwidth) {
+            MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+        }
+
+        videoSceneObjectPlayer = makeVideoSceneObject();
+        Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
+                permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
+        setMain(main, "gvr.xml");
+    }
+
+    private void parseIntent() {
+        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
             mediaUri = intent.getStringExtra("videoLink");
             logPrefix = intent.getStringExtra("videoName");
             minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
@@ -123,8 +138,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
             bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
                     DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
-            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", true);
-            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", true);
+            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
+            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
             gridWidth = intent.getIntExtra("W", 3);
             gridHeight = intent.getIntExtra("H", 3);
             tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -133,24 +148,72 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // TODO: handle the case when no intent exists (the app was not launched from the parametrizer)
 
             // Overriding some variables so that we can keep testing the application without the parametrizer
-            numberOfTiles = 9;
+            numberOfTiles = 1;
+            gridWidth = 1;
+            gridHeight = 1;
+            String tilesCSV = "0,0,1,1";
+            tiles = tilesCSV.split(",");
+            mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
+            /*numberOfTiles = 9;
             gridWidth = 3;
             gridHeight = 3;
             String tilesCSV = "0,0,1,1,1,0,1,1,2,0,1,1,0,1,1,1,1,1,1,1,2,1,1,1,0,2,1,1,1,2,1,1,2,2,1,1";
             tiles = tilesCSV.split(",");
-            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";*/
         }
+    }
 
-        // TODO: Check if mediaUri is actually reachable.
+    /**
+     * Always called before onResume (except when we first launch the application, in which
+     * case onResume gets called right after onCreate).
+     * The intent has extras only when it comes from the parametrizer app.
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
+            this.newIntent = true;
+            this.intent = intent;
+            if (videoSceneObjectPlayer != null) {
+                // TODO: Does this really releases the surfaces ?
+                videoSceneObjectPlayer.release();
+                videoSceneObjectPlayer = null;
+                player = null;
+            }
+        }
+    }
 
-        // Check whether we should log the bandwidth or not
-        if(loggingBandwidth)
-            MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+    // Rebuild everything if the intent has changed.
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (newIntent) {
+            newIntent = false;
+            parseIntent();
 
-        videoSceneObjectPlayer = makeVideoSceneObject();
-        final Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
-                permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
-        setMain(main, "gvr.xml");
+            // clean the listeners list, we got to start fresh.
+            MASTER_TRANSFER_LISTENER.removeAllListeners();
+
+            // Old logging instance removed from the listeners and a new one is created.
+            if(loggingBandwidth) {
+                MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+            }
+
+            // Lets reset the bandwidth meter too to avoid using legacy bandwidth estimates
+            BANDWIDTH_METER = new DefaultBandwidthMeter();
+            MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
+
+            videoSceneObjectPlayer = makeVideoSceneObject();
+            Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
+                    permissionManager, logPrefix, tiles, gridWidth, gridHeight, loggingHeadMotion);
+            setMain(main, "gvr.xml");
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (videoSceneObjectPlayer != null)
+            videoSceneObjectPlayer.pause();
     }
 
     /**
