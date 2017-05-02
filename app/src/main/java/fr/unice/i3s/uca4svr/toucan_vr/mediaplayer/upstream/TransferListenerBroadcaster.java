@@ -28,7 +28,7 @@ import java.util.Set;
  */
 public class TransferListenerBroadcaster implements TransferListener<Object> {
 
-    Set<TransferListener<Object>> listeners = new HashSet<>();
+    private Set<TransferListener<Object>> listeners = new HashSet<>();
 
     public TransferListenerBroadcaster() {}
 
@@ -48,9 +48,7 @@ public class TransferListenerBroadcaster implements TransferListener<Object> {
 
     @Override
     synchronized public void onTransferStart(Object source, DataSpec dataSpec) {
-        for (TransferListener<Object> listener : listeners) {
-            listener.onTransferStart(source, dataSpec);
-        }
+        listeners.removeAll(listeners);
     }
 
     @Override
