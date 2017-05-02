@@ -66,7 +66,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener {
 
-    private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
+    private static DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
             new TransferListenerBroadcaster();
 
@@ -118,8 +118,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         parseIntent();
 
         // Check whether we should log the bandwidth or not
-        if(loggingBandwidth)
+        if(loggingBandwidth) {
             MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+        }
 
         videoSceneObjectPlayer = makeVideoSceneObject();
         Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
@@ -173,6 +174,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             this.newIntent = true;
             this.intent = intent;
             if (videoSceneObjectPlayer != null) {
+                // TODO: Does this really releases the surfaces ?
                 videoSceneObjectPlayer.release();
                 videoSceneObjectPlayer = null;
                 player = null;
@@ -188,9 +190,17 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             newIntent = false;
             parseIntent();
 
-            // FIXME: This needs to be handled better. Plus, what happens to the old log files?
-            if(loggingBandwidth)
+            // clean the listeners list, we got to start fresh.
+            MASTER_TRANSFER_LISTENER.removeAllListeners();
+
+            // Old logging instance removed from the listeners and a new one is created.
+            if(loggingBandwidth) {
                 MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+            }
+
+            // Lets reset the bandwidth meter too to avoid using legacy bandwidth estimates
+            BANDWIDTH_METER = new DefaultBandwidthMeter();
+            MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
 
             videoSceneObjectPlayer = makeVideoSceneObject();
             Minimal360Video main = new Minimal360Video(videoSceneObjectPlayer,
