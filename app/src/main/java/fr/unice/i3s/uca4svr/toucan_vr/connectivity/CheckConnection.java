@@ -1,4 +1,4 @@
-package fr.unice.i3s.uca4svr.toucan_vr.connection_checker;
+package fr.unice.i3s.uca4svr.toucan_vr.connectivity;
 
 import android.content.Context;
 import android.net.ConnectivityManager;

@@ -56,9 +56,6 @@ public class Minimal360Video extends GVRMain {
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker = null;
 
-    // The prefix to give to the log file
-    private final String logPrefix;
-
     private int statusCode = 0;
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
@@ -73,10 +70,9 @@ public class Minimal360Video extends GVRMain {
     private String[] tiles;
 
     Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer, int statusCode,
-                    String logPrefix, String [] tiles, int gridWidth, int gridHeight) {
+                    String [] tiles, int gridWidth, int gridHeight) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
         this.statusCode = statusCode;
-        this.logPrefix = logPrefix;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
         this.gridHeight = gridHeight;
@@ -253,10 +249,10 @@ public class Minimal360Video extends GVRMain {
         scene.getMainCameraRig().addChildObject(textObject);
     }
 
-    public void initHeadMotionTracker() {
-        // Give the context to the logger so that it has access to the camera
+    public void initHeadMotionTracker(String logPrefix) {
+        // We cannot provide the GVRContext because is not yet available when the method is called
         if (headMotionTracker == null)
-            headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
+            headMotionTracker = new HeadMotionTracker(logPrefix);
     }
 
     @Override
@@ -267,7 +263,7 @@ public class Minimal360Video extends GVRMain {
                 videoSceneObjectPlayer != null &&
                 videoSceneObjectPlayer.getPlayer() != null &&
                 videoSceneObjectPlayer.getPlayer().getPlayWhenReady()) {
-            headMotionTracker.track(videoSceneObjectPlayer.getPlayer().getCurrentPosition());
+            headMotionTracker.track(gvrContext, videoSceneObjectPlayer.getPlayer().getCurrentPosition());
         }
     }
 }

@@ -55,8 +55,8 @@ import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 import java.util.HashSet;
 import java.util.Set;
 
-import fr.unice.i3s.uca4svr.toucan_vr.connection_checker.CheckConnection;
-import fr.unice.i3s.uca4svr.toucan_vr.connection_checker.CheckConnectionResponse;
+import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnection;
+import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnectionResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
@@ -72,8 +72,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     public static final int NO_INTENT = 1;
     public static final int NO_INTERNET = 2;
     public static final int NO_PERMISSION = 3;
-
-    private int statusCode = STATUS_OK;
 
     private static DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
@@ -111,6 +109,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private final boolean shouldAutoPlay = false;
 
+    private int statusCode = STATUS_OK;
+
     private Intent intent;
     private boolean newIntent = false;
 
@@ -128,17 +128,17 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // We avoid creating the player at first. We will create it only if the source is accessible.
         final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
-                statusCode, logPrefix, tiles, gridWidth, gridHeight);
+                statusCode, tiles, gridWidth, gridHeight);
         setMain(main, "gvr.xml");
 
-        // If there is no intent, we don't try to create the player or ask for permissions etc.
+        // At this point we know if there is no intent, in which case
+        // we don't try to create the player or ask for permissions etc.
         if (statusCode != NO_INTENT)
             checkInternetAndPermissions();
     }
 
     private void parseIntent() {
         if(intent!=null && intent.getStringExtra("videoLink")!=null) {
-            statusCode = STATUS_OK;
             mediaUri = intent.getStringExtra("videoLink");
             logPrefix = intent.getStringExtra("videoName");
             minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
@@ -153,42 +153,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             gridHeight = intent.getIntExtra("H", 3);
             tiles = intent.getStringExtra("tilesCSV").split(",");
             numberOfTiles = tiles.length / 4;
+            statusCode = STATUS_OK;
         } else {
-            // N.B. uncommenting the following line should prevent the player from being created
             statusCode = NO_INTENT;
-
-            // Overriding some variables so that we can keep testing the application without the parametrizer
-            numberOfTiles = 1;
-            gridWidth = 1;
-            gridHeight = 1;
-            String tilesCSV = "0,0,1,1";
-            tiles = tilesCSV.split(",");
-            mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
-            /*numberOfTiles = 9;
-            gridWidth = 3;
-            gridHeight = 3;
-            String tilesCSV = "0,0,1,1,1,0,1,1,2,0,1,1,0,1,1,1,1,1,1,1,2,1,1,1,0,2,1,1,1,2,1,1,2,2,1,1";
-            tiles = tilesCSV.split(",");
-            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";*/
-        }
-    }
-
-    /**
-     *  Permissions for accessing the storage are now requested upfront (if necessary).
-     *  Also, we check the internet connectivity and whether the link is actually accessible.
-     *  Such requests lead to callbacks that are handled later in the code.
-     */
-    private void checkInternetAndPermissions() {
-        if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
-            Set<String> permissions = new HashSet<>();
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            permissionManager.requestPermissions(permissions, this);
-        }
-        if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
-            CheckConnection checkConnection = new CheckConnection(this);
-            checkConnection.response = this;
-            checkConnection.execute(mediaUri);
         }
     }
 
@@ -227,7 +194,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
 
             final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
-                    statusCode, logPrefix, tiles, gridWidth, gridHeight);
+                    statusCode, tiles, gridWidth, gridHeight);
             setMain(main, "gvr.xml");
 
             if (statusCode != NO_INTENT)
@@ -243,6 +210,25 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     }
 
     /**
+     *  Permissions for accessing the storage are now requested upfront (if necessary).
+     *  Also, we check the internet connectivity and whether the link is actually accessible.
+     *  Such requests lead to callbacks that are handled later in the code.
+     */
+    private void checkInternetAndPermissions() {
+        if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
+            Set<String> permissions = new HashSet<>();
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            permissionManager.requestPermissions(permissions, this);
+        }
+        if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
+            CheckConnection checkConnection = new CheckConnection(this);
+            checkConnection.response = this;
+            checkConnection.execute(mediaUri);
+        }
+    }
+
+    /**
      * The event is triggered every time the user touches the GearVR trackpad.
      * If the touch event lasts less than 200 ms it is recognized as a "Tap".
      * The tap che be used to play/pause the playback or to trigger a change of scene.
@@ -255,9 +241,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             switch (statusCode) {
                 case NO_INTENT:
                     break;
-                case NO_INTERNET:
-                    ((Minimal360Video) getMain()).sceneDispatcher();
-                    break;
                 case NO_PERMISSION:
                     ((Minimal360Video) getMain()).sceneDispatcher();
                     // Permissions can be requested up to three times
@@ -266,7 +249,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
                     permissionManager.requestPermissions(permissions, this);
                     break;
-                case STATUS_OK:
+                // in case of NO_INTERNET the video object player is null
+                default:
                     ((Minimal360Video) getMain()).sceneDispatcher();
                     if (videoSceneObjectPlayer != null) {
                         final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
@@ -356,7 +340,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 statusCode = STATUS_OK;
                 ((Minimal360Video) getMain()).setStatusCode(STATUS_OK);
                 if (loggingHeadMotion)
-                    ((Minimal360Video) getMain()).initHeadMotionTracker();
+                    ((Minimal360Video) getMain()).initHeadMotionTracker(logPrefix);
                 if(loggingBandwidth)
                     MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
             }
