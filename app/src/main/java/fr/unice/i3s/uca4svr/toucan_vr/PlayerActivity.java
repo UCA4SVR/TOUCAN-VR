@@ -75,7 +75,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private int statusCode = STATUS_OK;
 
-    private static final DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
+    private static DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
     private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
             new TransferListenerBroadcaster();
 
@@ -101,8 +101,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingHeadMotion = false;
 
     private String[] tiles;
-    private int gridWidth = 3;
-    private int gridHeight = 3;
+    private int gridWidth = 1;
+    private int gridHeight = 1;
     private int numberOfTiles = 1;
 
     private String userAgent;
@@ -111,19 +111,34 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private final boolean shouldAutoPlay = false;
 
+    private Intent intent;
+    private boolean newIntent = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         permissionManager = new PermissionManager(this);
-
         userAgent = Util.getUserAgent(this, "Toucan_VR");
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
-        // Extract parameters from the intent
-        Intent intent = getIntent();
+        intent = getIntent();
+        parseIntent();
+
+        // We avoid creating the player at first. We will create it only if the source is accessible.
+        final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
+                statusCode, logPrefix, tiles, gridWidth, gridHeight);
+        setMain(main, "gvr.xml");
+
+        // If there is no intent, we don't try to create the player or ask for permissions etc.
+        if (statusCode != NO_INTENT)
+            checkInternetAndPermissions();
+    }
+
+    private void parseIntent() {
         if(intent!=null && intent.getStringExtra("videoLink")!=null) {
+            statusCode = STATUS_OK;
             mediaUri = intent.getStringExtra("videoLink");
             logPrefix = intent.getStringExtra("videoName");
             minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
@@ -140,25 +155,22 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             numberOfTiles = tiles.length / 4;
         } else {
             // N.B. uncommenting the following line should prevent the player from being created
-            //statusCode = NO_INTENT;
+            statusCode = NO_INTENT;
 
             // Overriding some variables so that we can keep testing the application without the parametrizer
-            numberOfTiles = 9;
+            numberOfTiles = 1;
+            gridWidth = 1;
+            gridHeight = 1;
+            String tilesCSV = "0,0,1,1";
+            tiles = tilesCSV.split(",");
+            mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
+            /*numberOfTiles = 9;
             gridWidth = 3;
             gridHeight = 3;
             String tilesCSV = "0,0,1,1,1,0,1,1,2,0,1,1,0,1,1,1,1,1,1,1,2,1,1,1,0,2,1,1,1,2,1,1,2,2,1,1";
             tiles = tilesCSV.split(",");
-            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";*/
         }
-
-        // We avoid creating the player at first. We will create it only if the source is accessible.
-        final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
-                statusCode, logPrefix, tiles, gridWidth, gridHeight);
-        setMain(main, "gvr.xml");
-
-        // If there is no intent, we don't try to create the player or ask for permissions etc.
-        if (statusCode != NO_INTENT)
-            checkInternetAndPermissions();
     }
 
     /**
@@ -167,17 +179,67 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      *  Such requests lead to callbacks that are handled later in the code.
      */
     private void checkInternetAndPermissions() {
-        if(Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
+        if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
             Set<String> permissions = new HashSet<>();
             permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
             permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
             permissionManager.requestPermissions(permissions, this);
         }
-        if(!Util.isLocalFileUri(Uri.parse(mediaUri))) {
+        if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
             CheckConnection checkConnection = new CheckConnection(this);
             checkConnection.response = this;
             checkConnection.execute(mediaUri);
         }
+    }
+
+    /**
+     * Always called before onResume (except when we first launch the application, in which
+     * case onResume gets called right after onCreate).
+     * The intent has extras only when it comes from the parametrizer app.
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
+            this.newIntent = true;
+            this.intent = intent;
+            if (videoSceneObjectPlayer != null) {
+                // TODO: Does this really releases the surfaces ?
+                videoSceneObjectPlayer.release();
+                videoSceneObjectPlayer = null;
+                player = null;
+            }
+        }
+    }
+
+    // Rebuild everything if the intent has changed.
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (newIntent) {
+            newIntent = false;
+            parseIntent();
+
+            // clean the listeners list, we got to start fresh.
+            MASTER_TRANSFER_LISTENER.removeAllListeners();
+
+            // Lets reset the bandwidth meter too to avoid using legacy bandwidth estimates
+            BANDWIDTH_METER = new DefaultBandwidthMeter();
+            MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
+
+            final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
+                    statusCode, logPrefix, tiles, gridWidth, gridHeight);
+            setMain(main, "gvr.xml");
+
+            if (statusCode != NO_INTENT)
+                checkInternetAndPermissions();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (videoSceneObjectPlayer != null)
+            videoSceneObjectPlayer.pause();
     }
 
     /**
@@ -313,6 +375,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
         } else {
             statusCode = NO_INTERNET;
+            videoSceneObjectPlayer = null;
             ((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
             ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(null);
         }

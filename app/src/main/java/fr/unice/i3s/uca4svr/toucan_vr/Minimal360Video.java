@@ -54,7 +54,7 @@ public class Minimal360Video extends GVRMain {
     private GVRContext gvrContext;
 
     // The head motion tracker to log head motions
-    private HeadMotionTracker headMotionTracker;
+    private HeadMotionTracker headMotionTracker = null;
 
     // The prefix to give to the log file
     private final String logPrefix;
@@ -94,9 +94,6 @@ public class Minimal360Video extends GVRMain {
     @Override
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
-
-        // The tracker will be initialized from the PlayerActivity, once it has access to storage.
-        headMotionTracker = null;
 
         // We need to create the scene
         sceneDispatcher();
