@@ -34,6 +34,7 @@ import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 
 import java.util.List;
+import java.util.Random;
 
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
@@ -164,6 +165,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         reason = C.SELECTION_REASON_INITIAL;
     }
 
+    boolean cnt = false;
 
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
@@ -179,7 +181,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         //long nowMs = SystemClock.elapsedRealtime();
         // Get the current and ideal selections.
         int currentSelectedIndex = selectedIndex;
-        selectedIndex = isPicked ? 0 : 1;
+        cnt = !cnt;
+        selectedIndex = isPicked ? 0 : 2;
         //Format currentFormat = getSelectedFormat();
         //int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
         //Format idealFormat = getFormat(idealSelectedIndex);

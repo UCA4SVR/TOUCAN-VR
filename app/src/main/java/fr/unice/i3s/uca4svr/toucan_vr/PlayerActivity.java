@@ -146,7 +146,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             gridHeight = 3;
             String tilesCSV = "0,0,1,1,1,0,1,1,2,0,1,1,0,1,1,1,1,1,1,1,2,1,1,1,0,2,1,1,1,2,1,1,2,2,1,1";
             tiles = tilesCSV.split(",");
-            mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+            //mediaUri = "http://download.tsi.telecom-paristech.fr/gpac/SRD/360/srd_360.mpd";
+            mediaUri = "file:///android_asset/3lay/manifest.mpd";
         }
         
         // TODO: Check if mediaUri is actually reachable.
