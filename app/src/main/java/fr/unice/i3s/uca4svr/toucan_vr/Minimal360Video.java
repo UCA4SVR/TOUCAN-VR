@@ -56,9 +56,10 @@ public class Minimal360Video extends GVRMain {
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker = null;
 
+    // The status code needed to always know which virtual scene to create
     private int statusCode = 0;
 
-    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
+    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer = null;
 
     private boolean videoStarted = false;
     private boolean videoEnded = false;
@@ -69,9 +70,7 @@ public class Minimal360Video extends GVRMain {
     private int gridWidth;
     private String[] tiles;
 
-    Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer, int statusCode,
-                    String [] tiles, int gridWidth, int gridHeight) {
-        this.videoSceneObjectPlayer = videoSceneObjectPlayer;
+    Minimal360Video(int statusCode, String [] tiles, int gridWidth, int gridHeight) {
         this.statusCode = statusCode;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
@@ -91,7 +90,7 @@ public class Minimal360Video extends GVRMain {
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
 
-        // We need to create the scene
+        // We need to create the initial scene
         sceneDispatcher();
     }
 
@@ -238,7 +237,7 @@ public class Minimal360Video extends GVRMain {
         sphereObject.getTransform().setScale(100, 100, 100);
         scene.addSceneObject(sphereObject);
 
-        // add the message to the scene (using Text Objects for now, but we can still change this)
+        // add the message to the scene (using Text Objects for now)
         GVRTextViewSceneObject textObject = (GVRTextViewSceneObject)message;
         textObject.setBackgroundColor(Color.TRANSPARENT);
         textObject.setTextColor(Color.RED);
@@ -250,7 +249,7 @@ public class Minimal360Video extends GVRMain {
     }
 
     public void initHeadMotionTracker(String logPrefix) {
-        // We cannot provide the GVRContext because is not yet available when the method is called
+        // We cannot provide the GVRContext because it is not yet available when the method is called
         if (headMotionTracker == null)
             headMotionTracker = new HeadMotionTracker(logPrefix);
     }

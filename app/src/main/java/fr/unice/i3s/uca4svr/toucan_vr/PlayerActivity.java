@@ -73,18 +73,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     public static final int NO_INTERNET = 2;
     public static final int NO_PERMISSION = 3;
 
-    private static DefaultBandwidthMeter BANDWIDTH_METER = new DefaultBandwidthMeter();
-    private static final TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
+    private static TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
             new TransferListenerBroadcaster();
-
-    static {
-        MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
-    }
 
     private PermissionManager permissionManager = null;
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
     private ExoPlayer player;
+    private DefaultBandwidthMeter bandwidthMeter;
 
     // Player's parameters to fine tune as we need
     private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
@@ -123,18 +119,46 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         mediaDataSourceFactory = buildDataSourceFactory(true);
         mainHandler = new Handler();
 
+        // Retrieve the intent and extract the parameters
         intent = getIntent();
         parseIntent();
 
-        // We avoid creating the player at first. We will create it only if the source is accessible.
-        final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
-                statusCode, tiles, gridWidth, gridHeight);
+        // We can avoid providing the videoSceneObject at first. We will create it only if the source is accessible.
+        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
         setMain(main, "gvr.xml");
 
-        // At this point we know if there is no intent, in which case
-        // we don't try to create the player or ask for permissions etc.
-        if (statusCode != NO_INTENT)
+        // From the parsing method we know if there is no intent available, in which case
+        // we can avoid creating the player, asking for permissions etc.
+        if (statusCode != NO_INTENT) {
+            bandwidthMeter = new DefaultBandwidthMeter();
+            MASTER_TRANSFER_LISTENER.addListener(bandwidthMeter);
             checkInternetAndPermissions();
+        }
+    }
+
+    // Rebuild everything if the intent has changed after launching a new video from the parametrizer.
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (newIntent) {
+            newIntent = false;
+            parseIntent();
+
+            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+            setMain(main, "gvr.xml");
+
+            if (statusCode != NO_INTENT) {
+                // Clean the listeners list, we got to start fresh.
+                MASTER_TRANSFER_LISTENER.removeAllListeners();
+
+                // Lets reset the bandwidth meter too to avoid using legacy bandwidth estimates
+                bandwidthMeter = new DefaultBandwidthMeter();
+                MASTER_TRANSFER_LISTENER.addListener(bandwidthMeter);
+
+                // Check the availability of connection and permissions
+                checkInternetAndPermissions();
+            }
+        }
     }
 
     private void parseIntent() {
@@ -170,35 +194,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             this.newIntent = true;
             this.intent = intent;
             if (videoSceneObjectPlayer != null) {
-                // TODO: Does this really releases the surfaces ?
+                // TODO: Does this really release the surfaces?
                 videoSceneObjectPlayer.release();
                 videoSceneObjectPlayer = null;
                 player = null;
             }
-        }
-    }
-
-    // Rebuild everything if the intent has changed.
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (newIntent) {
-            newIntent = false;
-            parseIntent();
-
-            // clean the listeners list, we got to start fresh.
-            MASTER_TRANSFER_LISTENER.removeAllListeners();
-
-            // Lets reset the bandwidth meter too to avoid using legacy bandwidth estimates
-            BANDWIDTH_METER = new DefaultBandwidthMeter();
-            MASTER_TRANSFER_LISTENER.addListener(BANDWIDTH_METER);
-
-            final Minimal360Video main = new Minimal360Video(/*videoSceneObjectPlayer*/ null,
-                    statusCode, tiles, gridWidth, gridHeight);
-            setMain(main, "gvr.xml");
-
-            if (statusCode != NO_INTENT)
-                checkInternetAndPermissions();
         }
     }
 
@@ -249,7 +249,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
                     permissionManager.requestPermissions(permissions, this);
                     break;
-                // in case of NO_INTERNET the video object player is null
+                // In case of NO_INTERNET the video object player is null
                 default:
                     ((Minimal360Video) getMain()).sceneDispatcher();
                     if (videoSceneObjectPlayer != null) {
@@ -289,7 +289,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // The video track selection factory and the track selector.
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
-                    new AdaptiveTrackSelection.Factory(BANDWIDTH_METER);
+                    new AdaptiveTrackSelection.Factory(bandwidthMeter);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
@@ -329,7 +329,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         return new ExoplayerSceneObject(player);
     }
 
-    // Callback for the permission requests
+    // Callback from the permission requests.
     @Override
     public void onPermissionRequestDone(int requestID, int result) {
         // If there is no internet, it's not safe to overwrite the status
@@ -339,9 +339,10 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
                 statusCode = STATUS_OK;
                 ((Minimal360Video) getMain()).setStatusCode(STATUS_OK);
+                // Initialize the logging to file
                 if (loggingHeadMotion)
                     ((Minimal360Video) getMain()).initHeadMotionTracker(logPrefix);
-                if(loggingBandwidth)
+                if (loggingBandwidth)
                     MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
             }
             if (result == PackageManager.PERMISSION_DENIED) {
