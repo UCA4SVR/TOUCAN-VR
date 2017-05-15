@@ -68,10 +68,10 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
 
-    public enum Status {
+    enum Status {
         NO_INTENT, NO_INTERNET, NO_PERMISSION, CHECKING_INTERNET, CHECKING_PERMISSION,
         CHECKING_INTERNET_AND_PERMISSION, READY_TO_PLAY, PLAYING, PAUSED, PLAYBACK_ENDED,
-        PLAYBACK_ERROR, NULL;
+        PLAYBACK_ERROR, NULL
     }
 
     private static TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
@@ -103,8 +103,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
-
-    private final boolean shouldAutoPlay = false;
 
     private Status statusCode = Status.NULL;
 
@@ -378,7 +376,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // Instantiation of the ExoPlayer using our custom implementation.
             // The number of tiles and the other components created above are given as parameters.
             player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
-            player.setPlayWhenReady(shouldAutoPlay);
+            player.setPlayWhenReady(false);
         }
 
         boolean needPreparePlayer = videoSceneObjectPlayer == null;

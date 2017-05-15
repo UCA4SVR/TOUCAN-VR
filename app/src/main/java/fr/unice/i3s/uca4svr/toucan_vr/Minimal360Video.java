@@ -62,8 +62,6 @@ public class Minimal360Video extends GVRMain {
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer = null;
 
     private boolean videoStarted = false;
-    private boolean videoEnded = false;
-    private boolean onInit = true;
 
     // Info about the tiles, needed to properly build the sphere
     private int gridHeight;
@@ -127,7 +125,6 @@ public class Minimal360Video extends GVRMain {
                     switch (playbackState) {
                         case ExoPlayer.STATE_ENDED:
                             // Display the end scene
-                            videoEnded = true;
                             videoSceneObjectPlayer = null;
                             setStatusCode(PlayerActivity.Status.PLAYBACK_ENDED);
                             break;
@@ -139,7 +136,6 @@ public class Minimal360Video extends GVRMain {
                 @Override
                 public void onPlayerError(ExoPlaybackException error) {
                     // Display the end scene on error
-                    videoEnded = true;
                     videoSceneObjectPlayer = null;
                     setStatusCode(PlayerActivity.Status.PLAYBACK_ERROR);
                 }
@@ -191,7 +187,7 @@ public class Minimal360Video extends GVRMain {
         }
     }
 
-    public void sceneDispatcher() {
+    private void sceneDispatcher() {
         gvrContext.runOnGlThread(
                 new Runnable() {
                      @Override
@@ -221,20 +217,17 @@ public class Minimal360Video extends GVRMain {
                                  break;
                              case PLAYING:
                                  displayVideo();
+                                 break;
                              case PLAYBACK_ENDED:
-                                 if (videoEnded) {
-                                     textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                             "Please remove the headset");
-                                     createScene(textObject);
-                                 }
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Please remove the headset");
+                                 createScene(textObject);
                                  break;
                              case PLAYBACK_ERROR:
-                                 if (videoEnded) {
-                                     textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                             "There was an error while playing the video \n" +
-                                                     "Please remove the headset");
-                                     createScene(textObject);
-                                 }
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "There was an error while playing the video \n" +
+                                                 "Please remove the headset");
+                                 createScene(textObject);
                                  break;
                              case CHECKING_INTERNET:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
@@ -294,11 +287,7 @@ public class Minimal360Video extends GVRMain {
     @Override
     public void onStep() {
         if (headMotionTracker != null &&
-                videoStarted &&
-                !videoEnded &&
-                videoSceneObjectPlayer != null &&
-                videoSceneObjectPlayer.getPlayer() != null &&
-                videoSceneObjectPlayer.getPlayer().getPlayWhenReady()) {
+                statusCode == PlayerActivity.Status.PLAYING) {
             headMotionTracker.track(gvrContext, videoSceneObjectPlayer.getPlayer().getCurrentPosition());
         }
     }
