@@ -57,7 +57,7 @@ public class Minimal360Video extends GVRMain {
     private HeadMotionTracker headMotionTracker = null;
 
     // The status code needed to always know which virtual scene to create
-    private int statusCode = 0;
+    private PlayerActivity.Status statusCode = PlayerActivity.Status.NULL;
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer = null;
 
@@ -70,7 +70,8 @@ public class Minimal360Video extends GVRMain {
     private int gridWidth;
     private String[] tiles;
 
-    Minimal360Video(int statusCode, String [] tiles, int gridWidth, int gridHeight) {
+    Minimal360Video(PlayerActivity.Status statusCode, String [] tiles,
+                    int gridWidth, int gridHeight) {
         this.statusCode = statusCode;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
@@ -81,8 +82,11 @@ public class Minimal360Video extends GVRMain {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
     }
 
-    public void setStatusCode(int statusCode) {
+    public void setStatusCode(PlayerActivity.Status statusCode) {
         this.statusCode = statusCode;
+        if (gvrContext != null) {
+            sceneDispatcher();
+        }
     }
 
     /** Called when the activity is first created. */
@@ -125,7 +129,7 @@ public class Minimal360Video extends GVRMain {
                             // Display the end scene
                             videoEnded = true;
                             videoSceneObjectPlayer = null;
-                            sceneDispatcher();
+                            setStatusCode(PlayerActivity.Status.PLAYBACK_ENDED);
                             break;
                         default:
                             break;
@@ -137,7 +141,7 @@ public class Minimal360Video extends GVRMain {
                     // Display the end scene on error
                     videoEnded = true;
                     videoSceneObjectPlayer = null;
-                    sceneDispatcher();
+                    setStatusCode(PlayerActivity.Status.PLAYBACK_ERROR);
                 }
 
                 @Override
@@ -188,40 +192,73 @@ public class Minimal360Video extends GVRMain {
     }
 
     public void sceneDispatcher() {
-        // According to the state of the application we can understand what scene to build
-        GVRTextViewSceneObject textObject;
-        switch (statusCode) {
-            case PlayerActivity.NO_INTENT:
-                textObject = new GVRTextViewSceneObject(gvrContext, 1.7f, 4f,
-                        "Please launch the application from the parametrizer app");
-                createScene(textObject);
-                break;
-            case PlayerActivity.NO_INTERNET:
-                textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                        "There is no internet connection");
-                createScene(textObject);
-                break;
-            case PlayerActivity.NO_PERMISSION:
-                textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                        "Tap to start after accepting the permissions");
-                createScene(textObject);
-                break;
-            case PlayerActivity.STATUS_OK:
-                if (videoEnded) {
-                    textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                            "Please remove the headset");
-                    createScene(textObject);
-                } else if (!videoStarted) {
-                    if(videoSceneObjectPlayer==null || onInit) {
-                        onInit = false;
-                        textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                "Tap to play!");
-                        createScene(textObject);
-                    } else
-                        displayVideo();
-                }
-                break;
-        }
+        gvrContext.runOnGlThread(
+                new Runnable() {
+                     @Override
+                     public void run() {
+                         // According to the state of the application we can understand what scene to build
+                         GVRTextViewSceneObject textObject;
+                         switch (statusCode) {
+                             case NO_INTENT:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.7f, 4f,
+                                         "Please launch the application from the parametrizer app");
+                                 createScene(textObject);
+                                 break;
+                             case NO_INTERNET:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "There is no internet connection");
+                                 createScene(textObject);
+                                 break;
+                             case NO_PERMISSION:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Tap to start after accepting the permissions");
+                                 createScene(textObject);
+                                 break;
+                             case READY_TO_PLAY:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Tap to play!");
+                                 createScene(textObject);
+                                 break;
+                             case PLAYING:
+                                 displayVideo();
+                             case PLAYBACK_ENDED:
+                                 if (videoEnded) {
+                                     textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                             "Please remove the headset");
+                                     createScene(textObject);
+                                 }
+                                 break;
+                             case PLAYBACK_ERROR:
+                                 if (videoEnded) {
+                                     textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                             "There was an error while playing the video \n" +
+                                                     "Please remove the headset");
+                                     createScene(textObject);
+                                 }
+                                 break;
+                             case CHECKING_INTERNET:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Checking internet connection...");
+                                 createScene(textObject);
+                                 break;
+                             case CHECKING_PERMISSION:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Checking permissions...");
+                                 createScene(textObject);
+                                 break;
+                             case CHECKING_INTERNET_AND_PERMISSION:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Checking internet connection and permissions...");
+                                 createScene(textObject);
+                                 break;
+                             case NULL:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Initializing...");
+                                 createScene(textObject);
+                                 break;
+                         }
+                     }
+                });
     }
 
     private void createScene(GVRSceneObject message) {

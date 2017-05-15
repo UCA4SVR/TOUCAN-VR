@@ -68,10 +68,11 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
 
-    public static final int STATUS_OK = 0;
-    public static final int NO_INTENT = 1;
-    public static final int NO_INTERNET = 2;
-    public static final int NO_PERMISSION = 3;
+    public enum Status {
+        NO_INTENT, NO_INTERNET, NO_PERMISSION, CHECKING_INTERNET, CHECKING_PERMISSION,
+        CHECKING_INTERNET_AND_PERMISSION, READY_TO_PLAY, PLAYING, PAUSED, PLAYBACK_ENDED,
+        PLAYBACK_ERROR, NULL;
+    }
 
     private static TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
             new TransferListenerBroadcaster();
@@ -105,7 +106,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private final boolean shouldAutoPlay = false;
 
-    private int statusCode = STATUS_OK;
+    private Status statusCode = Status.NULL;
 
     private Intent intent;
     private boolean newIntent = false;
@@ -121,15 +122,21 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // Retrieve the intent and extract the parameters
         intent = getIntent();
-        parseIntent();
+        if (isIntentValid(intent)) {
+            parseIntent();
+        } else {
+            synchronized (this) {
+                changeStatus(Status.NO_INTENT);
+            }
+        }
 
-        // We can avoid providing the videoSceneObject at first. We will create it only if the source is accessible.
+        // We can avoid providing the videoSceneObject at first. We will create it only if the
+        // intent exists and every parameter specified in it can be activated.
         final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
         setMain(main, "gvr.xml");
 
-        // From the parsing method we know if there is no intent available, in which case
-        // we can avoid creating the player, asking for permissions etc.
-        if (statusCode != NO_INTENT) {
+        // The intent is required to run the app, if it has not been provided we can stop there.
+        if (statusCode != Status.NO_INTENT) {
             bandwidthMeter = new DefaultBandwidthMeter();
             MASTER_TRANSFER_LISTENER.addListener(bandwidthMeter);
             checkInternetAndPermissions();
@@ -142,12 +149,19 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         super.onResume();
         if (newIntent) {
             newIntent = false;
-            parseIntent();
+            statusCode = Status.NULL;
+            if (isIntentValid(intent)) {
+                parseIntent();
+            } else {
+                synchronized (this) {
+                    changeStatus(Status.NO_INTENT);
+                }
+            }
 
             final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
             setMain(main, "gvr.xml");
 
-            if (statusCode != NO_INTENT) {
+            if (statusCode != Status.NO_INTENT) {
                 // Clean the listeners list, we got to start fresh.
                 MASTER_TRANSFER_LISTENER.removeAllListeners();
 
@@ -161,26 +175,37 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         }
     }
 
+    /**
+     * Checks if the intent is valid for our app (and thus can be parsed)
+     *
+     * @param intent
+     *      The intent to check
+     * @return
+     *      True if the intent is valid, false if it is not
+     */
+    private boolean isIntentValid(Intent intent) {
+        return intent!=null && intent.getStringExtra("videoLink")!=null;
+    }
+
+    /**
+     * Retrieves all the necessary values from the intent currently held by this instance.
+     */
     private void parseIntent() {
-        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
-            mediaUri = intent.getStringExtra("videoLink");
-            logPrefix = intent.getStringExtra("videoName");
-            minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
-            maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
-            bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
-                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
-            bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
-                    DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
-            loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
-            loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
-            gridWidth = intent.getIntExtra("W", 3);
-            gridHeight = intent.getIntExtra("H", 3);
-            tiles = intent.getStringExtra("tilesCSV").split(",");
-            numberOfTiles = tiles.length / 4;
-            statusCode = STATUS_OK;
-        } else {
-            statusCode = NO_INTENT;
-        }
+        mediaUri = intent.getStringExtra("videoLink");
+        logPrefix = intent.getStringExtra("videoName");
+        minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
+        maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
+        bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+        bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+        loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
+        loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
+        gridWidth = intent.getIntExtra("W", 3);
+        gridHeight = intent.getIntExtra("H", 3);
+        tiles = intent.getStringExtra("tilesCSV").split(",");
+        numberOfTiles = tiles.length / 4;
+        // changeStatus(Status.OK);
     }
 
     /**
@@ -190,11 +215,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      */
     @Override
     protected void onNewIntent(Intent intent) {
-        if(intent!=null && intent.getStringExtra("videoLink")!=null) {
+        if(isIntentValid(intent)) {
             this.newIntent = true;
             this.intent = intent;
             if (videoSceneObjectPlayer != null) {
-                // TODO: Does this really release the surfaces?
+                // TODO: Does this really releases the surfaces?
                 videoSceneObjectPlayer.release();
                 videoSceneObjectPlayer = null;
                 player = null;
@@ -215,17 +240,40 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      *  Such requests lead to callbacks that are handled later in the code.
      */
     private void checkInternetAndPermissions() {
-        if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
-            Set<String> permissions = new HashSet<>();
-            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-            permissionManager.requestPermissions(permissions, this);
+        synchronized (this) {
+            if (statusCode == Status.NO_INTENT) {
+                // If there is no intent, there is no need to check anything else
+                return;
+            }
+            changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
+
+            if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
+                Set<String> permissions = new HashSet<>();
+                permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                permissionManager.requestPermissions(permissions, this);
+            } else {
+                changeStatus(Status.CHECKING_INTERNET);
+            }
+            if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
+                CheckConnection checkConnection = new CheckConnection(this);
+                checkConnection.response = this;
+                checkConnection.execute(mediaUri);
+            } else {
+                if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
+                    changeStatus(Status.CHECKING_PERMISSION);
+                } else {
+                    videoSceneObjectPlayer = makeVideoSceneObject();
+                    ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+                    changeStatus(Status.READY_TO_PLAY);
+                }
+            }
         }
-        if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
-            CheckConnection checkConnection = new CheckConnection(this);
-            checkConnection.response = this;
-            checkConnection.execute(mediaUri);
-        }
+    }
+
+    private void changeStatus(Status newStatus) {
+        this.statusCode = newStatus;
+        ((Minimal360Video) getMain()).setStatusCode(newStatus);
     }
 
     /**
@@ -236,35 +284,59 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         super.onTouchEvent(event);
-        if (event.getActionMasked() == MotionEvent.ACTION_UP &&
-                event.getEventTime() - event.getDownTime() < 200) {
-            switch (statusCode) {
-                case NO_INTENT:
-                    break;
-                case NO_PERMISSION:
-                    ((Minimal360Video) getMain()).sceneDispatcher();
-                    // Permissions can be requested up to three times
-                    Set<String> permissions = new HashSet<>();
-                    permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-                    permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-                    permissionManager.requestPermissions(permissions, this);
-                    break;
-                // In case of NO_INTERNET the video object player is null
-                default:
-                    ((Minimal360Video) getMain()).sceneDispatcher();
-                    if (videoSceneObjectPlayer != null) {
-                        final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
-                        if (exoPlayer != null) {
-                            if (exoPlayer.getPlayWhenReady())
-                                videoSceneObjectPlayer.pause();
-                            else
-                                videoSceneObjectPlayer.start();
+        synchronized (this) {
+            if (event.getActionMasked() == MotionEvent.ACTION_UP &&
+                    event.getEventTime() - event.getDownTime() < 200) {
+                switch (statusCode) {
+                    case NO_INTENT:
+                        break;
+                    case NO_PERMISSION:
+                        //((Minimal360Video) getMain()).sceneDispatcher();
+                        // Permissions can be requested up to three times
+                        synchronized (this) {
+                            changeStatus(Status.CHECKING_PERMISSION);
                         }
-                    }
-                    break;
+                        Set<String> permissions = new HashSet<>();
+                        permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+                        permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                        permissionManager.requestPermissions(permissions, this);
+                        break;
+                    // In case of NO_INTERNET the video object player is null
+                    case READY_TO_PLAY:
+                        startPlaying(true);
+                        synchronized (this) {
+                            changeStatus(Status.PLAYING);
+                        }
+                        break;
+                    case PLAYING:
+                        startPlaying(false);
+                        synchronized (this) {
+                            changeStatus(Status.PAUSED);
+                        }
+                        break;
+                    case PAUSED:
+                        startPlaying(true);
+                        synchronized (this) {
+                            changeStatus(Status.PLAYING);
+                        }
+                        break;
+                }
             }
         }
         return true;
+    }
+
+    private void startPlaying(boolean play) {
+        if (videoSceneObjectPlayer != null) {
+            final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
+            if (exoPlayer != null) {
+                if (!play) {
+                    videoSceneObjectPlayer.pause();
+                } else {
+                    videoSceneObjectPlayer.start();
+                }
+            }
+        }
     }
 
     @Override
@@ -332,37 +404,107 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     // Callback from the permission requests.
     @Override
     public void onPermissionRequestDone(int requestID, int result) {
-        // If there is no internet, it's not safe to overwrite the status
-        if (statusCode != NO_INTERNET) {
-            if (result == PackageManager.PERMISSION_GRANTED) {
-                videoSceneObjectPlayer = makeVideoSceneObject();
-                ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
-                statusCode = STATUS_OK;
-                ((Minimal360Video) getMain()).setStatusCode(STATUS_OK);
-                // Initialize the logging to file
-                if (loggingHeadMotion)
-                    ((Minimal360Video) getMain()).initHeadMotionTracker(logPrefix);
-                if (loggingBandwidth)
-                    MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
-            }
-            if (result == PackageManager.PERMISSION_DENIED) {
-                statusCode = NO_PERMISSION;
-                ((Minimal360Video) getMain()).setStatusCode(NO_PERMISSION);
+        synchronized (this) {
+            // If we know that there is no internet, we can stop there
+            if (statusCode != Status.NO_INTERNET && statusCode != Status.NO_INTENT) {
+                if (result == PackageManager.PERMISSION_GRANTED) {
+                    // Initialize the logging to file
+                    if (loggingHeadMotion) {
+                        ((Minimal360Video) getMain()).initHeadMotionTracker(logPrefix);
+                    }
+                    if (loggingBandwidth) {
+                        MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
+                    }
+                    switch (statusCode) {
+                        case CHECKING_PERMISSION:
+                            videoSceneObjectPlayer = makeVideoSceneObject();
+                            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+                            changeStatus(Status.READY_TO_PLAY);
+                            break;
+                        case CHECKING_INTERNET_AND_PERMISSION:
+                            changeStatus(Status.CHECKING_INTERNET);
+                            break;
+                        case READY_TO_PLAY:
+                        case PLAYING:
+                        case CHECKING_INTERNET:
+                        // case NO_INTENT: Can't happen
+                        // case NO_INTERNET: Can't happen
+                        case NO_PERMISSION:
+                        case NULL:
+                        default:
+                            break;
+                    }
+                }
+                if (result == PackageManager.PERMISSION_DENIED) {
+                    switch(statusCode) {
+                        case READY_TO_PLAY:
+                        case PLAYING:
+                        case CHECKING_INTERNET:
+                        case CHECKING_PERMISSION:
+                        case CHECKING_INTERNET_AND_PERMISSION:
+                        case NO_PERMISSION:
+                            changeStatus(Status.NO_PERMISSION);
+                            break;
+                        // case NO_INTENT: can't happen
+                        // case NO_INTERNET: can't happen
+                        case NULL:
+                        default:
+                            break;
+                    }
+                }
             }
         }
     }
 
-    // Callback for the internet connectivity check. If okay, the remote link is reachable.
+    /**
+     * Callback for the internet connectivity check. If okay, the remote link is reachable.
+     * @param exists
+     *      True if the URL has been reached, false if it has not been reached
+     */
     @Override
     public void urlChecked(boolean exists) {
-        if (exists) {
-            videoSceneObjectPlayer = makeVideoSceneObject();
-            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
-        } else {
-            statusCode = NO_INTERNET;
-            videoSceneObjectPlayer = null;
-            ((Minimal360Video) getMain()).setStatusCode(NO_INTERNET);
-            ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(null);
+        synchronized (this) {
+            if (exists) {
+                switch (statusCode) {
+                    case CHECKING_INTERNET:
+                        videoSceneObjectPlayer = makeVideoSceneObject();
+                        ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(videoSceneObjectPlayer);
+                        changeStatus(Status.READY_TO_PLAY);
+                        break;
+                    case CHECKING_INTERNET_AND_PERMISSION:
+                        changeStatus(Status.CHECKING_PERMISSION);
+                        break;
+                    case READY_TO_PLAY:
+                    case PLAYING:
+                    case CHECKING_PERMISSION:
+                    case NO_INTENT:
+                    case NO_INTERNET:
+                    case NO_PERMISSION:
+                    case NULL:
+                    default:
+                        break;
+                }
+            } else {
+                // No internet is stronger than no permissions, but weaker than no intent.
+                // Although we shouldn't be there if there is no intent, lets do a proper check
+                switch(statusCode) {
+                    case READY_TO_PLAY:
+                    case PLAYING:
+                    case CHECKING_INTERNET:
+                    case CHECKING_PERMISSION:
+                    case CHECKING_INTERNET_AND_PERMISSION:
+                    case NO_PERMISSION:
+                        changeStatus(Status.NO_INTERNET);
+                        break;
+                    case NO_INTENT:
+                    case NO_INTERNET:
+                    case NULL:
+                    default:
+                        break;
+                }
+                videoSceneObjectPlayer = null;
+                ((Minimal360Video) getMain()).setVideoSceneObjectPlayer(null);
+            }
         }
     }
 
