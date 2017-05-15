@@ -273,7 +273,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private void changeStatus(Status newStatus) {
         this.statusCode = newStatus;
-        ((Minimal360Video) getMain()).setStatusCode(newStatus);
+        if (getMain() != null) {
+            ((Minimal360Video) getMain()).setStatusCode(newStatus);
+        }
     }
 
     /**
