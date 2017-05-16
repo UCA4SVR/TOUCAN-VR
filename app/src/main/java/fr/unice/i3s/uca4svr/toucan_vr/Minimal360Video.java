@@ -197,22 +197,22 @@ public class Minimal360Video extends GVRMain {
                          switch (statusCode) {
                              case NO_INTENT:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.7f, 4f,
-                                         "Please launch the application from the parametrizer app");
+                                         gvrContext.getActivity().getString(R.string.no_intent));
                                  createScene(textObject);
                                  break;
                              case NO_INTERNET:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "There is no internet connection");
+                                         gvrContext.getActivity().getString(R.string.source_unreachable));
                                  createScene(textObject);
                                  break;
                              case NO_PERMISSION:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Tap to start after accepting the permissions");
+                                         gvrContext.getActivity().getString(R.string.no_permission));
                                  createScene(textObject);
                                  break;
                              case READY_TO_PLAY:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Tap to play!");
+                                         gvrContext.getActivity().getString(R.string.tap_to_play));
                                  createScene(textObject);
                                  break;
                              case PLAYING:
@@ -220,33 +220,32 @@ public class Minimal360Video extends GVRMain {
                                  break;
                              case PLAYBACK_ENDED:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Please remove the headset");
+                                         gvrContext.getActivity().getString(R.string.remove_headset));
                                  createScene(textObject);
                                  break;
                              case PLAYBACK_ERROR:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "There was an error while playing the video \n" +
-                                                 "Please remove the headset");
+                                         gvrContext.getActivity().getString(R.string.playback_error));
                                  createScene(textObject);
                                  break;
                              case CHECKING_INTERNET:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Checking internet connection...");
+                                         gvrContext.getActivity().getString(R.string.checking_url));
                                  createScene(textObject);
                                  break;
                              case CHECKING_PERMISSION:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Checking permissions...");
+                                         gvrContext.getActivity().getString(R.string.checking_permissions));
                                  createScene(textObject);
                                  break;
                              case CHECKING_INTERNET_AND_PERMISSION:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Checking internet connection and permissions...");
+                                         gvrContext.getActivity().getString(R.string.checking_url_permissions));
                                  createScene(textObject);
                                  break;
                              case NULL:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                                         "Initializing...");
+                                         gvrContext.getActivity().getString(R.string.initializing));
                                  createScene(textObject);
                                  break;
                          }
