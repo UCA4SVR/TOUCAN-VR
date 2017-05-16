@@ -18,7 +18,6 @@
 package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 
 import android.os.Environment;
-import android.util.Log;
 
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.TransferListener;
@@ -69,8 +68,6 @@ public class BandwidthConsumedTracker implements TransferListener<Object> {
         String logFilePath = Environment.getExternalStoragePublicDirectory("toucan/logs/")
                 + File.separator
                 + createLogFileName(logFilePrefix);
-        Log.d("BandwidthTracker", logFilePath);
-        // logFilePath = context.getContext().getFileStreamPath(logFilePath).getAbsolutePath();
 
         // Initialize and configure a new logger in logback
         LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();

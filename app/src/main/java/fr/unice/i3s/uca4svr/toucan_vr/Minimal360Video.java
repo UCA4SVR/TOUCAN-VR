@@ -19,8 +19,6 @@
 
 package fr.unice.i3s.uca4svr.toucan_vr;
 
-import android.Manifest;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.view.Gravity;
 
@@ -31,13 +29,10 @@ import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 
 import org.gearvrf.GVRAndroidResource;
-import org.gearvrf.GVRAssetLoader;
-import org.gearvrf.GVRBoxCollider;
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRFrustumPicker;
 import org.gearvrf.GVRMain;
 import org.gearvrf.GVRMeshCollider;
-import org.gearvrf.GVRPicker;
 import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
@@ -49,60 +44,50 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.Future;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
-import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
-import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
-public class Minimal360Video extends GVRMain implements RequestPermissionResultListener {
-
-    private TilesPicker tilesPicker;
+public class Minimal360Video extends GVRMain {
 
     // The associated GVR context
     private GVRContext gvrContext;
 
     // The head motion tracker to log head motions
-    private HeadMotionTracker headMotionTracker;
+    private HeadMotionTracker headMotionTracker = null;
 
-    // Whether we should track the head motions or not
-    private boolean loggingHeadMotion;
+    // The status code needed to always know which virtual scene to create
+    private PlayerActivity.Status statusCode = PlayerActivity.Status.NULL;
 
-    // The prefix to give to the log file
-    private final String logPrefix;
-
-    private final PermissionManager permissionManager;
-
-    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
+    private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer = null;
 
     private boolean videoStarted = false;
-    private boolean videoEnded = false;
 
     // Info about the tiles, needed to properly build the sphere
     private int gridHeight;
     private int gridWidth;
     private String[] tiles;
 
-    Minimal360Video(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer,
-                    PermissionManager permissionManager, String logPrefix,
-                    String [] tiles, int gridWidth, int gridHeight,
-                    boolean loggingHeadMotion) {
-        this.videoSceneObjectPlayer = videoSceneObjectPlayer;
-        this.permissionManager = permissionManager;
-        this.logPrefix = logPrefix;
+    Minimal360Video(PlayerActivity.Status statusCode, String [] tiles,
+                    int gridWidth, int gridHeight) {
+        this.statusCode = statusCode;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
         this.gridHeight = gridHeight;
-        this.loggingHeadMotion = loggingHeadMotion;
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
         this.videoSceneObjectPlayer = videoSceneObjectPlayer;
+    }
+
+    public void setStatusCode(PlayerActivity.Status statusCode) {
+        this.statusCode = statusCode;
+        if (gvrContext != null) {
+            sceneDispatcher();
+        }
     }
 
     /** Called when the activity is first created. */
@@ -110,31 +95,11 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
 
-        // The HeadMotionTracker needs permission to write to external storage.
-        // Lets check that now or ask for it if necessary
-        Set<String> permissions = new HashSet<>();
-        permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
-
-        // Only one permission request is done in this component. No need to save the callID to
-        // discriminate different permission requests, the callback will be called for these
-        // particular permissions only.
-        permissionManager.requestPermissions(permissions, this);
-
-        // N.B. permissions need to be granted before playing the video
-        if (videoSceneObjectPlayer == null) {
-            createWaitForPermissionScene();
-        } else {
-
-            // create the initial scene as waiting screen
-            createInitialScene();
-
-            // pause the player from automatically starting
-            videoSceneObjectPlayer.pause();
-        }
+        // We need to create the initial scene
+        sceneDispatcher();
     }
 
-    public void displayVideo() {
+    private void displayVideo() {
         // start building the scene for 360 playback
         if (!videoStarted) {
             videoStarted = true;
@@ -142,7 +107,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
             final GVRScene scene = gvrContext.getMainScene();
 
             GVRFrustumPicker frustumPicker = new GVRFrustumPicker(gvrContext,scene);
-            frustumPicker.setFrustum(60,1,49,50);
+            frustumPicker.setFrustum(40,1,49,50);
+
 
             //Attaching the tiles picker
             scene.getEventReceiver().addListener(TilesPicker.getPicker());
@@ -171,9 +137,9 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                 public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
                     switch (playbackState) {
                         case ExoPlayer.STATE_ENDED:
-                            videoEnded = true;
-                            // handle the event in order to rebuild the scene
-                            createEndScene();
+                            // Display the end scene
+                            videoSceneObjectPlayer = null;
+                            setStatusCode(PlayerActivity.Status.PLAYBACK_ENDED);
                             break;
                         default:
                             break;
@@ -183,8 +149,8 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
                 @Override
                 public void onPlayerError(ExoPlaybackException error) {
                     // Display the end scene on error
-                    videoEnded = true;
-                    createEndScene();
+                    videoSceneObjectPlayer = null;
+                    setStatusCode(PlayerActivity.Status.PLAYBACK_ERROR);
                 }
 
                 @Override
@@ -236,17 +202,77 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         }
     }
 
-    private void initHeadMotionTracker() {
-        // Check whether we should log the head motions or not.
-        if (loggingHeadMotion)
-            // Give the context to the logger so that it has access to the camera
-            headMotionTracker = new HeadMotionTracker(gvrContext, logPrefix);
+    private void sceneDispatcher() {
+        gvrContext.runOnGlThread(
+                new Runnable() {
+                     @Override
+                     public void run() {
+                         // According to the state of the application we can understand what scene to build
+                         GVRTextViewSceneObject textObject;
+                         switch (statusCode) {
+                             case NO_INTENT:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.7f, 4f,
+                                         "Please launch the application from the parametrizer app");
+                                 createScene(textObject);
+                                 break;
+                             case NO_INTERNET:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "There is no internet connection");
+                                 createScene(textObject);
+                                 break;
+                             case NO_PERMISSION:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Tap to start after accepting the permissions");
+                                 createScene(textObject);
+                                 break;
+                             case READY_TO_PLAY:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Tap to play!");
+                                 createScene(textObject);
+                                 break;
+                             case PLAYING:
+                                 displayVideo();
+                                 break;
+                             case PLAYBACK_ENDED:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Please remove the headset");
+                                 createScene(textObject);
+                                 break;
+                             case PLAYBACK_ERROR:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "There was an error while playing the video \n" +
+                                                 "Please remove the headset");
+                                 createScene(textObject);
+                                 break;
+                             case CHECKING_INTERNET:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Checking internet connection...");
+                                 createScene(textObject);
+                                 break;
+                             case CHECKING_PERMISSION:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Checking permissions...");
+                                 createScene(textObject);
+                                 break;
+                             case CHECKING_INTERNET_AND_PERMISSION:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Checking internet connection and permissions...");
+                                 createScene(textObject);
+                                 break;
+                             case NULL:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         "Initializing...");
+                                 createScene(textObject);
+                                 break;
+                         }
+                     }
+                });
     }
 
-    private void createWaitForPermissionScene() {
-        GVRScene scene = gvrContext.getMainScene();
+    private void createScene(GVRSceneObject message) {
 
-        // clean the scene before adding objects
+        // clean the old scene before building the new one
+        GVRScene scene = gvrContext.getMainScene();
         scene.removeAllSceneObjects();
 
         // add a 360-photo as background, taken from resources
@@ -256,84 +282,28 @@ public class Minimal360Video extends GVRMain implements RequestPermissionResultL
         sphereObject.getTransform().setScale(100, 100, 100);
         scene.addSceneObject(sphereObject);
 
-        // add a message to the scene asking the user to tap the TrackPad to start the video
-        GVRTextViewSceneObject textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
-                "Tap to start after accepting the permissions.");
+        // add the message to the scene (using Text Objects for now)
+        GVRTextViewSceneObject textObject = (GVRTextViewSceneObject)message;
         textObject.setBackgroundColor(Color.TRANSPARENT);
         textObject.setTextColor(Color.RED);
         textObject.setGravity(Gravity.CENTER);
-        textObject.setTextSize(5.0f);
+        textObject.setTextSize(4.0f);
         textObject.getTransform().setPosition(0.0f, 0.0f, -2.0f);
         textObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
         scene.getMainCameraRig().addChildObject(textObject);
     }
 
-    private void createInitialScene()
-    {
-        GVRScene scene = gvrContext.getMainScene();
-        scene.removeAllSceneObjects();
-
-        // add a 360-photo as background, taken from resources
-        Future<GVRTexture> textureSphere  = gvrContext.loadFutureTexture(
-                new GVRAndroidResource(gvrContext, R.drawable.prague));
-        GVRSphereSceneObject sphereObject = new GVRSphereSceneObject(gvrContext, false, textureSphere);
-        sphereObject.getTransform().setScale(100, 100, 100);
-        scene.addSceneObject(sphereObject);
-
-        // add a message to the scene asking the user to tap the TrackPad to start the video
-        GVRAssetLoader gvrAssetLoader = new GVRAssetLoader(gvrContext);
-        GVRTexture texture = gvrAssetLoader.loadTexture(new GVRAndroidResource(
-                gvrContext, R.drawable.tap_text));
-        GVRSceneObject messageObject = new GVRSceneObject(gvrContext, 1.2f, 0.3f, texture);
-        messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
-        messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
-        scene.getMainCameraRig().addChildObject(messageObject);
-        //*/
-    }
-
-    private void createEndScene()
-    {
-        // the player has been released at this point, we can put it to null
-        videoSceneObjectPlayer = null;
-
-        // clean the old scene to build the new one
-        // N.B. getNextMainScene() can be used but it's going to become deprecated soon
-        GVRScene scene = gvrContext.getMainScene();
-        scene.removeAllSceneObjects();
-
-        // add a 360-photo as background
-        Future<GVRTexture> textureSphere  = gvrContext.loadFutureTexture(
-                new GVRAndroidResource(gvrContext, R.drawable.prague));
-        GVRSphereSceneObject sphereObject = new GVRSphereSceneObject(gvrContext, false, textureSphere);
-        sphereObject.getTransform().setScale(100, 100, 100);
-        scene.addSceneObject(sphereObject);
-
-        // add message with request to remove the headset
-        GVRAssetLoader gvrAssetLoader = new GVRAssetLoader(gvrContext);
-        GVRTexture texture = gvrAssetLoader.loadTexture(new GVRAndroidResource(
-                gvrContext, R.drawable.remove));
-        GVRSceneObject messageObject = new GVRSceneObject(gvrContext, 1.8f, 0.3f, texture);
-        messageObject.getTransform().setPosition(0.0f, 0.0f, -3.0f);
-        messageObject.getRenderData().setRenderingOrder(GVRRenderData.GVRRenderingOrder.TRANSPARENT);
-        scene.getMainCameraRig().addChildObject(messageObject);
+    public void initHeadMotionTracker(String logPrefix) {
+        // We cannot provide the GVRContext because it is not yet available when the method is called
+        if (headMotionTracker == null)
+            headMotionTracker = new HeadMotionTracker(logPrefix);
     }
 
     @Override
     public void onStep() {
         if (headMotionTracker != null &&
-                videoStarted &&
-                !videoEnded &&
-                videoSceneObjectPlayer != null &&
-                videoSceneObjectPlayer.getPlayer() != null &&
-                videoSceneObjectPlayer.getPlayer().getPlayWhenReady()) {
-            headMotionTracker.track(videoSceneObjectPlayer.getPlayer().getCurrentPosition());
-        }
-    }
-
-    @Override
-    public void onPermissionRequestDone(int requestID, int result) {
-        if (result == PackageManager.PERMISSION_GRANTED && headMotionTracker == null) {
-            initHeadMotionTracker();
+                statusCode == PlayerActivity.Status.PLAYING) {
+            headMotionTracker.track(gvrContext, videoSceneObjectPlayer.getPlayer().getCurrentPosition());
         }
     }
 }

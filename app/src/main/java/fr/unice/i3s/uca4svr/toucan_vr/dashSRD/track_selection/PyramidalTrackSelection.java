@@ -56,6 +56,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int selectedIndex;
     private int reason;
     private int adaptationSetIndex;
+    //TODO FIX counter is not reset on new intent so it causes an IndexOutOfBuonds exception
     private static int initCounter = -1;
 
     /**
@@ -164,25 +165,21 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         adaptationSetIndex = ++initCounter;
         reason = C.SELECTION_REASON_INITIAL;
     }
-
-    boolean cnt = false;
-
+int count = 0;
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
-
-        Log.e("SRD","Method called for the adaptation set "+adaptationSetIndex);
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
-        Log.e("SRD",adaptationSetIndex + "Picked? "+isPicked);
-
-
+        int currentSelectedIndex = selectedIndex;
+        if(isPicked) selectedIndex=1;
+        else selectedIndex=0;
+        Log.e("SRD"+count,adaptationSetIndex+"->"+isPicked);
+        count++;
 
 
 
         //long nowMs = SystemClock.elapsedRealtime();
         // Get the current and ideal selections.
-        int currentSelectedIndex = selectedIndex;
-        cnt = !cnt;
-        selectedIndex = isPicked ? 0 : 2;
+
         //Format currentFormat = getSelectedFormat();
         //int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
         //Format idealFormat = getFormat(idealSelectedIndex);
@@ -208,7 +205,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
-        Log.e("SRD","Selection for tile "+adaptationSetIndex + " is " + selectedIndex);
 
     }
 
@@ -261,7 +257,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
      */
     private int determineIdealSelectedIndex(boolean isPicked) {;
-        if(isPicked) return 0; else return length-1;
+        if(isPicked) return 0; else return 1;
     }
 
     /*
