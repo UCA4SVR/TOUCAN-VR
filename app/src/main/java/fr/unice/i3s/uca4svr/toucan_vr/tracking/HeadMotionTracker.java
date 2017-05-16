@@ -56,9 +56,6 @@ public class HeadMotionTracker {
     // so that creating a new logger won't override the previous one
     private static int loggerNextID = 0;
 
-    // The GearVR framework context from which we're logging the head motion
-    private final GVRContext context;
-
     private final Logger logger;
 
     /**
@@ -66,11 +63,10 @@ public class HeadMotionTracker {
      * from the main camera of the given context to a file name logFilePrefix_date.csv.
      * Be aware that tracking is done by calling the <code>track</code> method every time
      * and entry is needed.
-     * @param context The GVRContext from which the mainCamera movements must be tracked.
+     *
      * @param logFilePrefix The prefix for the log file name
      */
-    public HeadMotionTracker(GVRContext context, String logFilePrefix) {
-        this.context = context;
+    public HeadMotionTracker(String logFilePrefix) {
 
         String logFilePath = Environment.getExternalStoragePublicDirectory("toucan/logs/")
                 + File.separator
@@ -102,9 +98,11 @@ public class HeadMotionTracker {
      * Outputs a track record to the log file.
      * The frameTime argument is used as a timestamp.
      * It can be a frame number or whatever time value you see fit.
+     *
+     * @param context The GearVR framework context from which we're logging the head motion
      * @param frameTime The timestamps of the record in the log file
      */
-    public void track(float frameTime) {
+    public void track(GVRContext context, float frameTime) {
         GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
         String rotationsString = String.format(Locale.ENGLISH, "%1f,%2$.0f,%3$.0f,%4$.0f",
                 frameTime, headTransform.getRotationPitch(), headTransform.getRotationYaw(),

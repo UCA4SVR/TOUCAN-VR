@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Toucan-VR</string>
+
+    <string name="no_intent">Please launch the application from the parametrizer app</string>
+    <string name="source_unreachable">The specified URL was unreachable</string>
+    <string name="no_permission">Tap to start after accepting the permissions</string>
+    <string name="tap_to_play">Tap to play!</string>
+    <string name="remove_headset">Please remove the headset</string>
+    <string name="playback_error">There was an error while playing the video.
+        Please remove the headset</string>
+    <string name="checking_url">Checking the URL...</string>
+    <string name="checking_permissions">Checking permissions...</string>
+    <string name="checking_url_permissions">Checking URL and permissions...</string>
+    <string name="initializing">Initializing...</string>
 </resources>
