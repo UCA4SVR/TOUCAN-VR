@@ -30,7 +30,9 @@ import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 
 import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRContext;
+import org.gearvrf.GVRFrustumPicker;
 import org.gearvrf.GVRMain;
+import org.gearvrf.GVRMeshCollider;
 import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
@@ -46,6 +48,7 @@ import java.util.concurrent.Future;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
 public class Minimal360Video extends GVRMain {
@@ -102,6 +105,16 @@ public class Minimal360Video extends GVRMain {
             videoStarted = true;
 
             final GVRScene scene = gvrContext.getMainScene();
+
+            GVRFrustumPicker frustumPicker = new GVRFrustumPicker(gvrContext,scene);
+            frustumPicker.setFrustum(40,1,49,50);
+
+
+            //Attaching the tiles picker
+            scene.getEventReceiver().addListener(TilesPicker.getPicker());
+
+
+
             // Add a listener to the player to catch the end of the playback
             final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             player.addListener(new ExoPlayer.EventListener() {
@@ -178,8 +191,10 @@ public class Minimal360Video extends GVRMain {
                         videos[id] = new GVRVideoSceneObject(gvrContext, sphereMeshes.getMeshById(id),
                                 videoSceneObjectPlayer, GVRVideoType.MONO);
                         // FIXME: Is this really necessary ?
-                        videos[id].getTransform().setScale(100f, 100f, 100f);
+                        videos[id].getTransform().setScale(50f, 50f, 50f);
                         videos[id].setName( "video_" + id );
+                        videos[id].setTag("vd"+(id));
+                        videos[id].attachCollider(new GVRMeshCollider(gvrContext, true));
                         scene.addSceneObject( videos[id] );
                     }
                 }).start();

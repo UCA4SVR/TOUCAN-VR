@@ -23,21 +23,22 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
+import com.google.android.exoplayer2.SRDLoadControl;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.dash.DefaultDashChunkSource;
+import com.google.android.exoplayer2.source.dash.DefaultDashSRDChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
-import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DataSource;
@@ -58,6 +59,7 @@ import java.util.Set;
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnection;
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnectionResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
@@ -84,12 +86,18 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private DefaultBandwidthMeter bandwidthMeter;
 
     // Player's parameters to fine tune as we need
-    private int minBufferMs = DefaultLoadControl.DEFAULT_MIN_BUFFER_MS;
-    private int maxBufferMs = DefaultLoadControl.DEFAULT_MAX_BUFFER_MS;
-    private int bufferForPlaybackMs =
-            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS;
-    private int bufferForPlaybackAfterRebufferMs =
-            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS;
+    //First section
+    private int minBufferMs;
+    private int maxBufferMs;
+    private int bufferForPlaybackMs;
+    private int bufferForPlaybackAfterRebufferMs;
+    //Second section
+    private int maxInitialBitrate = PyramidalTrackSelection.DEFAULT_MAX_INITIAL_BITRATE;
+    private int minDurationForQualityIncreaseUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
+    private int maxDurationForQualityDecreaseUs = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
+    private int minDurationToRetainAfterDiscardUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
+    private float bandwidthFraction = PyramidalTrackSelection.DEFAULT_BANDWIDTH_FRACTION;
+
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
     private String logPrefix = "Log";
     private boolean loggingBandwidth = false;
@@ -191,12 +199,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private void parseIntent() {
         mediaUri = intent.getStringExtra("videoLink");
         logPrefix = intent.getStringExtra("videoName");
-        minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
-        maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
+        minBufferMs = intent.getIntExtra("minBufferSize", SRDLoadControl.DEFAULT_MIN_BUFFER_MS);
+        maxBufferMs = intent.getIntExtra("maxBufferSize", SRDLoadControl.DEFAULT_MAX_BUFFER_MS);
         bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+                SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
         bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
-                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+                SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
         gridWidth = intent.getIntExtra("W", 3);
@@ -361,11 +369,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // The video track selection factory and the track selector.
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
-                    new AdaptiveTrackSelection.Factory(bandwidthMeter);
+                    new PyramidalTrackSelection.Factory(
+                            bandwidthMeter, maxInitialBitrate, minDurationForQualityIncreaseUs,
+                            maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
+                            bandwidthFraction);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
-            LoadControl loadControl = new DefaultLoadControl(
+            LoadControl loadControl = new SRDLoadControl(
                     new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
                     minBufferMs,
                     maxBufferMs,
@@ -529,7 +540,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         /* eventListener */ null);
             case C.TYPE_DASH:
                 return new DashSRDMediaSource(uri, buildDataSourceFactory(false),
-                        new DefaultDashChunkSource.Factory(mediaDataSourceFactory), mainHandler,
+                        new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,
