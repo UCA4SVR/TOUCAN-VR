@@ -18,13 +18,14 @@ public class TilesPicker implements IPickEvents {
     }
 
     public synchronized boolean isPicked(int index) {
-        if(pickedTiles!=null)
-            return pickedTiles[index];
-        else
+        if(pickedTiles!=null) {
+            if(pickedTiles.length>index)
+                return pickedTiles[index];
+            else
+                return false;
+        } else
             return true;
     }
-
-
 
     @Override
     public synchronized void onPick(GVRPicker picker) {

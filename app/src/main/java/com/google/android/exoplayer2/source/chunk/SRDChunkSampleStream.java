@@ -56,6 +56,7 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
     private final DefaultTrackOutput primarySampleQueue;
     private final DefaultTrackOutput[] embeddedSampleQueues;
     private final BaseMediaChunkOutput mediaChunkOutput;
+    public final int adaptationSetIndex;
 
     private Format primaryDownstreamTrackFormat;
     private long pendingResetPositionUs;
@@ -74,9 +75,10 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
      *     before propagating an error.
      * @param eventDispatcher A dispatcher to notify of events.
      */
-    public SRDChunkSampleStream(int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
+    public SRDChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                              Callback<SRDChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
                              int minLoadableRetryCount, AdaptiveMediaSourceEventListener.EventDispatcher eventDispatcher) {
+        this.adaptationSetIndex = adaptationSetIndex;
         this.primaryTrackType = primaryTrackType;
         this.embeddedTrackTypes = embeddedTrackTypes;
         this.chunkSource = chunkSource;
@@ -325,8 +327,6 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
     @Override
     public boolean continueLoading(long positionUs) {
 
-        Log.e("Replace",""+chunkSource.getPreferredQueueSize(positionUs, readOnlyMediaChunks));
-
         if (loadingFinished || loader.isLoading()) {
             return false;
         }
@@ -357,6 +357,10 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
         eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
                 loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
                 loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
+        return true;
+    }
+
+    public boolean replace(long safePosition) {
         return true;
     }
 

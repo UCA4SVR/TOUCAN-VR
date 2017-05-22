@@ -539,9 +539,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultSsChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_DASH:
-                return new DashSRDMediaSource(uri, buildDataSourceFactory(false),
+                DashSRDMediaSource mediaSource = new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
+                mediaSource.setBuffers(minBufferMs, maxBufferMs);
+                return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,
                         /* eventListener */ null);

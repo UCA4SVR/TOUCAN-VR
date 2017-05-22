@@ -18,6 +18,9 @@ package com.google.android.exoplayer2.source;
 import android.util.Log;
 
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.source.chunk.SRDChunkSampleStream;
+
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 /**
  * A {@link SequenceableLoader} that encapsulates multiple other {@link SequenceableLoader}s.
@@ -62,10 +65,16 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
     return madeProgress;
   }
 
-  public boolean replaceChunks(long positionUs) {
-    Log.e("DASH-SRD", "Replacing chunks at position " + positionUs);
-    // TODO: call method to replace chunks in the sample streams
-    return false;
+  public boolean replaceChunks(long safePosition) {
+    boolean madeProgress = false;
+    Log.e("DASH-SRD", "Replacing chunks at position " + safePosition);
+    TilesPicker tilesPicker = TilesPicker.getPicker();
+      //Need to replace: which one? choose the currently picked tiles!
+      for (SequenceableLoader loader : loaders) {
+          if (tilesPicker.isPicked(((SRDChunkSampleStream) loader).adaptationSetIndex)) {
+              madeProgress |= ((SRDChunkSampleStream) loader).replace(safePosition);
+          }
+      }
+      return madeProgress;
   }
-
 }
