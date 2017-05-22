@@ -485,4 +485,12 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
 
     }
 
+    /**
+     * The method is called when I'm downloading chunks for the replacement strategy but at some
+     * point I need to rebuffer again. In this case I've to stop the download.
+     */
+    public void stopReplacing() {
+        if(loader.isLoading()) loader.cancelLoading();
+    }
+
 }
