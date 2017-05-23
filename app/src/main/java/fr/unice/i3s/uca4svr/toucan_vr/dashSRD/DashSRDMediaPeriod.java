@@ -61,7 +61,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
     private final TrackGroupArray trackGroups;
     private final int minBufferMs;
     private final int maxBufferMs;
-    private final int safeMargin;
 
     private Callback callback;
     private SRDChunkSampleStream<DashChunkSource>[] sampleStreams;
@@ -86,8 +85,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
         //Buffers are provided in ms and then used in microseconds
         this.minBufferMs = minBufferMs*1000;
         this.maxBufferMs = maxBufferMs*1000;
-        //Safe margin: playback position + the safe margin identifies the starting point for replacement
-        this.safeMargin = 2*1000000;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -173,13 +170,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
     @Override
     public boolean continueLoading(long positionUs) {
         long bufferedPosition = getBufferedPositionUs();
-        //Log.e("DASH-SRD", "Pos "+positionUs/1000000+" Buff "+bufferedPosition/1000000+" Diff "+(bufferedPosition-positionUs)/1000000);
         /*If the buffer is full and the playback has started, start replacing chunks.
         It doesn't make sense to replace if the playback hasn't started: we have no information
         from the picker */
         if ((bufferedPosition-positionUs) > maxBufferMs) {
             if (positionUs>0)
-                sequenceableLoader.replaceChunks(positionUs+safeMargin);
+                sequenceableLoader.replaceChunks(positionUs);
             else {
                 //Nothing to do
             }

@@ -26,11 +26,13 @@ import com.google.android.exoplayer2.extractor.DefaultTrackOutput;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
+import com.google.android.exoplayer2.source.dash.DefaultDashSRDChunkSource;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.Loader;
 import com.google.android.exoplayer2.util.Assertions;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -56,7 +58,8 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
     private final DefaultTrackOutput primarySampleQueue;
     private final DefaultTrackOutput[] embeddedSampleQueues;
     private final BaseMediaChunkOutput mediaChunkOutput;
-    public final int adaptationSetIndex;
+    private final String highestFormatId;
+	public final int adaptationSetIndex;
 
     private Format primaryDownstreamTrackFormat;
     private long pendingResetPositionUs;
@@ -79,6 +82,8 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
                              Callback<SRDChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
                              int minLoadableRetryCount, AdaptiveMediaSourceEventListener.EventDispatcher eventDispatcher) {
         this.adaptationSetIndex = adaptationSetIndex;
+		//Getting the highest format for this tile
+		this.highestFormatId = ((DefaultDashSRDChunkSource)chunkSource).getHighestFormatId();
         this.primaryTrackType = primaryTrackType;
         this.embeddedTrackTypes = embeddedTrackTypes;
         this.chunkSource = chunkSource;
@@ -360,8 +365,61 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
         return true;
     }
 
-    public boolean replace(long safePosition) {
-        return true;
+    public boolean replace(long playbackPosition) {
+		//Still buffering?
+		if(loader.isLoading())
+			return false;
+
+        /*        Targeting the chunk to be replaced: mediachunks holds in a linked list all
+        the chunks already downloaded. The chunk whose startTimeUS and endTimeUs satisfy
+        startTimeUS < playbackPosition < endTimeUs is identified and then the replacement
+        starts two segments after */
+		MediaChunk maybeReplace = null;
+		int maybeReplaceIndex = 0;
+        for(MediaChunk mediaChunk : mediaChunks) {
+			if((mediaChunk.startTimeUs<playbackPosition)&&(mediaChunk.endTimeUs>playbackPosition)) {
+				maybeReplace = mediaChunk;
+				break;
+			}
+			maybeReplaceIndex++;
+		}
+
+		if(maybeReplace!=null) {
+			/*
+			I've found the chunk that is currently playing in the buffer.
+			Checking if I can replace chunk starting two segments ahead of it.
+			 */
+			maybeReplaceIndex+=2;
+			if((maybeReplaceIndex)<mediaChunks.size()) {
+				maybeReplace = mediaChunks.get(maybeReplaceIndex);
+				if(!maybeReplace.trackFormat.id.equals(highestFormatId)) {
+					//Fire the download
+					//First put into nextChunkHolder the correct Chunk
+					((DefaultDashSRDChunkSource)chunkSource).getChunkToBeReplaced(maybeReplace.chunkIndex,nextChunkHolder);
+					//Then fire the download
+					Chunk loadable = nextChunkHolder.chunk;
+					nextChunkHolder.clear();
+					//TODO HANDLE THE CALLBACK WITH ROMARIC's CODE TO UPDATE THE MEDIA CHUNK LINKED LIST
+					long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
+					eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
+							loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
+							loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
+					return true;
+				} else {
+					//The tile is already at the maximum quality: do nothing
+					return false;
+				}
+			} else {
+				//No time to replace: do nothing
+				return false;
+			}
+		} else {
+			/*
+			I've not found the chunk that is now playing in the buffer
+			Should I do the replacement anyway?
+			*/
+			return false;
+		}
     }
 
     @Override

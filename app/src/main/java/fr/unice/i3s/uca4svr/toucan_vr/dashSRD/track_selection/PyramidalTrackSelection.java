@@ -161,51 +161,24 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.maxDurationForQualityDecreaseUs = maxDurationForQualityDecreaseMs * 1000L;
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
-        selectedIndex = determineIdealSelectedIndex(true);
+        selectedIndex = 0;
         adaptationSetIndex = ++initCounter;
         reason = C.SELECTION_REASON_INITIAL;
     }
-int count = 0;
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
-        if(isPicked) selectedIndex=1;
-        else selectedIndex=0;
-        Log.e("SRD"+count,adaptationSetIndex+"->"+isPicked);
-        count++;
-
-
-
-        //long nowMs = SystemClock.elapsedRealtime();
-        // Get the current and ideal selections.
-
-        //Format currentFormat = getSelectedFormat();
-        //int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
-        //Format idealFormat = getFormat(idealSelectedIndex);
-        // Assume we can switch to the ideal selection.
-        //selectedIndex = idealSelectedIndex;
-
-        /*
-        // Revert back to the current selection if conditions are not suitable for switching.
-        if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
-            if (idealFormat.bitrate > currentFormat.bitrate
-                    && bufferedDurationUs < minDurationForQualityIncreaseUs) {
-                // The ideal track is a higher quality, but we have insufficient buffer to safely switch
-                // up. Defer switching up for now./selectedIndex = currentSelectedIndex;
-            } else if (idealFormat.bitrate < currentFormat.bitrate
-                    && bufferedDurationUs >= maxDurationForQualityDecreaseUs) {
-                // The ideal track is a lower quality, but we have sufficient buffer to defer switching
-                // down for now.
-                selectedIndex = currentSelectedIndex;
-            }
-        }
-        */
+        if(isPicked) selectedIndex=0;
+        else selectedIndex=1;
         // If we adapted, update the trigger.
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
+    }
 
+    public void forceSelectedTrack() {
+        selectedIndex = 0;
     }
 
     @Override

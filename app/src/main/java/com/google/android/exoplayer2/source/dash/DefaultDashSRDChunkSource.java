@@ -89,6 +89,7 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
 
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int adaptationSetIndex;
+    private final String highestFormatId;
     private final TrackSelection trackSelection;
     private final RepresentationHolder[] representationHolders;
     private final DataSource dataSource;
@@ -126,6 +127,7 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
         this.manifest = manifest;
         this.adaptationSetIndex = adaptationSetIndex;
+        this.highestFormatId = trackSelection.getFormat(0).id;
         this.trackSelection = trackSelection;
         this.dataSource = dataSource;
         this.periodIndex = periodIndex;
@@ -186,7 +188,6 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         long bufferedDurationUs = previous != null ? (previous.endTimeUs - playbackPositionUs) : 0;
 
         //Call the method to choose the track
-        int a = adaptationSetIndex;
         trackSelection.updateSelectedTrack(bufferedDurationUs);
 
         RepresentationHolder representationHolder =
@@ -263,6 +264,18 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         out.chunk = newMediaChunk(representationHolder, dataSource, trackSelection.getSelectedFormat(),
                 trackSelection.getSelectionReason(), trackSelection.getSelectionData(), segmentNum,
                 maxSegmentCount);
+    }
+
+    public void getChunkToBeReplaced(int segmentNum, ChunkHolder out) {
+		//Force the quality to be the highest one
+		((PyramidalTrackSelection)trackSelection).forceSelectedTrack();
+		RepresentationHolder representationHolder = representationHolders[trackSelection.getSelectedIndex()];
+		out.chunk = newMediaChunk(representationHolder, dataSource, trackSelection.getSelectedFormat(),
+				trackSelection.getSelectionReason(), null, segmentNum, 1);
+	}
+
+    public String getHighestFormatId() {
+        return this.highestFormatId;
     }
 
     @Override

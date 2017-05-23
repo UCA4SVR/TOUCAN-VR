@@ -49,7 +49,7 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
 
 	@Override
 	public boolean continueLoading(long positionUs) {
-	/* I need to buffer again: if I was rebuffering I have to stop the process */
+	/* I need to buffer again: if I was replacing I have to stop the process */
 		if (this.imReplacing) {
 			for (SequenceableLoader loader : loaders) {
 				((SRDChunkSampleStream) loader).stopReplacing();
@@ -74,15 +74,14 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
 		return madeProgress;
 	}
 
-	public boolean replaceChunks(long safePosition) {
+	public boolean replaceChunks(long playbackPosition) {
 		this.imReplacing = true;
 		boolean madeProgress = false;
-		Log.e("DASH-SRD", "Replacing chunks at position " + safePosition);
 		TilesPicker tilesPicker = TilesPicker.getPicker();
 		//Need to replace: which one? choose the currently picked tiles!
 		for (SequenceableLoader loader : loaders) {
 			if (tilesPicker.isPicked(((SRDChunkSampleStream) loader).adaptationSetIndex)) {
-				madeProgress |= ((SRDChunkSampleStream) loader).replace(safePosition);
+				madeProgress |= ((SRDChunkSampleStream) loader).replace(playbackPosition);
 			}
 		}
 		return madeProgress;
