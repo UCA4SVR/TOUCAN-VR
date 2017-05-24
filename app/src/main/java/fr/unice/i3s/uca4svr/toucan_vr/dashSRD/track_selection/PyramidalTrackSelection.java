@@ -161,20 +161,26 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.maxDurationForQualityDecreaseUs = maxDurationForQualityDecreaseMs * 1000L;
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
-        selectedIndex = 0;
+        selectedIndex = 1;
         adaptationSetIndex = ++initCounter;
         reason = C.SELECTION_REASON_INITIAL;
     }
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
-        boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
+
+        int currentSelectedIndex = selectedIndex;
+        selectedIndex=1;
+        if (selectedIndex != currentSelectedIndex) {
+            reason = C.SELECTION_REASON_ADAPTIVE;
+        }
+        /*boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
         if(isPicked) selectedIndex=0;
         else selectedIndex=1;
         // If we adapted, update the trigger.
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
-        }
+        }*/
     }
 
     public void forceSelectedTrack() {
@@ -206,7 +212,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         if (bufferedDurationUs < minDurationToRetainAfterDiscardUs) {
             return queueSize;
         }
-        int idealSelectedIndex = determineIdealSelectedIndex(true);
+        int idealSelectedIndex = determineIdealSelectedIndex(false);
         Format idealFormat = getFormat(idealSelectedIndex);
         // If the chunks contain video, discard from the first SD chunk beyond
         // minDurationToRetainAfterDiscardUs whose resolution and bitrate are both lower than the ideal

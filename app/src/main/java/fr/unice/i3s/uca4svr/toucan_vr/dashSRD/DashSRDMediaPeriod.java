@@ -174,10 +174,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
         It doesn't make sense to replace if the playback hasn't started: we have no information
         from the picker */
         if ((bufferedPosition-positionUs) > maxBufferMs) {
-            if (positionUs>0)
-                sequenceableLoader.replaceChunks(positionUs);
-            else {
+            if (positionUs>0) {
+                if (!sequenceableLoader.replaceChunks(positionUs))
+                    callback.onContinueLoadingRequested(this);
+            } else {
                 //Nothing to do
+				callback.onContinueLoadingRequested(this);
             }
         } else {
             sequenceableLoader.continueLoading(positionUs);
@@ -187,7 +189,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
         // something periodically checks again by calling maybeContinueLoading.
         // So, we need to implement the replacement strategy to make this work.
         // A workaround is to call the following method. Not efficient.
-        callback.onContinueLoadingRequested(this);
         // It doesn't matter what we return (returned value isn't used in the ExoPlayerImpInternal).
         return true;
     }

@@ -390,7 +390,7 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
 			Checking if I can replace chunk starting two segments ahead of it.
 			 */
 			maybeReplaceIndex+=2;
-			if((maybeReplaceIndex)<mediaChunks.size()) {
+			if(maybeReplaceIndex < mediaChunks.size()) {
 				maybeReplace = mediaChunks.get(maybeReplaceIndex);
 				if(!maybeReplace.trackFormat.id.equals(highestFormatId)) {
 					//Fire the download
@@ -399,8 +399,16 @@ public class SRDChunkSampleStream<T extends ChunkSource> implements SampleStream
 					//Then fire the download
 					Chunk loadable = nextChunkHolder.chunk;
 					nextChunkHolder.clear();
+
 					//TODO HANDLE THE CALLBACK WITH ROMARIC's CODE TO UPDATE THE MEDIA CHUNK LINKED LIST
-					long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
+                    if (isMediaChunk(loadable)) {
+                        BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
+                        mediaChunk.init(mediaChunkOutput);
+                        mediaChunks.remove(maybeReplaceIndex);
+                        mediaChunks.add(maybeReplaceIndex,mediaChunk);
+                    }
+
+                    long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
 					eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
 							loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
 							loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
