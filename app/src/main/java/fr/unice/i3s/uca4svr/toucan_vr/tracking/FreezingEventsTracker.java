@@ -22,6 +22,11 @@ import ch.qos.logback.core.FileAppender;
 
 /**
  * It tracks the stalls happening during the playback, and their duration.
+ * Each entry in the log file will record:
+ *  - the global clock as time reference used by every tracker;
+ *  - an index, increased for each new stalling event;
+ *  - the duration of the freezing event;
+ *  - the position of the video playback when the event occurred.
  */
 public class FreezingEventsTracker {
 
@@ -103,7 +108,7 @@ public class FreezingEventsTracker {
         if (wasBuffering && playbackState != ExoPlayer.STATE_BUFFERING) {
             wasBuffering = false;
             long freezeDuration = clock.elapsedRealtime() - freezeStartTime;
-            logger.error(String.format(Locale.ENGLISH, "%d, %d, %d, %d",
+            logger.error(String.format(Locale.ENGLISH, "%d,%d,%d,%d",
                     clock.elapsedRealtime(), ++freezeEventCounter,
                     freezeDuration, playbackPosition));
         }
