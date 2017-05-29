@@ -63,6 +63,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSele
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.UnboundedAllocator;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
@@ -377,7 +378,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
             // The LoadControl, responsible for the buffering strategy
             LoadControl loadControl = new SRDLoadControl(
-                    new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
+                    new UnboundedAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
                     minBufferMs,
                     maxBufferMs,
                     bufferForPlaybackMs,

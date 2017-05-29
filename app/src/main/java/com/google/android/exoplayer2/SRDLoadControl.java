@@ -15,14 +15,14 @@
  */
 package com.google.android.exoplayer2;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.util.PriorityTaskManager;
 import com.google.android.exoplayer2.util.Util;
+
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.UnboundedAllocator;
 
 /**
  * The default {@link LoadControl} implementation.
@@ -57,7 +57,7 @@ public final class SRDLoadControl implements LoadControl {
     private static final int BETWEEN_WATERMARKS = 1;
     private static final int BELOW_LOW_WATERMARK = 2;
 
-    private final DefaultAllocator allocator;
+    private final UnboundedAllocator allocator;
 
     private final long minBufferUs;
     private final long maxBufferUs;
@@ -72,15 +72,15 @@ public final class SRDLoadControl implements LoadControl {
      * Constructs a new instance, using the {@code DEFAULT_*} constants defined in this class.
      */
     public SRDLoadControl() {
-        this(new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE));
+        this(new UnboundedAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE));
     }
 
     /**
      * Constructs a new instance, using the {@code DEFAULT_*} constants defined in this class.
      *
-     * @param allocator The {@link DefaultAllocator} used by the loader.
+     * @param allocator The {@link UnboundedAllocator} used by the loader.
      */
-    public SRDLoadControl(DefaultAllocator allocator) {
+    public SRDLoadControl(UnboundedAllocator allocator) {
         this(allocator, DEFAULT_MIN_BUFFER_MS, DEFAULT_MAX_BUFFER_MS, DEFAULT_BUFFER_FOR_PLAYBACK_MS,
                 DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
     }
@@ -99,7 +99,7 @@ public final class SRDLoadControl implements LoadControl {
      *     playback to resume after a rebuffer, in milliseconds. A rebuffer is defined to be caused by
      *     buffer depletion rather than a user action.
      */
-    public SRDLoadControl(DefaultAllocator allocator, int minBufferMs, int maxBufferMs,
+    public SRDLoadControl(UnboundedAllocator allocator, int minBufferMs, int maxBufferMs,
                               long bufferForPlaybackMs, long bufferForPlaybackAfterRebufferMs) {
         this(allocator, minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs,
                 null);
@@ -122,7 +122,7 @@ public final class SRDLoadControl implements LoadControl {
      *     {@link C#PRIORITY_PLAYBACK} during loading periods, and unregisters itself during draining
      *     periods.
      */
-    public SRDLoadControl(DefaultAllocator allocator, int minBufferMs, int maxBufferMs,
+    public SRDLoadControl(UnboundedAllocator allocator, int minBufferMs, int maxBufferMs,
                               long bufferForPlaybackMs, long bufferForPlaybackAfterRebufferMs,
                               PriorityTaskManager priorityTaskManager) {
         this.allocator = allocator;
