@@ -35,8 +35,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.UnboundedAllocator;
@@ -76,7 +74,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private final AtomicInteger state;
 
   // Accessed only by the consuming thread.
-  private long totalBytesDropped;
+  private long totalBytesDropped = 0;
+  private long currentOffset = 0;
   private Format downstreamFormat;
 
   // Accessed only by the loading thread (or the consuming thread when there is no loading thread).
@@ -151,20 +150,30 @@ public final class ReplacementTrackOutput implements TrackOutput {
    */
   public void discardUpstreamSamples(int discardFromIndex) {
     totalBytesWritten = infoQueue.discardUpstreamSamples(discardFromIndex);
-    dropUpstreamFrom(discardFromIndex);
+    dropUpstreamFrom(totalBytesWritten);
   }
 
   /**
    * Discards data from the write side of the buffer. Data is discarded from the specified absolute
    * position. Any allocations that are fully discarded are returned to the allocator.
    *
-   * @param discardFromIndex The absolute index of the first sample to be discarded.
+   * @param absolutePosition The absolute position of the first sample to be discarded.
    */
-  private void dropUpstreamFrom(int discardFromIndex) {
-    int discardCount = infoQueue.getWriteIndex() - discardFromIndex;
+  private void dropUpstreamFrom(long absolutePosition) {
+    long position = totalBytesDropped;
+    int index = 0;
+
+    while (position < absolutePosition && index < dataQueue.size()) {
+      position = position + dataQueue.get(index).data.length;
+      index++;
+    }
     // Discard the allocations.
-    for (int i = 0; i < discardCount; i++) {
-      allocator.release(dataQueue.remove(dataQueue.size()-1));
+    while (index < dataQueue.size()) {
+      allocator.release(dataQueue.remove(index));
+    }
+    // Reset the offset to 0 if everything has been discarded
+    if (index == 0) {
+      currentOffset = 0;
     }
     // Update lastAllocation and lastAllocationOffset to reflect the new position.
     lastAllocation = dataQueue.get(dataQueue.size()-1);
@@ -252,11 +261,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * @return Whether the skip was successful.
    */
   public boolean skipToKeyframeBefore(long timeUs, boolean allowTimeBeyondBuffer) {
-    int nextIndex = infoQueue.skipToKeyframeBefore(timeUs, allowTimeBeyondBuffer);
-    if (nextIndex == C.POSITION_UNSET) {
+    long absolutePosition = infoQueue.skipToKeyframeBefore(timeUs, allowTimeBeyondBuffer);
+    if (absolutePosition == C.POSITION_UNSET) {
       return false;
     }
-    dropDownstreamTo(nextIndex);
+    dropDownstreamTo(absolutePosition);
     return true;
   }
 
@@ -296,8 +305,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
           // Write the sample data into the holder.
           buffer.ensureSpaceForWrite(extrasHolder.size);
           readData(extrasHolder.offset, buffer.data, extrasHolder.size);
-          // Advance the read head.
-          dropDownstreamTo(1);
         }
         return C.RESULT_BUFFER_READ;
       case C.RESULT_NOTHING_READ:
@@ -383,42 +390,45 @@ public final class ReplacementTrackOutput implements TrackOutput {
   /**
    * Reads data from the front of the rolling buffer.
    *
-   * @param relativePosition The absolute position from which data should be read.
+   * @param absolutePosition The absolute position from which data should be read.
    * @param target           The buffer into which data should be written.
    * @param length           The number of bytes to read.
    */
-  private void readData(long relativePosition, ByteBuffer target, int length) {
+  private void readData(long absolutePosition, ByteBuffer target, int length) {
     int remaining = length;
+    dropDownstreamTo(absolutePosition);
     while (remaining > 0) {
-      if (relativePosition >= dataQueue.get(0).data.length) {
+      if (currentOffset >= dataQueue.get(0).data.length) {
         dropDownstreamTo(1);
       }
       Allocation allocation = dataQueue.get(0);
-      int toCopy = (int) Math.min(remaining, allocation.data.length - relativePosition);
-      target.put(allocation.data, allocation.translateOffset((int) relativePosition), toCopy);
-      relativePosition += toCopy;
+      int toCopy = (int) Math.min(remaining, allocation.data.length - currentOffset);
+      target.put(allocation.data, allocation.translateOffset((int) currentOffset), toCopy);
+      currentOffset += toCopy;
       remaining -= toCopy;
     }
+
   }
 
   /**
    * Reads data from the front of the rolling buffer.
    *
-   * @param relativePosition The relative position from which data should be read.
+   * @param absolutePosition The relative position from which data should be read.
    * @param target           The array into which data should be written.
    * @param length           The number of bytes to read.
    */
-  private void readData(long relativePosition, byte[] target, int length) {
+  private void readData(long absolutePosition, byte[] target, int length) {
     int bytesRead = 0;
+    dropDownstreamTo(absolutePosition);
     while (bytesRead < length) {
-      if (relativePosition >= dataQueue.get(0).data.length) {
+      if (currentOffset >= dataQueue.get(0).data.length) {
         dropDownstreamTo(1);
       }
       Allocation allocation = dataQueue.get(0);
-      int toCopy = (int) Math.min(length - bytesRead, allocation.data.length - relativePosition);
-      System.arraycopy(allocation.data, allocation.translateOffset((int) relativePosition), target,
+      int toCopy = (int) Math.min(length - bytesRead, allocation.data.length - currentOffset);
+      System.arraycopy(allocation.data, allocation.translateOffset((int) currentOffset), target,
               bytesRead, toCopy);
-      relativePosition += toCopy;
+      currentOffset += toCopy;
       bytesRead += toCopy;
     }
   }
@@ -433,7 +443,19 @@ public final class ReplacementTrackOutput implements TrackOutput {
     for (int i = 0; i < relativeIndex; i++) {
       totalBytesDropped += dataQueue.get(0).data.length;
       allocator.release(dataQueue.remove(0));
+      currentOffset = 0;
     }
+  }
+
+  private void dropDownstreamTo(long absolutePosition) {
+    while (dataQueue.size() > 0 && totalBytesDropped + dataQueue.get(0).data.length <= absolutePosition) {
+      totalBytesDropped += dataQueue.get(0).data.length;
+      allocator.release(dataQueue.remove(0));
+      if (currentOffset > 0) {
+        currentOffset = 0;
+      }
+    }
+    currentOffset = absolutePosition - totalBytesDropped;
   }
 
   // Called by the loading thread.
@@ -827,7 +849,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
      * @return The offset of the keyframe's data if the keyframe was present.
      * {@link C#POSITION_UNSET} otherwise.
      */
-    public synchronized int skipToKeyframeBefore(long timeUs, boolean allowTimeBeyondBuffer) {
+    public synchronized long skipToKeyframeBefore(long timeUs, boolean allowTimeBeyondBuffer) {
       if (queueSize() == 0 || timeUs < timesUs.get(0)) {
         return C.POSITION_UNSET;
       }
@@ -866,7 +888,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
         encryptionKeys.remove(0);
       }
       absoluteReadIndex += sampleCountToKeyframe;
-      return sampleCountToKeyframe;
+      return offsets.get(0);
     }
 
     // Called by the loading thread.

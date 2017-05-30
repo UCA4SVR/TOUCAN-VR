@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.source.dash;
 
 import android.net.Uri;
 import android.os.SystemClock;
-import android.util.Log;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -33,10 +32,8 @@ import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.chunk.ChunkExtractorWrapper;
 import com.google.android.exoplayer2.source.chunk.ChunkHolder;
 import com.google.android.exoplayer2.source.chunk.ChunkedTrackBlacklistUtil;
-import com.google.android.exoplayer2.source.chunk.ContainerMediaChunk;
 import com.google.android.exoplayer2.source.chunk.InitializationChunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
-import com.google.android.exoplayer2.source.chunk.SingleSampleMediaChunk;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.source.dash.manifest.RangedUri;
@@ -53,6 +50,8 @@ import java.io.IOException;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.ContainerMediaChunk;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.SingleSampleMediaChunk;
 
 /**
  * A default {@link DashChunkSource} implementation.
