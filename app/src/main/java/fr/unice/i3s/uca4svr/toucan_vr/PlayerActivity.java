@@ -206,7 +206,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
-        loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", true);
+        loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", false);
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -421,15 +421,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             if (statusCode != Status.NO_INTERNET && statusCode != Status.NO_INTENT) {
                 if (result == PackageManager.PERMISSION_GRANTED) {
                     // Initialize the logging to file
-                    if (loggingHeadMotion) {
+                    if (loggingHeadMotion)
                         ((Minimal360Video) getMain()).initHeadMotionTracker(logPrefix);
-                    }
-                    if (loggingBandwidth) {
+                    if (loggingBandwidth)
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
-                    }
-                    if (loggingFreezes) {
+                    if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
-                    }
                     switch (statusCode) {
                         case CHECKING_PERMISSION:
                             videoSceneObjectPlayer = makeVideoSceneObject();

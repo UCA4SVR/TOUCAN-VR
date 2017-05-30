@@ -1,7 +1,6 @@
 package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 
 import android.os.Environment;
-import android.util.Log;
 
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.util.Clock;
@@ -21,10 +20,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
 /**
- * It tracks the stalls happening during the playback, and their duration.
+ * It tracks the stalls happening during the playback.
  * Each entry in the log file will record:
- *  - the global clock as time reference used by every tracker;
  *  - an index, increased for each new stalling event;
+ *  - the system clock used as time reference by every tracker;
  *  - the duration of the freezing event;
  *  - the position of the video playback when the event occurred.
  */
@@ -56,7 +55,6 @@ public class FreezingEventsTracker {
         String logFilePath = Environment.getExternalStoragePublicDirectory("toucan/logs/")
                 + File.separator
                 + createLogFileName(logFilePrefix);
-        Log.d("FreezingEventsTracker", logFilePath);
 
         // Initialize and configure a new logger in logback
         LoggerContext lc = (LoggerContext) LoggerFactory.getILoggerFactory();
@@ -92,8 +90,8 @@ public class FreezingEventsTracker {
     /**
      * Outputs a track record to the log file.
      * Each entry in the csv file will have:
-     *  - the global clock as time reference used by every tracker;
      *  - an index, increased for each new stalling event;
+     *  - the system clock used as time reference by every tracker;
      *  - the duration of the freezing event;
      *  - the position of the video playback when the event occurred.
      *
@@ -109,7 +107,7 @@ public class FreezingEventsTracker {
             wasBuffering = false;
             long freezeDuration = clock.elapsedRealtime() - freezeStartTime;
             logger.error(String.format(Locale.ENGLISH, "%d,%d,%d,%d",
-                    clock.elapsedRealtime(), ++freezeEventCounter,
+                    ++freezeEventCounter, clock.elapsedRealtime(),
                     freezeDuration, playbackPosition));
         }
     }

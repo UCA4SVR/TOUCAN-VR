@@ -18,7 +18,6 @@ package com.google.android.exoplayer2.source.dash;
 
 import android.net.Uri;
 import android.os.SystemClock;
-import android.util.Log;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -51,8 +50,6 @@ import com.google.android.exoplayer2.util.Util;
 
 import java.io.IOException;
 import java.util.List;
-
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
 
 /**
  * A default {@link DashChunkSource} implementation.
