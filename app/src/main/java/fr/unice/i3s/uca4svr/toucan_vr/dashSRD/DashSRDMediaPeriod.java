@@ -20,7 +20,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
-import android.util.Log;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
@@ -43,7 +42,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
 
 /**
  * A DASH {@link MediaPeriod}.
@@ -214,9 +212,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
         for (int i = 0; i < adaptationSetCount; i++) {
             // casting to AdaptationSetSRD
             AdaptationSetSRD adaptationSet = (AdaptationSetSRD)adaptationSets.get(i);
-
-            // TODO: parse SupplementalProperty to build a proper object to attach to the TrackGroup (?)
-
             List<Representation> representations = adaptationSet.representations;
             Format[] formats = new Format[representations.size()];
             for (int j = 0; j < formats.length; j++) {

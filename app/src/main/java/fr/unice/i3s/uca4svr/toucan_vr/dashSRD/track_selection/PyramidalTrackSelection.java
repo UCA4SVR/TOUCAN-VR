@@ -21,7 +21,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
-import android.os.SystemClock;
 import android.util.Log;
 
 import com.google.android.exoplayer2.C;
@@ -34,7 +33,6 @@ import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 
 import java.util.List;
-import java.util.Random;
 
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
@@ -170,8 +168,8 @@ int count = 0;
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
-        if(isPicked) selectedIndex=1;
-        else selectedIndex=0;
+        if(isPicked) selectedIndex=0;
+        else selectedIndex=1;
         Log.e("SRD"+count,adaptationSetIndex+"->"+isPicked);
         count++;
 

@@ -23,11 +23,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.SRDLoadControl;
@@ -102,6 +100,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private String logPrefix = "Log";
     private boolean loggingBandwidth = false;
     private boolean loggingHeadMotion = false;
+    private boolean loggingFreezes = false;
 
     private String[] tiles;
     private int gridWidth = 1;
@@ -207,6 +206,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
+        loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", false);
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -253,7 +253,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             }
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
-            if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion || loggingBandwidth) {
+            if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion
+                    || loggingBandwidth || loggingFreezes) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -420,12 +421,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             if (statusCode != Status.NO_INTERNET && statusCode != Status.NO_INTENT) {
                 if (result == PackageManager.PERMISSION_GRANTED) {
                     // Initialize the logging to file
-                    if (loggingHeadMotion) {
+                    if (loggingHeadMotion)
                         ((Minimal360Video) getMain()).initHeadMotionTracker(logPrefix);
-                    }
-                    if (loggingBandwidth) {
+                    if (loggingBandwidth)
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
-                    }
+                    if (loggingFreezes)
+                        ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
                     switch (statusCode) {
                         case CHECKING_PERMISSION:
                             videoSceneObjectPlayer = makeVideoSceneObject();
