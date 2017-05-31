@@ -581,10 +581,12 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * number of bytes that can actually be appended.
    */
   private int prepareForAppend(int length) {
-    lastAllocationOffset = 0;
-    lastAllocation = allocator.allocate(length);
-    dataQueue.add(lastAllocation);
-    return length;
+    if (lastAllocation == null || lastAllocationOffset >= lastAllocation.data.length) {
+      lastAllocationOffset = 0;
+      lastAllocation = allocator.allocate(length);
+      dataQueue.add(lastAllocation);
+    }
+    return lastAllocation.data.length - lastAllocationOffset;
   }
 
   /**
