@@ -86,7 +86,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private Allocation lastAllocation;
   private int lastAllocationOffset;
   private boolean needKeyframe;
-  private boolean pendingSplice;
   private UpstreamFormatChangedListener upstreamFormatChangeListener;
 
   /**
@@ -117,23 +116,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     if (previousState == STATE_DISABLED) {
       downstreamFormat = null;
     }
-  }
-
-  /**
-   * Sets a source identifier for subsequent samples.
-   *
-   * @param sourceId The source identifier.
-   */
-  public void sourceId(int sourceId) {
-    infoQueue.sourceId(sourceId);
-  }
-
-  /**
-   * Indicates that samples subsequently queued to the buffer should be spliced into those already
-   * queued.
-   */
-  public void splice() {
-    pendingSplice = true;
   }
 
   /**
@@ -552,12 +534,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
       return;
     }
     try {
-      if (pendingSplice) {
-        if ((flags & C.BUFFER_FLAG_KEY_FRAME) == 0 || !infoQueue.attemptSplice(timeUs)) {
-          return;
-        }
-        pendingSplice = false;
-      }
       if (needKeyframe) {
         if ((flags & C.BUFFER_FLAG_KEY_FRAME) == 0) {
           return;
@@ -924,27 +900,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     public synchronized void commitSampleTimestamp(long timeUs) {
       largestQueuedTimestampUs = Math.max(largestQueuedTimestampUs, timeUs);
     }
-
-    /**
-     * Attempts to discard samples from the tail of the queue to allow samples starting from the
-     * specified timestamp to be spliced in.
-     *
-     * @param timeUs The timestamp at which the splice occurs.
-     * @return Whether the splice was successful.
-     */
-    public synchronized boolean attemptSplice(long timeUs) {
-      if (largestDequeuedTimestampUs >= timeUs) {
-        return false;
-      }
-      int retainCount = queueSize();
-      while (retainCount > 0
-              && timesUs.get(retainCount - 1) >= timeUs) {
-        retainCount--;
-      }
-      discardUpstreamSamples(absoluteReadIndex + retainCount);
-      return true;
-    }
-
   }
 
   /**
@@ -956,8 +911,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     public long offset;
     public long nextOffset;
     public byte[] encryptionKeyId;
-    public int absoluteIndex;
-
   }
 
 }
