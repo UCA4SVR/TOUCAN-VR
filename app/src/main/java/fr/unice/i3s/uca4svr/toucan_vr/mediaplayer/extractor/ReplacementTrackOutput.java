@@ -389,7 +389,9 @@ public final class ReplacementTrackOutput implements TrackOutput {
       currentOffset += toCopy;
       remaining -= toCopy;
     }
-
+    if (currentOffset >= dataQueue.get(0).data.length) {
+      dropDownstreamTo(1);
+    }
   }
 
   /**
@@ -412,6 +414,9 @@ public final class ReplacementTrackOutput implements TrackOutput {
               bytesRead, toCopy);
       currentOffset += toCopy;
       bytesRead += toCopy;
+    }
+    if (currentOffset >= dataQueue.get(0).data.length) {
+      dropDownstreamTo(1);
     }
   }
 
@@ -620,6 +625,9 @@ public final class ReplacementTrackOutput implements TrackOutput {
     private Format upstreamFormat;
     private int upstreamSourceId;
 
+    private final int batchReadingLimit = 20;
+    private int readCounter = 0;
+
     public InfoQueue() {
       sourceIds = new ArrayList<>();
       offsets = new ArrayList<>();
@@ -795,6 +803,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
         return C.RESULT_FORMAT_READ;
       }
 
+      if (readCounter >= batchReadingLimit) {
+        readCounter = 0;
+        return C.RESULT_NOTHING_READ;
+      }
+
       buffer.timeUs = timesUs.get(0);
       buffer.setFlags(flags.get(0));
       extrasHolder.size = sizes.get(0);
@@ -807,10 +820,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
       sizes.remove(0);
       offsets.remove(0);
       encryptionKeys.remove(0);
+      formats.remove(0);
+      sourceIds.remove(0);
       absoluteReadIndex++;
 
       extrasHolder.nextOffset = queueSize() > 0 ? offsets.get(0)
               : extrasHolder.offset + extrasHolder.size;
+      readCounter++;
       return C.RESULT_BUFFER_READ;
     }
 
