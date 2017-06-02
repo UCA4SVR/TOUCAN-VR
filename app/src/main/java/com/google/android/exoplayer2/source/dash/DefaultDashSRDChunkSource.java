@@ -51,6 +51,8 @@ import com.google.android.exoplayer2.util.Util;
 import java.io.IOException;
 import java.util.List;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
+
 /**
  * A default {@link DashChunkSource} implementation.
  */
@@ -182,8 +184,15 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
 
         long bufferedDurationUs = previous != null ? (previous.endTimeUs - playbackPositionUs) : 0;
 
-        //Call the method to choose the track
-        int a = adaptationSetIndex;
+        // Provide the info needed to perform the pyramidal strategy
+        if (trackSelection instanceof PyramidalTrackSelection) {
+            PyramidalTrackSelection pyramidalTrackSelection = (PyramidalTrackSelection)trackSelection;
+            pyramidalTrackSelection.updateAdaptationSetIndex(adaptationSetIndex);
+            pyramidalTrackSelection.updatePlaybackPosition(playbackPositionUs);
+            pyramidalTrackSelection.updateNextChunkPosition(previous != null ? previous.endTimeUs : 0);
+        }
+
+        // Call the method to update the quality for the next chunk
         trackSelection.updateSelectedTrack(bufferedDurationUs);
 
         RepresentationHolder representationHolder =
