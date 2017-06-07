@@ -35,13 +35,15 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.UnboundedAllocator;
 
 /**
  * A {@link TrackOutput} that buffers extracted samples in a queue and allows for consumption from
- * that queue. Also allow the replacement of any sample in the queue.
+ * that queue. Also allows the replacement of any sample in the queue.
  */
 public final class ReplacementTrackOutput implements TrackOutput {
 
@@ -68,7 +70,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private final UnboundedAllocator allocator;
 
   private final InfoQueue infoQueue;
-  private final ArrayList<Allocation> dataQueue;
+  private final List<Allocation> dataQueue;
   private final BufferExtrasHolder extrasHolder;
   private final ParsableByteArray scratch;
   private final AtomicInteger state;
@@ -95,7 +97,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
   public ReplacementTrackOutput(Allocator allocator) {
     this.allocator = (UnboundedAllocator) allocator;
     infoQueue = new InfoQueue();
-    dataQueue = new ArrayList<>();
+    ArrayList<Allocation> queue = new ArrayList<>();
+    dataQueue = Collections.synchronizedList(queue);
     extrasHolder = new BufferExtrasHolder();
     scratch = new ParsableByteArray(INITIAL_SCRATCH_SIZE);
     state = new AtomicInteger();
@@ -285,8 +288,14 @@ public final class ReplacementTrackOutput implements TrackOutput {
             readEncryptionData(buffer, extrasHolder);
           }
           // Write the sample data into the holder.
+          BufferExtrasHolder toStore = new BufferExtrasHolder();
+          toStore.encryptionKeyId = extrasHolder.encryptionKeyId;
+          toStore.nextOffset = extrasHolder.nextOffset;
+          toStore.offset = extrasHolder.offset;
+          toStore.size = extrasHolder.size;
           buffer.ensureSpaceForWrite(extrasHolder.size);
           readData(extrasHolder.offset, buffer.data, extrasHolder.size);
+          dropDownstreamTo(extrasHolder.nextOffset);
         }
         return C.RESULT_BUFFER_READ;
       case C.RESULT_NOTHING_READ:
@@ -377,20 +386,28 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * @param length           The number of bytes to read.
    */
   private void readData(long absolutePosition, ByteBuffer target, int length) {
+    long totalLengthRemaining = -currentOffset;
+    for (int i = 0; i < dataQueue.size(); i++) {
+      totalLengthRemaining += dataQueue.get(i).data.length;
+    }
+
     int remaining = length;
     dropDownstreamTo(absolutePosition);
     while (remaining > 0) {
-      if (currentOffset >= dataQueue.get(0).data.length) {
+      if (dataQueue.size() > 0 && currentOffset >= dataQueue.get(0).data.length) {
         dropDownstreamTo(1);
       }
+
       Allocation allocation = dataQueue.get(0);
       int toCopy = (int) Math.min(remaining, allocation.data.length - currentOffset);
       target.put(allocation.data, allocation.translateOffset((int) currentOffset), toCopy);
       currentOffset += toCopy;
       remaining -= toCopy;
     }
-    if (currentOffset >= dataQueue.get(0).data.length) {
+    if (dataQueue.size() > 0 && currentOffset >= dataQueue.get(0).data.length) {
       dropDownstreamTo(1);
+    } else {
+      currentOffset = 0;
     }
   }
 
@@ -426,7 +443,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
    *
    * @param relativeIndex The absolute position up to which allocations can be discarded.
    */
-  private void dropDownstreamTo(int relativeIndex) {
+  private synchronized void dropDownstreamTo(int relativeIndex) {
     for (int i = 0; i < relativeIndex; i++) {
       totalBytesDropped += dataQueue.get(0).data.length;
       allocator.release(dataQueue.remove(0));
@@ -434,7 +451,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
     }
   }
 
-  private void dropDownstreamTo(long absolutePosition) {
+  private synchronized void dropDownstreamTo(long absolutePosition) {
     while (dataQueue.size() > 0 && totalBytesDropped + dataQueue.get(0).data.length <= absolutePosition) {
       totalBytesDropped += dataQueue.get(0).data.length;
       allocator.release(dataQueue.remove(0));
@@ -555,11 +572,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
 
   // Private methods.
 
-  private boolean startWriteOperation() {
+  private synchronized boolean startWriteOperation() {
     return state.compareAndSet(STATE_ENABLED, STATE_ENABLED_WRITING);
   }
 
-  private void endWriteOperation() {
+  private synchronized void endWriteOperation() {
     if (!state.compareAndSet(STATE_ENABLED_WRITING, STATE_ENABLED)) {
       clearSampleData();
     }
@@ -611,13 +628,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
    */
   private static final class InfoQueue {
 
-    private ArrayList<Integer> sourceIds;
-    private ArrayList<Long> offsets;
-    private ArrayList<Integer> sizes;
-    private ArrayList<Integer> flags;
-    private ArrayList<Long> timesUs;
-    private ArrayList<byte[]> encryptionKeys;
-    private ArrayList<Format> formats;
+    private List<Integer> sourceIds;
+    private List<Long> offsets;
+    private List<Integer> sizes;
+    private List<Integer> flags;
+    private List<Long> timesUs;
+    private List<byte[]> encryptionKeys;
+    private List<Format> formats;
 
     private int absoluteReadIndex;
 
@@ -638,6 +655,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
       sizes = new ArrayList<>();
       encryptionKeys = new ArrayList<>();
       formats = new ArrayList<>();
+      sourceIds = Collections.synchronizedList(sourceIds);
+      offsets = Collections.synchronizedList(offsets);
+      timesUs = Collections.synchronizedList(timesUs);
+      flags = Collections.synchronizedList(flags);
+      sizes = Collections.synchronizedList(sizes);
+      encryptionKeys = Collections.synchronizedList(encryptionKeys);
+      formats = Collections.synchronizedList(formats);
       largestDequeuedTimestampUs = Long.MIN_VALUE;
       largestQueuedTimestampUs = Long.MIN_VALUE;
       upstreamFormatRequired = true;
