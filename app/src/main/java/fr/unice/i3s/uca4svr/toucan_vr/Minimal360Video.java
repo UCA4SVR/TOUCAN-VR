@@ -20,6 +20,7 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.graphics.Color;
+import android.util.Log;
 import android.view.Gravity;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -37,6 +38,7 @@ import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
 import org.gearvrf.GVRTexture;
+import org.gearvrf.GVRTransform;
 import org.gearvrf.scene_objects.GVRSphereSceneObject;
 import org.gearvrf.scene_objects.GVRTextViewSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
@@ -44,6 +46,7 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.Future;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
@@ -318,5 +321,19 @@ public class Minimal360Video extends GVRMain {
             if (freezingEventsTracker != null)
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
         }
+        double angle = 0;
+        float[] lookAt = gvrContext.getMainScene().getMainCameraRig().getLookAt();
+        // cos = [0], sin = [2]
+        double norm = Math.sqrt(lookAt[0] * lookAt[0] + lookAt[2] * lookAt[2]);
+        double cos = lookAt[0] / norm;
+        cos = Math.abs(cos) > 1 ? Math.signum(cos) : cos;
+        if (lookAt[2] == 0) {
+            angle = Math.acos(cos);
+        } else {
+            angle = Math.signum(lookAt[2]) * Math.acos(cos);
+        }
+        //From radiant to degree + orientation
+        angle = angle * 180 / Math.PI * -1;
+        Log.e("MOTION", angle+"");
     }
 }
