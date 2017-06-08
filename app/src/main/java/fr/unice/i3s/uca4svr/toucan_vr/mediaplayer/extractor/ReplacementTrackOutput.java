@@ -312,6 +312,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * {@link BufferExtrasHolder#size} is adjusted to subtract the number of bytes that were read. The
    * same value is added to {@link BufferExtrasHolder#offset}.
    *
+   * TODO: This is not working properly right now. Must be investigated and fixed to play DRM content.
+   *
    * @param buffer       The buffer into which the encryption data should be written.
    * @param extrasHolder The extras holder whose offset should be read and subsequently adjusted.
    */
@@ -379,18 +381,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   /**
-   * Reads data from the front of the rolling buffer.
+   * Reads data from the front of the buffer.
    *
    * @param absolutePosition The absolute position from which data should be read.
    * @param target           The buffer into which data should be written.
    * @param length           The number of bytes to read.
    */
   private void readData(long absolutePosition, ByteBuffer target, int length) {
-    long totalLengthRemaining = -currentOffset;
-    for (int i = 0; i < dataQueue.size(); i++) {
-      totalLengthRemaining += dataQueue.get(i).data.length;
-    }
-
     int remaining = length;
     dropDownstreamTo(absolutePosition);
     while (remaining > 0) {
@@ -412,7 +409,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   /**
-   * Reads data from the front of the rolling buffer.
+   * Reads data from the front of the buffer.
    *
    * @param absolutePosition The relative position from which data should be read.
    * @param target           The array into which data should be written.
@@ -499,9 +496,10 @@ public final class ReplacementTrackOutput implements TrackOutput {
 
   public void replaceSample(ParsableByteArray buffer, int length, long timeUs,
                             @C.BufferFlags int flags, int size, byte[] encryptionKey) {
-    // Don't be afraid that's normal. I need all of those lists to be lock while I'm doing the
-    // replacement to make sure that indexes are in sync at the replacement time.
-    // I'll be changing the locking facility at some point.
+    // Syncing both on the data and the info queue because we will be seeking and modifying a
+    // specific index in those queues. Don't want them to be changed elsewhere while we are working
+    // here !
+    
     // Be aware of a potential flaw when locking happens while only part of the lists in the info queue
     // have been treated by an addition or removal operation. Should be ok since everything should be locked
     // against offsets.
@@ -531,9 +529,16 @@ public final class ReplacementTrackOutput implements TrackOutput {
           }
           int offsetShift = size - infoQueue.sizes.get(infoQueueIndex);
           dataQueue.add(dataQueueIndex, newAlloc);
+
+          // TODO: There might be issues when replacing with a new format. Need to investigate more.
+          if (pendingFormatAdjustment) {
+            format(lastUnadjustedFormat);
+          }
           infoQueue.flags.set(infoQueueIndex, flags);
           infoQueue.sizes.set(infoQueueIndex, size);
           infoQueue.encryptionKeys.set(infoQueueIndex, encryptionKey);
+          infoQueue.formats.set(infoQueueIndex, infoQueue.upstreamFormat);
+
           for (int index = infoQueueIndex + 1; index < infoQueue.offsets.size(); index++) {
             infoQueue.offsets.set(index, infoQueue.offsets.get(index) + offsetShift);
           }
