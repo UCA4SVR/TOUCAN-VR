@@ -21,8 +21,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
@@ -54,8 +52,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int selectedIndex;
     private int reason;
     private int adaptationSetIndex;
-    //TODO FIX counter is not reset on new intent so it causes an IndexOutOfBuonds exception
-    private static int initCounter = -1;
+    private long currentPlaybackPosition;
+    private long chunkStartTime;
 
     /**
      * Factory for {@link AdaptiveTrackSelection} instances.
@@ -160,20 +158,26 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
         selectedIndex = determineIdealSelectedIndex(true);
-        adaptationSetIndex = ++initCounter;
         reason = C.SELECTION_REASON_INITIAL;
     }
-int count = 0;
+
+    public void updateAdaptationSetIndex(int adaptationSetIndex) {
+        this.adaptationSetIndex = adaptationSetIndex;
+    }
+
+    public void updatePlaybackPosition(long playbackPositionUs) {
+        this.currentPlaybackPosition = playbackPositionUs;
+    }
+
+    public void updateNextChunkPosition(long chunkStartTime) {
+        this.chunkStartTime = chunkStartTime;
+    }
+
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
-        if(isPicked) selectedIndex=0;
-        else selectedIndex=1;
-        Log.e("SRD"+count,adaptationSetIndex+"->"+isPicked);
-        count++;
-
-
+        selectedIndex = determineIdealSelectedIndex(isPicked);
 
         //long nowMs = SystemClock.elapsedRealtime();
         // Get the current and ideal selections.
@@ -254,8 +258,11 @@ int count = 0;
     /*
     Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
      */
-    private int determineIdealSelectedIndex(boolean isPicked) {;
-        if(isPicked) return 0; else return 1;
+    private int determineIdealSelectedIndex(boolean isPicked) {
+        if(isPicked)
+            return 0;
+        else
+            return 1;
     }
 
     /*
