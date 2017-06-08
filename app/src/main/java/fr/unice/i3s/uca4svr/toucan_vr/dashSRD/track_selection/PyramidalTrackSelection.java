@@ -21,9 +21,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
-import android.os.SystemClock;
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
@@ -34,7 +31,6 @@ import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 
 import java.util.List;
-import java.util.Random;
 
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
@@ -56,8 +52,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int selectedIndex;
     private int reason;
     private int adaptationSetIndex;
-    //TODO FIX counter is not reset on new intent so it causes an IndexOutOfBuonds exception
-    private static int initCounter = -1;
+    private long currentPlaybackPosition;
+    private long chunkStartTime;
 
     /**
      * Factory for {@link AdaptiveTrackSelection} instances.
@@ -161,15 +157,27 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.maxDurationForQualityDecreaseUs = maxDurationForQualityDecreaseMs * 1000L;
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
-        selectedIndex = 1;
-        adaptationSetIndex = ++initCounter;
+        selectedIndex = determineIdealSelectedIndex(true);
         reason = C.SELECTION_REASON_INITIAL;
     }
+
+    public void updateAdaptationSetIndex(int adaptationSetIndex) {
+        this.adaptationSetIndex = adaptationSetIndex;
+    }
+
+    public void updatePlaybackPosition(long playbackPositionUs) {
+        this.currentPlaybackPosition = playbackPositionUs;
+    }
+
+    public void updateNextChunkPosition(long chunkStartTime) {
+        this.chunkStartTime = chunkStartTime;
+    }
+
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
-
+        boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
-        selectedIndex=1;
+        selectedIndex = determineIdealSelectedIndex(isPicked);
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
@@ -235,8 +243,11 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     /*
     Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
      */
-    private int determineIdealSelectedIndex(boolean isPicked) {;
-        if(isPicked) return 0; else return 1;
+    private int determineIdealSelectedIndex(boolean isPicked) {
+        if(isPicked)
+            return 0;
+        else
+            return 1;
     }
 
     /*

@@ -49,6 +49,7 @@ import java.util.concurrent.Future;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.FreezingEventsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
 
 public class Minimal360Video extends GVRMain {
@@ -58,6 +59,9 @@ public class Minimal360Video extends GVRMain {
 
     // The head motion tracker to log head motions
     private HeadMotionTracker headMotionTracker = null;
+
+    // The tracker for the re-buffering events
+    private FreezingEventsTracker freezingEventsTracker = null;
 
     // The status code needed to always know which virtual scene to create
     private PlayerActivity.Status statusCode = PlayerActivity.Status.NULL;
@@ -104,16 +108,20 @@ public class Minimal360Video extends GVRMain {
         if (!videoStarted) {
             videoStarted = true;
 
+            // Get the main VR scene
             final GVRScene scene = gvrContext.getMainScene();
 
+            // Start with a clean scene to add only the video
+            scene.removeAllSceneObjects();
+
+            // The frustum picker needed to always know which tiles are within the FoV
             GVRFrustumPicker frustumPicker = new GVRFrustumPicker(gvrContext,scene);
+
+            // The frustum in which the picker is able to pick tiles
             frustumPicker.setFrustum(40,1,49,50);
 
-
-            //Attaching the tiles picker
+            // Attaching the picker
             scene.getEventReceiver().addListener(TilesPicker.getPicker());
-
-
 
             // Add a listener to the player to catch the end of the playback
             final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
@@ -158,9 +166,6 @@ public class Minimal360Video extends GVRMain {
                     // Does Nothing
                 }
             });
-
-            // Start with a clean scene to add only the video
-            scene.removeAllSceneObjects();
 
             // Create a list of tiles to provide to the sphere constructor
             ArrayList<int[]> listOfTiles = new ArrayList<>();
@@ -298,11 +303,20 @@ public class Minimal360Video extends GVRMain {
             headMotionTracker = new HeadMotionTracker(logPrefix);
     }
 
+    public void initFreezingEventsTracker(String logPrefix) {
+        if (freezingEventsTracker == null)
+            freezingEventsTracker = new FreezingEventsTracker(logPrefix);
+    }
+
     @Override
     public void onStep() {
-        if (headMotionTracker != null &&
-                statusCode == PlayerActivity.Status.PLAYING) {
-            headMotionTracker.track(gvrContext, videoSceneObjectPlayer.getPlayer().getCurrentPosition());
+        // We only perform the tracking if the video is playing
+        if (statusCode == PlayerActivity.Status.PLAYING && videoSceneObjectPlayer != null) {
+            final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
+            if (headMotionTracker != null)
+                headMotionTracker.track(gvrContext, player.getCurrentPosition());
+            if (freezingEventsTracker != null)
+                freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
         }
     }
 }

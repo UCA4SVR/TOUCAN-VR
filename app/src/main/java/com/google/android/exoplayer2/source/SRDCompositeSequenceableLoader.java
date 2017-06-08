@@ -15,11 +15,9 @@
  */
 package com.google.android.exoplayer2.source;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.source.chunk.SRDChunkSampleStream;
 
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 /**
@@ -52,7 +50,7 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
 	/* I need to buffer again: if I was replacing I have to stop the process */
 		if (this.imReplacing) {
 			for (SequenceableLoader loader : loaders) {
-				((SRDChunkSampleStream) loader).stopReplacing();
+				((OurChunkSampleStream) loader).stopReplacing();
 			}
 			this.imReplacing = false;
 		}
@@ -80,8 +78,8 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
 		TilesPicker tilesPicker = TilesPicker.getPicker();
 		//Need to replace: which one? choose the currently picked tiles!
 		for (SequenceableLoader loader : loaders) {
-			if (tilesPicker.isPicked(((SRDChunkSampleStream) loader).adaptationSetIndex)) {
-				madeProgress |= ((SRDChunkSampleStream) loader).replace(playbackPosition);
+			if (tilesPicker.isPicked(((OurChunkSampleStream) loader).adaptationSetIndex)) {
+				madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
 			}
 		}
 		return madeProgress;
