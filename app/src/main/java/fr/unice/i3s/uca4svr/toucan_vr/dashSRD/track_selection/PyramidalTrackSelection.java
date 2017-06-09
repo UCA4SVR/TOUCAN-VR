@@ -21,8 +21,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
@@ -54,8 +52,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int selectedIndex;
     private int reason;
     private int adaptationSetIndex;
-    //TODO FIX counter is not reset on new intent so it causes an IndexOutOfBuonds exception
-    private static int initCounter = -1;
+    private long currentPlaybackPosition;
+    private long chunkStartTime;
 
     /**
      * Factory for {@link AdaptiveTrackSelection} instances.
@@ -160,50 +158,41 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
         selectedIndex = determineIdealSelectedIndex(true);
-        adaptationSetIndex = ++initCounter;
         reason = C.SELECTION_REASON_INITIAL;
     }
-int count = 0;
+
+    public void updateAdaptationSetIndex(int adaptationSetIndex) {
+        this.adaptationSetIndex = adaptationSetIndex;
+    }
+
+    public void updatePlaybackPosition(long playbackPositionUs) {
+        this.currentPlaybackPosition = playbackPositionUs;
+    }
+
+    public void updateNextChunkPosition(long chunkStartTime) {
+        this.chunkStartTime = chunkStartTime;
+    }
+
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
-        if(isPicked) selectedIndex=0;
-        else selectedIndex=1;
-        Log.e("SRD"+count,adaptationSetIndex+"->"+isPicked);
-        count++;
-
-
-
-        //long nowMs = SystemClock.elapsedRealtime();
-        // Get the current and ideal selections.
-
-        //Format currentFormat = getSelectedFormat();
-        //int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
-        //Format idealFormat = getFormat(idealSelectedIndex);
-        // Assume we can switch to the ideal selection.
-        //selectedIndex = idealSelectedIndex;
-
-        /*
-        // Revert back to the current selection if conditions are not suitable for switching.
-        if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
-            if (idealFormat.bitrate > currentFormat.bitrate
-                    && bufferedDurationUs < minDurationForQualityIncreaseUs) {
-                // The ideal track is a higher quality, but we have insufficient buffer to safely switch
-                // up. Defer switching up for now./selectedIndex = currentSelectedIndex;
-            } else if (idealFormat.bitrate < currentFormat.bitrate
-                    && bufferedDurationUs >= maxDurationForQualityDecreaseUs) {
-                // The ideal track is a lower quality, but we have sufficient buffer to defer switching
-                // down for now.
-                selectedIndex = currentSelectedIndex;
-            }
-        }
-        */
-        // If we adapted, update the trigger.
+        selectedIndex = determineIdealSelectedIndex(isPicked);
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
+        /*boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
+        int currentSelectedIndex = selectedIndex;
+        if(isPicked) selectedIndex=0;
+        else selectedIndex=1;
+        // If we adapted, update the trigger.
+        if (selectedIndex != currentSelectedIndex) {
+            reason = C.SELECTION_REASON_ADAPTIVE;
+        }*/
+    }
 
+    public void forceSelectedTrack() {
+        selectedIndex = 0;
     }
 
     @Override
@@ -231,7 +220,7 @@ int count = 0;
         if (bufferedDurationUs < minDurationToRetainAfterDiscardUs) {
             return queueSize;
         }
-        int idealSelectedIndex = determineIdealSelectedIndex(true);
+        int idealSelectedIndex = determineIdealSelectedIndex(false);
         Format idealFormat = getFormat(idealSelectedIndex);
         // If the chunks contain video, discard from the first SD chunk beyond
         // minDurationToRetainAfterDiscardUs whose resolution and bitrate are both lower than the ideal
@@ -254,8 +243,11 @@ int count = 0;
     /*
     Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
      */
-    private int determineIdealSelectedIndex(boolean isPicked) {;
-        if(isPicked) return 0; else return 1;
+    private int determineIdealSelectedIndex(boolean isPicked) {
+        if(isPicked)
+            return 0;
+        else
+            return 1;
     }
 
     /*

@@ -23,13 +23,12 @@ package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
-import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.MediaPeriod;
+import com.google.android.exoplayer2.source.SRDCompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
-import com.google.android.exoplayer2.source.chunk.ChunkSampleStream;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
@@ -42,12 +41,15 @@ import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
+import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
 
 /**
  * A DASH {@link MediaPeriod}.
  */
 /* package */ final class DashSRDMediaPeriod implements MediaPeriod,
-        SequenceableLoader.Callback<ChunkSampleStream<DashChunkSource>> {
+    SequenceableLoader.Callback<OurChunkSampleStream<DashChunkSource>> {
 
     /* package */ final int id;
     private final DashChunkSource.Factory chunkSourceFactory;
@@ -57,10 +59,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final Allocator allocator;
     private final TrackGroupArray trackGroups;
+    private final int minBufferMs;
+    private final int maxBufferMs;
 
     private Callback callback;
-    private ChunkSampleStream<DashChunkSource>[] sampleStreams;
-    private CompositeSequenceableLoader sequenceableLoader;
+    private SRDCompositeSequenceableLoader sequenceableLoader;
+    private OurChunkSampleStream<DashChunkSource>[] sampleStreams;
     private DashManifest manifest;
     private int periodIndex;
     private List<AdaptationSet> adaptationSets;
@@ -68,7 +72,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
                            DashChunkSource.Factory chunkSourceFactory,  int minLoadableRetryCount,
                            EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
-                           LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator) {
+                           LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs) {
         this.id = id;
         this.manifest = manifest;
         this.periodIndex = periodIndex;
@@ -78,8 +82,11 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
         this.elapsedRealtimeOffset = elapsedRealtimeOffset;
         this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
         this.allocator = allocator;
+        //Buffers are provided in ms and then used in microseconds
+        this.minBufferMs = minBufferMs*1000;
+        this.maxBufferMs = maxBufferMs*1000;
         sampleStreams = newSampleStreamArray(0);
-        sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
+        sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
         trackGroups = buildTrackGroups(adaptationSets);
     }
@@ -89,7 +96,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
         this.periodIndex = periodIndex;
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
         if (sampleStreams != null) {
-            for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+            for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
                 sampleStream.getChunkSource().updateManifest(manifest, periodIndex);
             }
             callback.onContinueLoadingRequested(this);
@@ -97,7 +104,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     }
 
     public void release() {
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+        for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
             sampleStream.release();
         }
     }
@@ -122,12 +129,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
                              SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
         int adaptationSetCount = adaptationSets.size();
-        HashMap<Integer, ChunkSampleStream<DashChunkSource>> primarySampleStreams = new HashMap<>();
+        HashMap<Integer, OurChunkSampleStream<DashChunkSource>> primarySampleStreams = new HashMap<>();
 
         for (int i = 0; i < selections.length; i++) {
-            if (streams[i] instanceof ChunkSampleStream) {
+            if (streams[i] instanceof OurChunkSampleStream) {
                 @SuppressWarnings("unchecked")
-                ChunkSampleStream<DashChunkSource> stream = (ChunkSampleStream<DashChunkSource>) streams[i];
+                OurChunkSampleStream<DashChunkSource> stream = (OurChunkSampleStream<DashChunkSource>) streams[i];
                 if (selections[i] == null || !mayRetainStreamFlags[i]) {
                     stream.release();
                     streams[i] = null;
@@ -139,7 +146,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
             if (streams[i] == null && selections[i] != null) {
                 int trackGroupIndex = trackGroups.indexOf(selections[i].getTrackGroup());
                 if (trackGroupIndex < adaptationSetCount) {
-                    ChunkSampleStream<DashChunkSource> stream = buildSampleStream(trackGroupIndex,
+                    OurChunkSampleStream<DashChunkSource> stream = buildSampleStream(trackGroupIndex,
                             selections[i], positionUs);
                     primarySampleStreams.put(trackGroupIndex, stream);
                     streams[i] = stream;
@@ -149,20 +156,41 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
         }
         sampleStreams = newSampleStreamArray(primarySampleStreams.size());
         primarySampleStreams.values().toArray(sampleStreams);
-        sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
+        sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
         return positionUs;
     }
 
     @Override
     public void discardBuffer(long positionUs) {
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+        for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
             sampleStream.discardUnselectedEmbeddedTracksTo(positionUs);
         }
     }
 
     @Override
     public boolean continueLoading(long positionUs) {
-        return sequenceableLoader.continueLoading(positionUs);
+        long bufferedPosition = getBufferedPositionUs();
+        /*If the buffer is full and the playback has started, start replacing chunks.
+        It doesn't make sense to replace if the playback hasn't started: we have no information
+        from the picker */
+        if ((bufferedPosition-positionUs) > maxBufferMs) {
+            if (positionUs>0) {
+                if (!sequenceableLoader.replaceChunks(positionUs))
+                    callback.onContinueLoadingRequested(this);
+            } else {
+                //Nothing to do
+				callback.onContinueLoadingRequested(this);
+            }
+        } else {
+            sequenceableLoader.continueLoading(positionUs);
+        }
+        // I think the problem is that when LoadControl returns true, the method maybeContinueLoading
+        // only gets called when something finishes downloading. Instead, when it returns false, I guess
+        // something periodically checks again by calling maybeContinueLoading.
+        // So, we need to implement the replacement strategy to make this work.
+        // A workaround is to call the following method. Not efficient.
+        // It doesn't matter what we return (returned value isn't used in the ExoPlayerImpInternal).
+        return true;
     }
 
     @Override
@@ -178,7 +206,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     @Override
     public long getBufferedPositionUs() {
         long bufferedPositionUs = Long.MAX_VALUE;
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+        for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
             long rendererBufferedPositionUs = sampleStream.getBufferedPositionUs();
             if (rendererBufferedPositionUs != C.TIME_END_OF_SOURCE) {
                 bufferedPositionUs = Math.min(bufferedPositionUs, rendererBufferedPositionUs);
@@ -189,7 +217,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 
     @Override
     public long seekToUs(long positionUs) {
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+        for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
             sampleStream.seekToUs(positionUs);
         }
         return positionUs;
@@ -198,7 +226,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
     // SequenceableLoader.Callback implementation.
 
     @Override
-    public void onContinueLoadingRequested(ChunkSampleStream<DashChunkSource> sampleStream) {
+    public void onContinueLoadingRequested(OurChunkSampleStream<DashChunkSource> sampleStream) {
         callback.onContinueLoadingRequested(this);
     }
 
@@ -225,20 +253,20 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 
     // N.B. this method creates a stream of chunks for each of the renderer
     //      (provided that each renderer has a group of exposed tracks and is enabled)
-    private ChunkSampleStream<DashChunkSource> buildSampleStream(int adaptationSetIndex,
+    private OurChunkSampleStream<DashChunkSource> buildSampleStream(int adaptationSetIndex,
                                                                  TrackSelection selection, long positionUs) {
         AdaptationSet adaptationSet = adaptationSets.get(adaptationSetIndex);
         DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
                 manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
-        ChunkSampleStream<DashChunkSource> stream = new ChunkSampleStream<>(adaptationSet.type,
+        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex,adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
                 eventDispatcher);
         return stream;
     }
 
     @SuppressWarnings("unchecked")
-    private static ChunkSampleStream<DashChunkSource>[] newSampleStreamArray(int length) {
-        return new ChunkSampleStream[length];
+    private static OurChunkSampleStream<DashChunkSource>[] newSampleStreamArray(int length) {
+        return new OurChunkSampleStream[length];
     }
 }
