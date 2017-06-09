@@ -57,6 +57,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnection;
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnectionResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingParser;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
@@ -71,7 +73,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     enum Status {
         NO_INTENT, NO_INTERNET, NO_PERMISSION, CHECKING_INTERNET, CHECKING_PERMISSION,
         CHECKING_INTERNET_AND_PERMISSION, READY_TO_PLAY, PLAYING, PAUSED, PLAYBACK_ENDED,
-        PLAYBACK_ERROR, NULL
+        PLAYBACK_ERROR, WRONGDYNED, NULL
     }
 
     private static TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
@@ -106,6 +108,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private int gridWidth = 1;
     private int gridHeight = 1;
     private int numberOfTiles = 1;
+
+    private String dynamicEditingFN;
+    private DynamicEditingHolder dynamicEditingHolder;
 
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
@@ -211,7 +216,18 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
         numberOfTiles = tiles.length / 4;
+        //Dynamic Editing Parsing
+        dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
+        if(dynamicEditingFN.length()>0) parseDynamicEditing(dynamicEditingFN);
         // changeStatus(Status.OK);
+    }
+
+    private void parseDynamicEditing(String dynamicEditingFN) {
+        DynamicEditingParser parser = new DynamicEditingParser(dynamicEditingFN);
+        dynamicEditingHolder = parser.parse();
+        if(dynamicEditingHolder ==null) {
+            changeStatus(Status.WRONGDYNED);
+        }
     }
 
     /**
@@ -247,8 +263,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      */
     private void checkInternetAndPermissions() {
         synchronized (this) {
-            if (statusCode == Status.NO_INTENT) {
-                // If there is no intent, there is no need to check anything else
+            if (statusCode == Status.NO_INTENT || statusCode == Status.WRONGDYNED) {
+                // If there is no intent or the dynamic editing file thrown and exception, there is no need to check anything else
                 return;
             }
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);

@@ -251,6 +251,11 @@ public class Minimal360Video extends GVRMain {
                                          gvrContext.getActivity().getString(R.string.playback_error));
                                  createScene(textObject);
                                  break;
+                             case WRONGDYNED:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         gvrContext.getActivity().getString(R.string.dynamicEd_error));
+                                 createScene(textObject);
+                                 break;
                              case CHECKING_INTERNET:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
                                          gvrContext.getActivity().getString(R.string.checking_url));
@@ -334,6 +339,5 @@ public class Minimal360Video extends GVRMain {
         }
         //From radiant to degree + orientation
         angle = angle * 180 / Math.PI * -1;
-        Log.e("MOTION", angle+"");
     }
 }
