@@ -639,8 +639,18 @@ public final class ReplacementTrackOutput implements TrackOutput {
     }
   }
 
-  // Private methods.
+  public void beginReplacement(long startTimeUs, long endTimeUs) {
+    int infoQueueStartIndex =  infoQueue.findIndex(startTimeUs);
+    int infoQueueEndINdex = infoQueue.findIndex(endTimeUs);
 
+    throw new RuntimeException("Not yet implemented.");
+  }
+
+  public void cancelReplacement() {
+    throw new RuntimeException("Not implemented yet.");
+  }
+
+  // Private methods.
   private synchronized boolean startWriteOperation() {
     return state.compareAndSet(STATE_ENABLED, STATE_ENABLED_WRITING);
   }

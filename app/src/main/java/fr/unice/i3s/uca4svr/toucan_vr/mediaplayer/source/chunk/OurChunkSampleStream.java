@@ -43,7 +43,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutp
  * May also be configured to expose additional embedded {@link SampleStream}s.
  */
 public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream, SequenceableLoader,
-    Loader.Callback<Chunk> {
+        Loader.Callback<Chunk> {
 
   private final int primaryTrackType;
   private final int[] embeddedTrackTypes;
@@ -60,7 +60,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final ReplacementTrackOutput[] embeddedSampleQueues;
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
-	public final int adaptationSetIndex;
+  public final int adaptationSetIndex;
 
   private Format primaryDownstreamTrackFormat;
   private long pendingResetPositionUs;
@@ -68,23 +68,23 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   /* package */ boolean loadingFinished;
 
   /**
-   * @param primaryTrackType The type of the primary track. One of the {@link C}
-   *     {@code TRACK_TYPE_*} constants.
-   * @param embeddedTrackTypes The types of any embedded tracks, or null.
-   * @param chunkSource A {@link ChunkSource} from which chunks to load are obtained.
-   * @param callback An {@link Callback} for the stream.
-   * @param allocator An {@link Allocator} from which allocations can be obtained.
-   * @param positionUs The position from which to start loading media.
+   * @param primaryTrackType      The type of the primary track. One of the {@link C}
+   *                              {@code TRACK_TYPE_*} constants.
+   * @param embeddedTrackTypes    The types of any embedded tracks, or null.
+   * @param chunkSource           A {@link ChunkSource} from which chunks to load are obtained.
+   * @param callback              An {@link Callback} for the stream.
+   * @param allocator             An {@link Allocator} from which allocations can be obtained.
+   * @param positionUs            The position from which to start loading media.
    * @param minLoadableRetryCount The minimum number of times that the source should retry a load
-   *     before propagating an error.
-   * @param eventDispatcher A dispatcher to notify of events.
+   *                              before propagating an error.
+   * @param eventDispatcher       A dispatcher to notify of events.
    */
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
                               int minLoadableRetryCount, EventDispatcher eventDispatcher) {
     this.adaptationSetIndex = adaptationSetIndex;
     //Getting the highest format for this tile
-    this.highestFormatId = ((DefaultDashSRDChunkSource)chunkSource).getHighestFormatId();
+    this.highestFormatId = ((DefaultDashSRDChunkSource) chunkSource).getHighestFormatId();
     this.primaryTrackType = primaryTrackType;
     this.embeddedTrackTypes = embeddedTrackTypes;
     this.chunkSource = chunkSource;
@@ -139,7 +139,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    * another stream for the same track.
    *
    * @param positionUs The current playback position in microseconds.
-   * @param trackType The type of the embedded track to enable.
+   * @param trackType  The type of the embedded track to enable.
    * @return The {@link EmbeddedSampleStream} for the embedded track.
    */
   public EmbeddedSampleStream selectEmbeddedTrack(long positionUs, int trackType) {
@@ -166,7 +166,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    * Returns an estimate of the position up to which data is buffered.
    *
    * @return An estimate of the absolute position in microseconds up to which data is buffered, or
-   *     {@link C#TIME_END_OF_SOURCE} if the track is fully buffered.
+   * {@link C#TIME_END_OF_SOURCE} if the track is fully buffered.
    */
   public long getBufferedPositionUs() {
     if (loadingFinished) {
@@ -177,7 +177,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       long bufferedPositionUs = lastSeekPositionUs;
       BaseMediaChunk lastMediaChunk = mediaChunks.getLast();
       BaseMediaChunk lastCompletedMediaChunk = lastMediaChunk.isLoadCompleted() ? lastMediaChunk
-          : mediaChunks.size() > 1 ? mediaChunks.get(mediaChunks.size() - 2) : null;
+              : mediaChunks.size() > 1 ? mediaChunks.get(mediaChunks.size() - 2) : null;
       if (lastCompletedMediaChunk != null) {
         bufferedPositionUs = Math.max(bufferedPositionUs, lastCompletedMediaChunk.endTimeUs);
       }
@@ -194,12 +194,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     lastSeekPositionUs = positionUs;
     // If we're not pending a reset, see if we can seek within the primary sample queue.
     boolean seekInsideBuffer = !isPendingReset() && primarySampleQueue.skipToKeyframeBefore(
-        positionUs, positionUs < getNextLoadPositionUs());
+            positionUs, positionUs < getNextLoadPositionUs());
     if (seekInsideBuffer) {
       // We succeeded. We need to discard any chunks that we've moved past and perform the seek for
       // any embedded streams as well.
       while (mediaChunks.size() > 1
-          && mediaChunks.get(1).getFirstSampleIndex(0) <= primarySampleQueue.getReadIndex()) {
+              && mediaChunks.get(1).getFirstSampleIndex(0) <= primarySampleQueue.getReadIndex()) {
         mediaChunks.removeFirst();
       }
       // TODO: For this to work correctly, the embedded streams must not discard anything from their
@@ -253,13 +253,13 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   @Override
   public int readData(FormatHolder formatHolder, DecoderInputBuffer buffer,
-      boolean formatRequired) {
+                      boolean formatRequired) {
     if (isPendingReset()) {
       return C.RESULT_NOTHING_READ;
     }
     discardDownstreamMediaChunks(primarySampleQueue.getReadIndex());
     return primarySampleQueue.readData(formatHolder, buffer, formatRequired, loadingFinished,
-        lastSeekPositionUs);
+            lastSeekPositionUs);
   }
 
   @Override
@@ -273,19 +273,19 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   public void onLoadCompleted(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs) {
     chunkSource.onChunkLoadCompleted(loadable);
     eventDispatcher.loadCompleted(loadable.dataSpec, loadable.type, primaryTrackType,
-        loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
-        loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs,
-        loadable.bytesLoaded());
+            loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
+            loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs,
+            loadable.bytesLoaded());
     callback.onContinueLoadingRequested(this);
   }
 
   @Override
   public void onLoadCanceled(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs,
-      boolean released) {
+                             boolean released) {
     eventDispatcher.loadCanceled(loadable.dataSpec, loadable.type, primaryTrackType,
-        loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
-        loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs,
-        loadable.bytesLoaded());
+            loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
+            loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs,
+            loadable.bytesLoaded());
     if (!released) {
       primarySampleQueue.reset(true);
       for (ReplacementTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
@@ -297,7 +297,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   @Override
   public int onLoadError(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs,
-      IOException error) {
+                         IOException error) {
     long bytesLoaded = loadable.bytesLoaded();
     boolean isMediaChunk = isMediaChunk(loadable);
     boolean cancelable = !isMediaChunk || bytesLoaded == 0 || mediaChunks.size() > 1;
@@ -317,9 +317,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       }
     }
     eventDispatcher.loadError(loadable.dataSpec, loadable.type, primaryTrackType,
-        loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
-        loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs, bytesLoaded,
-        error, canceled);
+            loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
+            loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs, bytesLoaded,
+            error, canceled);
     if (canceled) {
       callback.onContinueLoadingRequested(this);
       return Loader.DONT_RETRY;
@@ -337,8 +337,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     }
 
     chunkSource.getNextChunk(mediaChunks.isEmpty() ? null : mediaChunks.getLast(),
-        pendingResetPositionUs != C.TIME_UNSET ? pendingResetPositionUs : positionUs,
-        nextChunkHolder);
+            pendingResetPositionUs != C.TIME_UNSET ? pendingResetPositionUs : positionUs,
+            nextChunkHolder);
     boolean endOfStream = nextChunkHolder.endOfStream;
     Chunk loadable = nextChunkHolder.chunk;
     nextChunkHolder.clear();
@@ -360,75 +360,79 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     }
     long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
     eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
-        loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
-        loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
+            loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
+            loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
     return true;
   }
 
-    public boolean replace(long playbackPosition) {
-		//Still buffering?
-		if(loader.isLoading())
-			return false;
+  public boolean replace(long playbackPosition) {
+    //Still buffering?
+    if (loader.isLoading()) {
+      return false;
+    }
 
-        /*        Targeting the chunk to be replaced: mediachunks holds in a linked list all
-        the chunks already downloaded. The chunk whose startTimeUS and endTimeUs satisfy
-        startTimeUS < playbackPosition < endTimeUs is identified and then the replacement
-        starts two segments after */
-		MediaChunk maybeReplace = null;
-		int maybeReplaceIndex = 0;
-        for(MediaChunk mediaChunk : mediaChunks) {
-			if((mediaChunk.startTimeUs<playbackPosition)&&(mediaChunk.endTimeUs>playbackPosition)) {
-				maybeReplace = mediaChunk;
-				break;
-			}
-			maybeReplaceIndex++;
-		}
+    /*
+    Targeting the chunk to be replaced: mediachunks holds in a linked list all
+    the chunks already downloaded. The chunk whose startTimeUS and endTimeUs satisfy
+    startTimeUS < playbackPosition < endTimeUs is identified and then the replacement
+    starts two segments after
+    */
+    MediaChunk maybeReplace = null;
+    int maybeReplaceIndex = 0;
+    for (MediaChunk mediaChunk : mediaChunks) {
+      if ((mediaChunk.startTimeUs < playbackPosition) && (mediaChunk.endTimeUs > playbackPosition)) {
+        maybeReplace = mediaChunk;
+        break;
+      }
+      maybeReplaceIndex++;
+    }
 
-		if(maybeReplace!=null) {
-			/*
+    if (maybeReplace != null) {
+      /*
 			I've found the chunk that is currently playing in the buffer.
 			Checking if I can replace chunk starting two segments ahead of it.
 			 */
-			maybeReplaceIndex+=2;
-			if(maybeReplaceIndex < mediaChunks.size()) {
-				maybeReplace = mediaChunks.get(maybeReplaceIndex);
-				if(!maybeReplace.trackFormat.id.equals(highestFormatId)) {
-					//Fire the download
-					//First put into nextChunkHolder the correct Chunk
-					((DefaultDashSRDChunkSource)chunkSource).getChunkToBeReplaced(maybeReplace.chunkIndex,nextChunkHolder);
-					//Then fire the download
-					Chunk loadable = nextChunkHolder.chunk;
-					nextChunkHolder.clear();
+      maybeReplaceIndex += 2;
+      if (maybeReplaceIndex < mediaChunks.size()) {
+        maybeReplace = mediaChunks.get(maybeReplaceIndex);
+        if (!maybeReplace.trackFormat.id.equals(highestFormatId)) {
+          //Fire the download
+          //First put into nextChunkHolder the correct Chunk
+          ((DefaultDashSRDChunkSource) chunkSource).getChunkToBeReplaced(maybeReplace.chunkIndex, nextChunkHolder);
+          //Then fire the download
+          Chunk loadable = nextChunkHolder.chunk;
+          nextChunkHolder.clear();
 
-					//TODO HANDLE THE CALLBACK WITH ROMARIC's CODE TO UPDATE THE MEDIA CHUNK LINKED LIST
-                    if (isMediaChunk(loadable)) {
-                        BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
-                        mediaChunk.init(mediaChunkOutput);
-                        mediaChunks.remove(maybeReplaceIndex);
-                        mediaChunks.add(maybeReplaceIndex,mediaChunk);
-                    }
+          //TODO HANDLE THE CALLBACK WITH ROMARIC's CODE TO UPDATE THE MEDIA CHUNK LINKED LIST
+          if (isMediaChunk(loadable)) {
+            BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
+            mediaChunk.init(mediaChunkOutput);
+            mediaChunks.remove(maybeReplaceIndex);
+            mediaChunks.add(maybeReplaceIndex, mediaChunk);
+          }
 
-                    long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
-					eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
-							loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
-							loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
-					return true;
-				} else {
-					//The tile is already at the maximum quality: do nothing
-					return false;
-				}
-			} else {
-				//No time to replace: do nothing
-				return false;
-			}
-		} else {
+          mediaChunkOutput.startReplacement(loadable.startTimeUs, loadable.endTimeUs);
+          long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
+          eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
+                  loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
+                  loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
+          return true;
+        } else {
+          //The tile is already at the maximum quality: do nothing
+          return false;
+        }
+      } else {
+        //No time to replace: do nothing
+        return false;
+      }
+    } else {
 			/*
 			I've not found the chunk that is now playing in the buffer
 			Should I do the replacement anyway?
 			*/
-			return false;
-		}
+      return false;
     }
+  }
 
   @Override
   public long getNextLoadPositionUs() {
@@ -442,6 +446,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   // Internal methods
 
   // TODO[REFACTOR]: Call maybeDiscardUpstream for DASH and SmoothStreaming.
+
   /**
    * Discards media chunks from the back of the buffer if conditions have changed such that it's
    * preferable to re-buffer the media at a different quality.
@@ -463,15 +468,15 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   private void discardDownstreamMediaChunks(int primaryStreamReadIndex) {
     while (mediaChunks.size() > 1
-        && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
+            && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
       mediaChunks.removeFirst();
     }
     BaseMediaChunk currentChunk = mediaChunks.getFirst();
     Format trackFormat = currentChunk.trackFormat;
     if (!trackFormat.equals(primaryDownstreamTrackFormat)) {
       eventDispatcher.downstreamFormatChanged(primaryTrackType, trackFormat,
-          currentChunk.trackSelectionReason, currentChunk.trackSelectionData,
-          currentChunk.startTimeUs);
+              currentChunk.trackSelectionReason, currentChunk.trackSelectionData,
+              currentChunk.startTimeUs);
     }
     primaryDownstreamTrackFormat = trackFormat;
   }
@@ -536,12 +541,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
     @Override
     public int readData(FormatHolder formatHolder, DecoderInputBuffer buffer,
-        boolean formatRequired) {
+                        boolean formatRequired) {
       if (isPendingReset()) {
         return C.RESULT_NOTHING_READ;
       }
       return sampleQueue.readData(formatHolder, buffer, formatRequired, loadingFinished,
-          lastSeekPositionUs);
+              lastSeekPositionUs);
     }
 
     public void release() {
@@ -551,12 +556,13 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   }
 
-    /**
-     * The method is called when I'm downloading chunks for the replacement strategy but at some
-     * point I need to rebuffer again. In this case I've to stop the download.
-     */
-    public void stopReplacing() {
-        if(loader.isLoading()) loader.cancelLoading();
-    }
+  /**
+   * The method is called when I'm downloading chunks for the replacement strategy but at some
+   * point I need to rebuffer again. In this case I've to stop the download.
+   */
+  public void stopReplacing() {
+    mediaChunkOutput.cancelReplacement();
+    if (loader.isLoading()) loader.cancelLoading();
+  }
 
 }

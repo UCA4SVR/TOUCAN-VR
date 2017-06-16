@@ -79,4 +79,16 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutp
     }
   }
 
+  public void cancelReplacement() {
+    for (ReplacementTrackOutput trackOutput : trackOutputs) {
+      trackOutput.cancelReplacement();
+    }
+  }
+
+  public void startReplacement(long startTimeUs, long endTimeUs) {
+    for (ReplacementTrackOutput trackOutput : trackOutputs) {
+      trackOutput.beginReplacement(startTimeUs, endTimeUs);
+    }
+  }
+
 }
