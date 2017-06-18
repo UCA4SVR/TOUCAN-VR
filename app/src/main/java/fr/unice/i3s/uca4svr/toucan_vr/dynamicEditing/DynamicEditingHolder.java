@@ -21,13 +21,51 @@ import java.util.List;
 
 public class DynamicEditingHolder {
 
+	private static DynamicEditingHolder dynamicEditingHolder = null;
 	private List<SnapChange> snapchanges;
+	public int nextSCMilliseconds;
+	public int nextSCroiDegrees;
+	public int[] nextSCfoVTiles;
+	private ArrayList<Float> doneRotations;
 
-	public DynamicEditingHolder() {
+	private DynamicEditingHolder() {
 		this.snapchanges = new ArrayList<>();
+		this.doneRotations = new ArrayList<>();
+	}
+
+	public static DynamicEditingHolder getDynamicEditingHolder() {
+		if (dynamicEditingHolder==null) dynamicEditingHolder = new DynamicEditingHolder();
+		return dynamicEditingHolder;
 	}
 
 	public void add(SnapChange snapchange) {
 		this.snapchanges.add(snapchange);
+	}
+
+    public boolean empty() { return snapchanges.size()==0; }
+
+
+	public void getNextSC() {
+		this.nextSCMilliseconds = snapchanges.get(0).getSCMilliseconds();
+		this.nextSCroiDegrees = snapchanges.get(0).getSCroiDegrees();
+		this.nextSCfoVTiles = snapchanges.get(0).getSCfoVTiles();
+	}
+
+	public boolean advance() {
+		if(this.snapchanges.size()==1)
+			return false;
+		else {
+			this.snapchanges.remove(0);
+			getNextSC();
+			return true;
+		}
+	}
+
+	public void addRotation(float degrees) {
+		this.doneRotations.add(degrees);
+	}
+
+	public float getRotationDisplacement() {
+		return 0;
 	}
 }

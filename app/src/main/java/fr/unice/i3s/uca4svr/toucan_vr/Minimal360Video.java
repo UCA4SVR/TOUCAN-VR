@@ -49,11 +49,14 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.concurrent.Future;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.FreezingEventsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
+
+import static java.lang.Math.abs;
 
 public class Minimal360Video extends GVRMain {
 
@@ -73,17 +76,31 @@ public class Minimal360Video extends GVRMain {
 
     private boolean videoStarted = false;
 
+    //Info about the dynamic editing
+    private boolean isDynamicEdited;
+    private DynamicEditingHolder dynamicEditingHolder;
+    private long timeThreshold;
+    private double angleThreshold;
+
+
     // Info about the tiles, needed to properly build the sphere
     private int gridHeight;
     private int gridWidth;
     private String[] tiles;
 
     Minimal360Video(PlayerActivity.Status statusCode, String [] tiles,
-                    int gridWidth, int gridHeight) {
+                    int gridWidth, int gridHeight, boolean isDynamicEdited) {
         this.statusCode = statusCode;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
         this.gridHeight = gridHeight;
+
+        this.isDynamicEdited=isDynamicEdited;
+        if(this.isDynamicEdited) {
+            timeThreshold=100;
+            angleThreshold = 30;
+            dynamicEditingHolder = DynamicEditingHolder.getDynamicEditingHolder();
+        }
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -318,26 +335,47 @@ public class Minimal360Video extends GVRMain {
 
     @Override
     public void onStep() {
-        // We only perform the tracking if the video is playing
+        // We only perform the tracking and the snapchanges if the video is playing
         if (statusCode == PlayerActivity.Status.PLAYING && videoSceneObjectPlayer != null) {
             final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             if (headMotionTracker != null)
                 headMotionTracker.track(gvrContext, player.getCurrentPosition());
             if (freezingEventsTracker != null)
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
+
+            //Dynamic Editing block
+            if(isDynamicEdited) {
+                if (abs(dynamicEditingHolder.nextSCMilliseconds - player.getCurrentPosition()) < timeThreshold) {
+                    //Check if a SnapChange is needed
+                    float currentAngle = getCurrentAngle();
+                    float difference = currentAngle-dynamicEditingHolder.nextSCroiDegrees;
+                    if(abs(difference) > angleThreshold) {
+                        //Perform the SnapChange
+                        gvrContext.getMainScene().getMainCameraRig().getHeadTransform().rotateByAxis(difference,0,1,0);
+                        // Add the rotation for the next SC
+                        // dynamicEditingHolder.addRotation(difference);
+                    }
+                    //Update for the next SnapChange
+                    isDynamicEdited = dynamicEditingHolder.advance();
+                }
+            }
+
         }
+    }
+
+    private float getCurrentAngle() {
         double angle = 0;
         float[] lookAt = gvrContext.getMainScene().getMainCameraRig().getLookAt();
         // cos = [0], sin = [2]
         double norm = Math.sqrt(lookAt[0] * lookAt[0] + lookAt[2] * lookAt[2]);
         double cos = lookAt[0] / norm;
-        cos = Math.abs(cos) > 1 ? Math.signum(cos) : cos;
+        cos = abs(cos) > 1 ? Math.signum(cos) : cos;
         if (lookAt[2] == 0) {
             angle = Math.acos(cos);
         } else {
             angle = Math.signum(lookAt[2]) * Math.acos(cos);
         }
         //From radiant to degree + orientation
-        angle = angle * 180 / Math.PI * -1;
+        return (float)(angle * 180 / Math.PI * -1);
     }
 }

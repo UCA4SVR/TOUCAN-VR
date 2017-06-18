@@ -49,7 +49,10 @@ import com.google.android.exoplayer2.util.Util;
 
 import org.gearvrf.GVRActivity;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
+import org.gearvrf.utility.Log;
+import org.xmlpull.v1.XmlPullParserException;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -111,6 +114,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private String dynamicEditingFN;
     private DynamicEditingHolder dynamicEditingHolder;
+    private boolean isDynamicEdited;
 
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
@@ -142,7 +146,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // We can avoid providing the videoSceneObject at first. We will create it only if the
         // intent exists and every parameter specified in it can be activated.
-        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, isDynamicEdited);
         setMain(main, "gvr.xml");
 
         // The intent is required to run the app, if it has not been provided we can stop there.
@@ -168,7 +172,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 }
             }
 
-            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, isDynamicEdited);
             setMain(main, "gvr.xml");
 
             if (statusCode != Status.NO_INTENT) {
@@ -216,18 +220,13 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
         numberOfTiles = tiles.length / 4;
-        //Dynamic Editing Parsing
+        //Dynamic editing check
         dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
-        if(dynamicEditingFN.length()>0) parseDynamicEditing(dynamicEditingFN);
+        if(dynamicEditingFN.length()>0)
+            isDynamicEdited=true;
+        else
+            isDynamicEdited=false;
         // changeStatus(Status.OK);
-    }
-
-    private void parseDynamicEditing(String dynamicEditingFN) {
-        DynamicEditingParser parser = new DynamicEditingParser(dynamicEditingFN);
-        dynamicEditingHolder = parser.parse();
-        if(dynamicEditingHolder ==null) {
-            changeStatus(Status.WRONGDYNED);
-        }
     }
 
     /**
@@ -263,14 +262,15 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      */
     private void checkInternetAndPermissions() {
         synchronized (this) {
-            if (statusCode == Status.NO_INTENT || statusCode == Status.WRONGDYNED) {
-                // If there is no intent or the dynamic editing file thrown and exception, there is no need to check anything else
+            if (statusCode == Status.NO_INTENT) {
+                // If there is no intent there is no need to check anything else
                 return;
             }
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
-            if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion
-                    || loggingBandwidth || loggingFreezes) {
+            if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes
+                    || isDynamicEdited) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -443,6 +443,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
                     if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
+                    if (isDynamicEdited) {
+                        parseDynamicEditing();
+                    }
                     switch (statusCode) {
                         case CHECKING_PERMISSION:
                             videoSceneObjectPlayer = makeVideoSceneObject();
@@ -605,5 +608,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      */
     private HttpDataSource.Factory buildHttpDataSourceFactory(TransferListener listener) {
         return new DefaultHttpDataSourceFactory(userAgent, listener);
+    }
+
+    private void parseDynamicEditing() {
+        DynamicEditingParser parser = new DynamicEditingParser(dynamicEditingFN);
+        try {
+            dynamicEditingHolder = parser.parse();
+        } catch (Exception e) {
+            changeStatus(Status.WRONGDYNED);
+        }
     }
 }

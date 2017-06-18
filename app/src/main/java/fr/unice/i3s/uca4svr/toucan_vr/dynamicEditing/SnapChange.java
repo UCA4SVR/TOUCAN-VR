@@ -16,8 +16,6 @@
 
 package fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing;
 
-import java.util.ArrayList;
-
 public class SnapChange {
 
 	private int milliseconds;
@@ -48,5 +46,17 @@ public class SnapChange {
 
 	public boolean isOK() {
 		return this.millisecondsFlag && this.roiDegreesFlag && this.foVTilesFlag;
+	}
+
+	public int getSCMilliseconds() {
+		return this.milliseconds;
+	}
+
+	public int getSCroiDegrees() {
+		return this.roiDegrees;
+	}
+
+	public int[] getSCfoVTiles() {
+		return this.foVTiles;
 	}
 }

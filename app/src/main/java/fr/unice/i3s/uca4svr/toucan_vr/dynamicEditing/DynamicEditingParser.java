@@ -21,6 +21,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -39,63 +40,62 @@ public class DynamicEditingParser {
 	}
 
 	//Main parse method
-	public DynamicEditingHolder parse() {
+	public DynamicEditingHolder parse() throws XmlPullParserException, IOException {
 		File file = new File("/storage/emulated/0/"+dynamicEditingFN);
-		dynamicEditingHolder = new DynamicEditingHolder();
-
+		dynamicEditingHolder = DynamicEditingHolder.getDynamicEditingHolder();
 		XmlPullParserFactory factory;
 		XmlPullParser parser;
-		try {
-			factory = XmlPullParserFactory.newInstance();
-			factory.setNamespaceAware(true);
-			parser = factory.newPullParser();
-			parser.setInput(new FileInputStream(file),"UTF-8");
-			int eventType = parser.getEventType();
-			while (eventType != XmlPullParser.END_DOCUMENT) {
-				String tagname = parser.getName();
-				switch (eventType) {
-					case XmlPullParser.START_TAG:
-						if (tagname.equalsIgnoreCase("snapchange")) {
-							snapchange = new SnapChange();
+		factory = XmlPullParserFactory.newInstance();
+		factory.setNamespaceAware(true);
+		parser = factory.newPullParser();
+		parser.setInput(new FileInputStream(file),"UTF-8");
+		int eventType = parser.getEventType();
+		while (eventType != XmlPullParser.END_DOCUMENT) {
+			String tagname = parser.getName();
+			switch (eventType) {
+				case XmlPullParser.START_TAG:
+					if (tagname.equalsIgnoreCase("snapchange")) {
+						snapchange = new SnapChange();
+					}
+					break;
+
+				case XmlPullParser.TEXT:
+					text = parser.getText();
+					break;
+
+				case XmlPullParser.END_TAG:
+					if (tagname.equalsIgnoreCase("snapchange")) {
+						// add video object to list and check if all the parameters are set
+						if(snapchange!=null && snapchange.isOK()) {
+							dynamicEditingHolder.add(snapchange);
+						} else {
+							throw new XmlPullParserException("Not well formed snapchange tag!");
 						}
-						break;
-
-					case XmlPullParser.TEXT:
-						text = parser.getText();
-						break;
-
-					case XmlPullParser.END_TAG:
-						if (tagname.equalsIgnoreCase("snapchange")) {
-							// add video object to list and check if all the parameters are set
-							if(snapchange!=null && snapchange.isOK() && dynamicEditingHolder!=null) {
-								dynamicEditingHolder.add(snapchange);
-							} else {
-								dynamicEditingHolder = null;
+					} else if (tagname.equalsIgnoreCase("milliseconds")) {
+						if (snapchange!=null) snapchange.setMilliseconds(Integer.parseInt(text));
+					} else if (tagname.equalsIgnoreCase("roiDegrees")) {
+						if (snapchange!=null) snapchange.setRoiDegrees(Integer.parseInt(text));
+					} else if (tagname.equalsIgnoreCase("foVTile")) {
+							strTiles = text.split(",");
+							intTiles = new int[strTiles.length];
+							for (int i = 0; i < strTiles.length; i++) {
+								intTiles[i] = Integer.parseInt(strTiles[i]);
 							}
-						} else if (tagname.equalsIgnoreCase("milliseconds")) {
-							if (snapchange!=null) snapchange.setMilliseconds(Integer.parseInt(text));
-						} else if (tagname.equalsIgnoreCase("roiDegrees")) {
-							if (snapchange!=null) snapchange.setRoiDegrees(Integer.parseInt(text));
-						} else if (tagname.equalsIgnoreCase("foVTile")) {
-								strTiles = text.split(",");
-								intTiles = new int[strTiles.length];
-								for (int i = 0; i < strTiles.length; i++) {
-									intTiles[i] = Integer.parseInt(strTiles[i]);
-								}
-								if (snapchange != null) snapchange.setFoVTiles(intTiles);
-						}
-						break;
-					default:
-						break;
-				}
-				eventType = parser.next();
+							if (snapchange != null) snapchange.setFoVTiles(intTiles);
+					}
+					break;
+				default:
+					break;
 			}
-		} catch (XmlPullParserException | IOException e) {
-			e.printStackTrace();
-			dynamicEditingHolder = null;
-		} finally {
-			return dynamicEditingHolder;
-		}
+			eventType = parser.next();
+			}
+			//check if the file is empty
+			if(dynamicEditingHolder.empty()) {
+				throw new XmlPullParserException("File is empty!");
+			} else {
+				dynamicEditingHolder.getNextSC();
+				return dynamicEditingHolder;
+			}
 	}
 
 }
