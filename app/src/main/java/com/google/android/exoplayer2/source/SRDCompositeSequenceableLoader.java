@@ -75,12 +75,11 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
 	public boolean replaceChunks(long playbackPosition) {
 		this.imReplacing = true;
 		boolean madeProgress = false;
-		TilesPicker tilesPicker = TilesPicker.getPicker();
-		//Need to replace: which one? choose the currently picked tiles!
+		/*Need to replace: all the loaders are examined:
+		a currently not picked tile will probably be picked if a snapchange occurs.
+		 */
 		for (SequenceableLoader loader : loaders) {
-			if (tilesPicker.isPicked(((OurChunkSampleStream) loader).adaptationSetIndex)) {
-				madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
-			}
+            madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
 		}
 		return madeProgress;
 	}

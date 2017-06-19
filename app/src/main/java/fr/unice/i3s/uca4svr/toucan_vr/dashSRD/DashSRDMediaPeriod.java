@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
@@ -69,10 +70,13 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     private int periodIndex;
     private List<AdaptationSet> adaptationSets;
 
+    private DynamicEditingHolder dynamicEditingHolder;
+
     public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
-                           DashChunkSource.Factory chunkSourceFactory,  int minLoadableRetryCount,
-                           EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
-                           LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs) {
+                              DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
+                              EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
+                              LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs,
+                              DynamicEditingHolder dynamicEditingHolder) {
         this.id = id;
         this.manifest = manifest;
         this.periodIndex = periodIndex;
@@ -85,6 +89,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         //Buffers are provided in ms and then used in microseconds
         this.minBufferMs = minBufferMs*1000;
         this.maxBufferMs = maxBufferMs*1000;
+        this.dynamicEditingHolder = dynamicEditingHolder;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -184,12 +189,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         } else {
             sequenceableLoader.continueLoading(positionUs);
         }
-        // I think the problem is that when LoadControl returns true, the method maybeContinueLoading
-        // only gets called when something finishes downloading. Instead, when it returns false, I guess
-        // something periodically checks again by calling maybeContinueLoading.
-        // So, we need to implement the replacement strategy to make this work.
-        // A workaround is to call the following method. Not efficient.
-        // It doesn't matter what we return (returned value isn't used in the ExoPlayerImpInternal).
         return true;
     }
 
@@ -261,7 +260,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
         OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex,adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-                eventDispatcher);
+                eventDispatcher, dynamicEditingHolder);
         return stream;
     }
 

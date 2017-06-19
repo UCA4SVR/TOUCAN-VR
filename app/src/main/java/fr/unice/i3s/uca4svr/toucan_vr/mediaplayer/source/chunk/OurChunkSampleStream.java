@@ -32,11 +32,14 @@ import com.google.android.exoplayer2.upstream.Loader;
 import com.google.android.exoplayer2.util.Assertions;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutput;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 /**
  * A {@link SampleStream} that loads media in {@link Chunk}s, obtained from a {@link ChunkSource}.
@@ -60,7 +63,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final ReplacementTrackOutput[] embeddedSampleQueues;
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
-	public final int adaptationSetIndex;
+  private DynamicEditingHolder dynamicEditingHolder;
+  public final int adaptationSetIndex;
 
   private Format primaryDownstreamTrackFormat;
   private long pendingResetPositionUs;
@@ -81,8 +85,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    */
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
-                              int minLoadableRetryCount, EventDispatcher eventDispatcher) {
+                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder) {
     this.adaptationSetIndex = adaptationSetIndex;
+    this.dynamicEditingHolder = dynamicEditingHolder;
     //Getting the highest format for this tile
     this.highestFormatId = ((DefaultDashSRDChunkSource)chunkSource).getHighestFormatId();
     this.primaryTrackType = primaryTrackType;
@@ -365,7 +370,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     return true;
   }
 
-    public boolean replace(long playbackPosition) {
+    public boolean replace(long playbackPositionUs) {
 		//Still buffering?
 		if(loader.isLoading())
 			return false;
@@ -377,7 +382,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 		MediaChunk maybeReplace = null;
 		int maybeReplaceIndex = 0;
         for(MediaChunk mediaChunk : mediaChunks) {
-			if((mediaChunk.startTimeUs<playbackPosition)&&(mediaChunk.endTimeUs>playbackPosition)) {
+			if((mediaChunk.startTimeUs<playbackPositionUs)&&(mediaChunk.endTimeUs>playbackPositionUs)) {
 				maybeReplace = mediaChunk;
 				break;
 			}
@@ -392,7 +397,31 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 			maybeReplaceIndex+=2;
 			if(maybeReplaceIndex < mediaChunks.size()) {
 				maybeReplace = mediaChunks.get(maybeReplaceIndex);
-				if(!maybeReplace.trackFormat.id.equals(highestFormatId)) {
+                /*if the video is dynamically edited I need to know if a snapchange occurs before the start of the chunk.
+                If yes, the tile will be analyzed iff it is in the field of view after the snapchange.
+                The replacement will take place if the quality is not the highest.
+                 */
+                boolean replaceFlag = false;
+                if(dynamicEditingHolder.isDynamicEdited() && dynamicEditingHolder.nextSCMicroseconds<maybeReplace.startTimeUs) {
+                    if(Arrays.asList(dynamicEditingHolder.nextSCfoVTiles).contains(adaptationSetIndex)
+                            && !maybeReplace.trackFormat.id.equals(highestFormatId)) {
+                        /*
+                        The snapchange occurs before the beginning of the chunk and
+                        this latter is in the field of view after the snap change and
+                        it hasn't the highest quality -> replace
+                         */
+                        replaceFlag = true;
+                    }
+                } else {
+                    //The video is not dynamically edited or a snapchange occurs AFTER the beginning of the chunk: i'll base my analysis on the picker
+                    TilesPicker tilesPicker = TilesPicker.getPicker();
+                    if(tilesPicker.isPicked(adaptationSetIndex) && !maybeReplace.trackFormat.id.equals(highestFormatId)) {
+                        //The tile is picked and it hasn't the highest quality -> replace
+                        replaceFlag = true;
+                    }
+                }
+                //Should I replace?
+				if(replaceFlag) {
 					//Fire the download
 					//First put into nextChunkHolder the correct Chunk
 					((DefaultDashSRDChunkSource)chunkSource).getChunkToBeReplaced(maybeReplace.chunkIndex,nextChunkHolder);
@@ -414,7 +443,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 							loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
 					return true;
 				} else {
-					//The tile is already at the maximum quality: do nothing
+					//For some reasons the tile should not be replaced: do nothing
 					return false;
 				}
 			} else {

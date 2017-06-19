@@ -561,6 +561,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 DashSRDMediaSource mediaSource = new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
+                mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
                 mediaSource.setBuffers(minBufferMs, maxBufferMs);
                 return mediaSource;
             case C.TYPE_HLS:
