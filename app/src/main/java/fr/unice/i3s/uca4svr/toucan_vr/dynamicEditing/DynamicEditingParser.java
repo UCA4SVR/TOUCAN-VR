@@ -40,9 +40,8 @@ public class DynamicEditingParser {
 	}
 
 	//Main parse method
-	public DynamicEditingHolder parse() throws XmlPullParserException, IOException {
+	public void parse(DynamicEditingHolder dynamicEditingHolder) throws XmlPullParserException, IOException {
 		File file = new File("/storage/emulated/0/"+dynamicEditingFN);
-		dynamicEditingHolder = DynamicEditingHolder.getDynamicEditingHolder();
 		XmlPullParserFactory factory;
 		XmlPullParser parser;
 		factory = XmlPullParserFactory.newInstance();
@@ -93,8 +92,8 @@ public class DynamicEditingParser {
 			if(dynamicEditingHolder.empty()) {
 				throw new XmlPullParserException("File is empty!");
 			} else {
+				//Snapchanges have been stored into the holder object. Preparing the first snapchange.
 				dynamicEditingHolder.getNextSC();
-				return dynamicEditingHolder;
 			}
 	}
 

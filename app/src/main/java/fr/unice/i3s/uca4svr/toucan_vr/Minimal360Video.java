@@ -1,4 +1,4 @@
-/* Copyright 2015 Samsung Electronics Co., LTD
+/* Copyrpyright 2015 Samsung Electronics Co., LTD
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,10 +77,7 @@ public class Minimal360Video extends GVRMain {
     private boolean videoStarted = false;
 
     //Info about the dynamic editing
-    private boolean isDynamicEdited;
     private DynamicEditingHolder dynamicEditingHolder;
-    private long timeThreshold;
-    private double angleThreshold;
 
 
     // Info about the tiles, needed to properly build the sphere
@@ -89,18 +86,12 @@ public class Minimal360Video extends GVRMain {
     private String[] tiles;
 
     Minimal360Video(PlayerActivity.Status statusCode, String [] tiles,
-                    int gridWidth, int gridHeight, boolean isDynamicEdited) {
+                    int gridWidth, int gridHeight, DynamicEditingHolder dynamicEditingHolder) {
         this.statusCode = statusCode;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
         this.gridHeight = gridHeight;
-
-        this.isDynamicEdited=isDynamicEdited;
-        if(this.isDynamicEdited) {
-            timeThreshold=100;
-            angleThreshold = 30;
-            dynamicEditingHolder = DynamicEditingHolder.getDynamicEditingHolder();
-        }
+        this.dynamicEditingHolder = dynamicEditingHolder;
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -344,19 +335,19 @@ public class Minimal360Video extends GVRMain {
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
 
             //Dynamic Editing block
-            if(isDynamicEdited) {
-                if (abs(dynamicEditingHolder.nextSCMilliseconds - player.getCurrentPosition()) < timeThreshold) {
+            if(dynamicEditingHolder.isDynamicEdited()) {
+                if (abs(dynamicEditingHolder.nextSCMilliseconds - player.getCurrentPosition()) < dynamicEditingHolder.timeThreshold) {
                     //Check if a SnapChange is needed
                     float currentAngle = getCurrentAngle();
                     float difference = currentAngle-dynamicEditingHolder.nextSCroiDegrees;
-                    if(abs(difference) > angleThreshold) {
+                    if(abs(difference) > dynamicEditingHolder.angleThreshold) {
                         //Perform the SnapChange
-                        gvrContext.getMainScene().getMainCameraRig().getHeadTransform().rotateByAxis(difference,0,1,0);
+                        //gvrContext.getMainScene().getMainCameraRig().getHeadTransform().rotateByAxis(difference,0,1,0);
                         // Add the rotation for the next SC
                         // dynamicEditingHolder.addRotation(difference);
                     }
                     //Update for the next SnapChange
-                    isDynamicEdited = dynamicEditingHolder.advance();
+                    dynamicEditingHolder.advance();
                 }
             }
 

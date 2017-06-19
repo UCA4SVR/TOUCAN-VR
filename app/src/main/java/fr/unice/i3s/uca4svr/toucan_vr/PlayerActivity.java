@@ -114,7 +114,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private String dynamicEditingFN;
     private DynamicEditingHolder dynamicEditingHolder;
-    private boolean isDynamicEdited;
 
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
@@ -146,7 +145,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // We can avoid providing the videoSceneObject at first. We will create it only if the
         // intent exists and every parameter specified in it can be activated.
-        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, isDynamicEdited);
+        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
         setMain(main, "gvr.xml");
 
         // The intent is required to run the app, if it has not been provided we can stop there.
@@ -172,7 +171,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 }
             }
 
-            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, isDynamicEdited);
+            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
             setMain(main, "gvr.xml");
 
             if (statusCode != Status.NO_INTENT) {
@@ -223,9 +222,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         //Dynamic editing check
         dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
         if(dynamicEditingFN.length()>0)
-            isDynamicEdited=true;
+            dynamicEditingHolder = new DynamicEditingHolder(true);
         else
-            isDynamicEdited=false;
+            dynamicEditingHolder = new DynamicEditingHolder(false);
         // changeStatus(Status.OK);
     }
 
@@ -270,7 +269,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
             if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
                     loggingHeadMotion || loggingBandwidth || loggingFreezes
-                    || isDynamicEdited) {
+                    || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -389,7 +388,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     new PyramidalTrackSelection.Factory(
                             bandwidthMeter, maxInitialBitrate, minDurationForQualityIncreaseUs,
                             maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
-                            bandwidthFraction);
+                            bandwidthFraction, dynamicEditingHolder);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
@@ -443,7 +442,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
                     if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
-                    if (isDynamicEdited) {
+                    if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
                     }
                     switch (statusCode) {
@@ -610,10 +609,13 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         return new DefaultHttpDataSourceFactory(userAgent, listener);
     }
 
+    /**
+     * Parse the dynamic editing XML file to retrieve snapchanges
+     */
     private void parseDynamicEditing() {
         DynamicEditingParser parser = new DynamicEditingParser(dynamicEditingFN);
         try {
-            dynamicEditingHolder = parser.parse();
+            parser.parse(dynamicEditingHolder);
         } catch (Exception e) {
             changeStatus(Status.WRONGDYNED);
         }

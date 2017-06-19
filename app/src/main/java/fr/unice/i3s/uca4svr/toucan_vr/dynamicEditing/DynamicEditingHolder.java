@@ -21,22 +21,36 @@ import java.util.List;
 
 public class DynamicEditingHolder {
 
-	private static DynamicEditingHolder dynamicEditingHolder = null;
 	private List<SnapChange> snapchanges;
+	private boolean isDynamicEdited;
+	public final long timeThreshold;
+	public final double angleThreshold;
 	public int nextSCMilliseconds;
+    public int nextSCMicroseconds;
 	public int nextSCroiDegrees;
 	public int[] nextSCfoVTiles;
 	private ArrayList<Float> doneRotations;
 
-	private DynamicEditingHolder() {
-		this.snapchanges = new ArrayList<>();
-		this.doneRotations = new ArrayList<>();
+	public DynamicEditingHolder(boolean isDynamicEdited) {
+		this.isDynamicEdited = isDynamicEdited;
+		this.timeThreshold = 100;
+		this.angleThreshold = 30;
+		if(this.isDynamicEdited) {
+			this.snapchanges = new ArrayList<>();
+			this.doneRotations = new ArrayList<>();
+		}
 	}
 
-	public static DynamicEditingHolder getDynamicEditingHolder() {
-		if (dynamicEditingHolder==null) dynamicEditingHolder = new DynamicEditingHolder();
-		return dynamicEditingHolder;
+	public DynamicEditingHolder(boolean isDynamicEdited, double angleThreshold, long timeThreshold) {
+		this.isDynamicEdited = isDynamicEdited;
+		this.timeThreshold = timeThreshold;
+		this.angleThreshold = angleThreshold;
+		if(this.isDynamicEdited) {
+			this.snapchanges = new ArrayList<>();
+			this.doneRotations = new ArrayList<>();
+		}
 	}
+
 
 	public void add(SnapChange snapchange) {
 		this.snapchanges.add(snapchange);
@@ -44,20 +58,23 @@ public class DynamicEditingHolder {
 
     public boolean empty() { return snapchanges.size()==0; }
 
+	public boolean isDynamicEdited() {
+		return isDynamicEdited;
+	}
 
 	public void getNextSC() {
 		this.nextSCMilliseconds = snapchanges.get(0).getSCMilliseconds();
+        this.nextSCMicroseconds = this.nextSCMilliseconds*1000;
 		this.nextSCroiDegrees = snapchanges.get(0).getSCroiDegrees();
 		this.nextSCfoVTiles = snapchanges.get(0).getSCfoVTiles();
 	}
 
-	public boolean advance() {
+	public void advance() {
 		if(this.snapchanges.size()==1)
-			return false;
+			this.isDynamicEdited = false;
 		else {
 			this.snapchanges.remove(0);
 			getNextSC();
-			return true;
 		}
 	}
 
