@@ -107,8 +107,8 @@ public class FreezingEventsTracker {
             wasBuffering = false;
             long freezeDuration = clock.elapsedRealtime() - freezeStartTime;
             logger.error(String.format(Locale.ENGLISH, "%d,%d,%d,%d",
-                    ++freezeEventCounter, clock.elapsedRealtime(),
-                    freezeDuration, playbackPosition));
+                    ++freezeEventCounter, freezeStartTime,
+                    playbackPosition, freezeDuration));
         }
     }
 }
