@@ -80,6 +80,9 @@ public class Minimal360Video extends GVRMain {
     private DynamicEditingHolder dynamicEditingHolder;
 
 
+    private GVRSceneObject videoHolder;
+
+
     // Info about the tiles, needed to properly build the sphere
     private int gridHeight;
     private int gridWidth;
@@ -109,7 +112,6 @@ public class Minimal360Video extends GVRMain {
     @Override
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
-
         // We need to create the initial scene
         sceneDispatcher();
     }
@@ -191,6 +193,22 @@ public class Minimal360Video extends GVRMain {
             final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
                     72, 144, gridHeight, gridWidth, listOfTiles, false);
 
+            // Create an holder objects for the video objects, attach it to the scene and rotate the object according the first snapchange
+            this.videoHolder = new GVRSceneObject(this.gvrContext);
+            scene.addSceneObject(videoHolder);
+
+            //Initial Rotation
+            if(dynamicEditingHolder.isDynamicEdited()) {
+                float currentAngle = getCurrentAngle();
+                float difference = currentAngle - dynamicEditingHolder.nextSCroiDegrees;
+                videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
+                Log.e("DYN", "Current init angle: " + currentAngle + " ROI init angle: " + dynamicEditingHolder.nextSCroiDegrees);
+                dynamicEditingHolder.advance(difference);
+            }
+
+            // need a final handle on the object for the thread
+            final GVRSceneObject videoHolderFinal = videoHolder;
+
             final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[tiles.length/4];
 
             final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
@@ -211,7 +229,7 @@ public class Minimal360Video extends GVRMain {
                         videos[id].setName( "video_" + id );
                         videos[id].setTag("vd"+(id));
                         videos[id].attachCollider(new GVRMeshCollider(gvrContext, true));
-                        scene.addSceneObject( videos[id] );
+                        videoHolderFinal.addChildObject( videos[id] );
                     }
                 }).start();
             }
@@ -333,26 +351,31 @@ public class Minimal360Video extends GVRMain {
                 headMotionTracker.track(gvrContext, player.getCurrentPosition());
             if (freezingEventsTracker != null)
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
-
             //Dynamic Editing block
             if(dynamicEditingHolder.isDynamicEdited()) {
                 if (abs(dynamicEditingHolder.nextSCMilliseconds - player.getCurrentPosition()) < dynamicEditingHolder.timeThreshold) {
                     //Check if a SnapChange is needed
                     float currentAngle = getCurrentAngle();
                     float difference = currentAngle-dynamicEditingHolder.nextSCroiDegrees;
-                    if(abs(difference) > dynamicEditingHolder.angleThreshold) {
+                    float trigger = computeTrigger(dynamicEditingHolder.lastRotation, currentAngle, dynamicEditingHolder.nextSCroiDegrees);
+                    Log.e("DYN", "Trigger"+ trigger);
+                    if(trigger > dynamicEditingHolder.angleThreshold) {
                         //Perform the SnapChange
-                        //gvrContext.getMainScene().getMainCameraRig().getHeadTransform().rotateByAxis(difference,0,1,0);
-                        // Add the rotation for the next SC
-                        // dynamicEditingHolder.addRotation(difference);
+                        videoHolder.getTransform().setRotationByAxis(difference,0,1,0);
                     }
                     //Update for the next SnapChange
-                    dynamicEditingHolder.advance();
+                    dynamicEditingHolder.advance(difference);
+
                 }
             }
 
         }
     }
+
+    /**
+     * Gets the current user position angle (in degrees). It ranges between -180 and 180
+     * @return User position
+     */
 
     private float getCurrentAngle() {
         double angle = 0;
@@ -368,5 +391,24 @@ public class Minimal360Video extends GVRMain {
         }
         //From radiant to degree + orientation
         return (float)(angle * 180 / Math.PI * -1);
+    }
+
+    /**
+     * Normalizes a given angle from a space between -360 and 360 to a space between -180 and 180
+     * @param angle Angle to be normalized
+     * @return Normalized angle
+     */
+    private float normalizeAngle(float angle) {
+        if((angle>=-180)&&(angle<=180))
+            return angle;
+        else
+            return -1*Math.signum(angle)*(360-abs(angle));
+    }
+
+    private float computeTrigger(float lastRotation, float currentUserPosition, float nextSCroiDegrees) {
+        float normalizedLastRotation = normalizeAngle(lastRotation);
+        float trigger = normalizeAngle(currentUserPosition-normalizedLastRotation);
+        trigger = normalizeAngle(trigger-nextSCroiDegrees);
+        return abs(trigger);
     }
 }

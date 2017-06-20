@@ -29,7 +29,7 @@ public class DynamicEditingHolder {
     public int nextSCMicroseconds;
 	public int nextSCroiDegrees;
 	public int[] nextSCfoVTiles;
-	private ArrayList<Float> doneRotations;
+	public float lastRotation;
 
 	public DynamicEditingHolder(boolean isDynamicEdited) {
 		this.isDynamicEdited = isDynamicEdited;
@@ -37,7 +37,6 @@ public class DynamicEditingHolder {
 		this.angleThreshold = 30;
 		if(this.isDynamicEdited) {
 			this.snapchanges = new ArrayList<>();
-			this.doneRotations = new ArrayList<>();
 		}
 	}
 
@@ -47,7 +46,6 @@ public class DynamicEditingHolder {
 		this.angleThreshold = angleThreshold;
 		if(this.isDynamicEdited) {
 			this.snapchanges = new ArrayList<>();
-			this.doneRotations = new ArrayList<>();
 		}
 	}
 
@@ -69,20 +67,13 @@ public class DynamicEditingHolder {
 		this.nextSCfoVTiles = snapchanges.get(0).getSCfoVTiles();
 	}
 
-	public void advance() {
+	public void advance(float lastRotation) {
 		if(this.snapchanges.size()==1)
 			this.isDynamicEdited = false;
 		else {
+			this.lastRotation = lastRotation;
 			this.snapchanges.remove(0);
 			getNextSC();
 		}
-	}
-
-	public void addRotation(float degrees) {
-		this.doneRotations.add(degrees);
-	}
-
-	public float getRotationDisplacement() {
-		return 0;
 	}
 }

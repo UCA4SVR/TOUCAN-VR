@@ -403,15 +403,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
                  */
                 boolean replaceFlag = false;
                 if(dynamicEditingHolder.isDynamicEdited() && dynamicEditingHolder.nextSCMicroseconds<maybeReplace.startTimeUs) {
-                    if(Arrays.asList(dynamicEditingHolder.nextSCfoVTiles).contains(adaptationSetIndex)
-                            && !maybeReplace.trackFormat.id.equals(highestFormatId)) {
                         /*
-                        The snapchange occurs before the beginning of the chunk and
-                        this latter is in the field of view after the snap change and
-                        it hasn't the highest quality -> replace
+                        The snapchange occurs before the beginning of the chunk.
+                        In this case I'm sure that it has the highest quality because the same consideration
+                        is adopted when choosing the quality for downloading the chunks.
+                        Do nothing!
                          */
-                        replaceFlag = true;
-                    }
                 } else {
                     //The video is not dynamically edited or a snapchange occurs AFTER the beginning of the chunk: i'll base my analysis on the picker
                     TilesPicker tilesPicker = TilesPicker.getPicker();
