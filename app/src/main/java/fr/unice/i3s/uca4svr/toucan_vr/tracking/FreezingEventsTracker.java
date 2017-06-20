@@ -21,11 +21,11 @@ import ch.qos.logback.core.FileAppender;
 
 /**
  * It tracks the stalls happening during the playback.
- * Each entry in the log file will record:
- *  - an index, increased for each new stalling event;
- *  - the system clock used as time reference by every tracker;
- *  - the duration of the freezing event;
- *  - the position of the video playback when the event occurred.
+ * Each entry in the csv file will have:
+ *  - an index, increased for each new stalling event (index=0 for the startup delay);
+ *  - the start time of the buffering event using the system clock as time reference;
+ *  - the position of the video playback when the event occurred;
+ *  - the duration of the freezing event.
  */
 public class FreezingEventsTracker {
 
@@ -90,10 +90,10 @@ public class FreezingEventsTracker {
     /**
      * Outputs a track record to the log file.
      * Each entry in the csv file will have:
-     *  - an index, increased for each new stalling event;
-     *  - the system clock used as time reference by every tracker;
-     *  - the duration of the freezing event;
-     *  - the position of the video playback when the event occurred.
+     *  - an index, increased for each new stalling event (index=0 for the startup delay);
+     *  - the start time of the buffering event using the system clock as time reference;
+     *  - the position of the video playback when the event occurred;
+     *  - the duration of the freezing event.
      *
      * @param playbackState The state of the playback according to ExoPlayer
      * @param playbackPosition The current position in the playback
@@ -107,7 +107,7 @@ public class FreezingEventsTracker {
             wasBuffering = false;
             long freezeDuration = clock.elapsedRealtime() - freezeStartTime;
             logger.error(String.format(Locale.ENGLISH, "%d,%d,%d,%d",
-                    ++freezeEventCounter, freezeStartTime,
+                    freezeEventCounter++, freezeStartTime,
                     playbackPosition, freezeDuration));
         }
     }

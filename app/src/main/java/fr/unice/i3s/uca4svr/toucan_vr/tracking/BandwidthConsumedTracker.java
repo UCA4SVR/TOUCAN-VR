@@ -51,15 +51,15 @@ public class BandwidthConsumedTracker implements TransferListener<Object> {
 
   private long totalBytesConsumed = 0;
   private boolean firstTransfer = true;
+  private int transferIndex = 0;
+
   private final Clock clock;
   private long lastRecordTime;
 
 
   /**
    * Initialize a {@link BandwidthConsumedTracker}, that will record the consumed
-   * bandwidth during playback to a file name logFilePrefix_date.csv.
-   * Be aware that tracking is done by calling the <code>track</code> method every time
-   * and entry is needed.
+   * bandwidth during playback to a file name logFilePrefix_bandwidth_date.csv.
    *
    * @param logFilePrefix The prefix for the log file name
    */
@@ -106,9 +106,10 @@ public class BandwidthConsumedTracker implements TransferListener<Object> {
 
   @Override
   public void onTransferStart(Object source, DataSpec dataSpec) {
+    transferIndex++;
     if (firstTransfer) {
-      logger.error(String.format(Locale.ENGLISH, "%d, %d",
-              clock.elapsedRealtime(), totalBytesConsumed));
+      logger.error(String.format(Locale.ENGLISH, "%d, %d, %d",
+              transferIndex, clock.elapsedRealtime(), totalBytesConsumed));
       firstTransfer = false;
     }
   }
@@ -119,8 +120,8 @@ public class BandwidthConsumedTracker implements TransferListener<Object> {
     long currentTime = clock.elapsedRealtime();
     if (currentTime - lastRecordTime > 16) {
       lastRecordTime = currentTime;
-      logger.error(String.format(Locale.ENGLISH, "%d, %d",
-              currentTime, totalBytesConsumed));
+      logger.error(String.format(Locale.ENGLISH, "%d, %d, %d",
+              transferIndex, currentTime, totalBytesConsumed));
     }
   }
 
