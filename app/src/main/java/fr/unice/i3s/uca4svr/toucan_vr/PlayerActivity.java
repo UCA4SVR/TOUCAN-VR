@@ -86,6 +86,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
     private ExoPlayer player;
+    private boolean needPreparePlayer = true;
     private DefaultBandwidthMeter bandwidthMeter;
 
     // Player's parameters to fine tune as we need
@@ -243,6 +244,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 videoSceneObjectPlayer.release();
                 videoSceneObjectPlayer = null;
                 player = null;
+                needPreparePlayer = true;
             }
         }
     }
@@ -354,7 +356,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         if (videoSceneObjectPlayer != null) {
             final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
             if (exoPlayer != null) {
-                if (!play) {
+                if (needPreparePlayer)
+                    preparePlayer();
+                else if (!play) {
                     videoSceneObjectPlayer.pause();
                 } else {
                     videoSceneObjectPlayer.start();
@@ -403,29 +407,31 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // Instantiation of the ExoPlayer using our custom implementation.
             // The number of tiles and the other components created above are given as parameters.
             player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
-            player.setPlayWhenReady(false);
-        }
-
-        boolean needPreparePlayer = videoSceneObjectPlayer == null;
-        if (needPreparePlayer) {
-            // Creation of the data source
-            Uri[] uris;
-            String[] extensions;
-            uris = new Uri[] {Uri.parse(mediaUri)};
-            extensions = new String[1];
-
-            MediaSource[] mediaSources = new MediaSource[uris.length];
-            for (int i = 0; i < uris.length; i++) {
-                mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
-            }
-            MediaSource mediaSource = mediaSources.length == 1 ? mediaSources[0]
-                    : new ConcatenatingMediaSource(mediaSources);
-
-            // Prepare the player with the given data source
-            player.prepare(mediaSource);
         }
 
         return new ExoplayerSceneObject(player);
+    }
+
+    // Starts downloading chunks of video from the source
+    private void preparePlayer() {
+        // Creation of the data source
+        Uri[] uris;
+        String[] extensions;
+        uris = new Uri[] {Uri.parse(mediaUri)};
+        extensions = new String[1];
+
+        MediaSource[] mediaSources = new MediaSource[uris.length];
+        for (int i = 0; i < uris.length; i++) {
+            mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
+        }
+        MediaSource mediaSource = mediaSources.length == 1 ? mediaSources[0]
+                : new ConcatenatingMediaSource(mediaSources);
+
+        needPreparePlayer = false;
+        player.setPlayWhenReady(true);
+
+        // Prepare the player with the given data source
+        player.prepare(mediaSource);
     }
 
     // Callback from the permission requests.
@@ -592,7 +598,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     /**
      * Helper method taken from the exoplayer demo app.
      *
-     * @param listener The transfert listener to be used. May be null.
+     * @param listener The transfer listener to be used. May be null.
      * @return A data source factory
      */
     private DataSource.Factory buildDataSourceFactory(TransferListener listener) {
