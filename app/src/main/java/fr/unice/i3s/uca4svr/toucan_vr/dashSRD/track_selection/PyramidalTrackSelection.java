@@ -193,8 +193,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         Otherwise, the tile picker is used
         */
         if(dynamicEditingHolder.isDynamicEdited()) {
-            if(dynamicEditingHolder.nextSCMicroseconds<chunkStartTime) {
-                selectedIndex = Arrays.asList(dynamicEditingHolder.nextSCfoVTiles).contains(adaptationSetIndex) ? 0 : 1;
+            if(dynamicEditingHolder.nextSCMicroseconds<=chunkStartTime) {
+                selectedIndex = Arrays.binarySearch(dynamicEditingHolder.nextSCfoVTiles, adaptationSetIndex) >= 0 ? 0 : 1;
             } else {
                 selectedIndex = determineIdealSelectedIndex(isPicked);
             }
