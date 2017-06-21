@@ -114,6 +114,10 @@ public class BandwidthConsumedTracker implements TransferListener<Object> {
     }
   }
 
+  /**
+   * Records every 16 milliseconds (or more) the bandwidth consumed by the application,
+   * together with the system clock and the number of files transferred up to that point.
+   */
   @Override
   public void onBytesTransferred(Object source, int bytesTransferred) {
     totalBytesConsumed += bytesTransferred;
