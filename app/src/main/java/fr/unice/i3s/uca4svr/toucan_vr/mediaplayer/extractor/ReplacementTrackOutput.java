@@ -19,6 +19,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -38,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.UnboundedAllocator;
 
@@ -90,13 +93,20 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private boolean needKeyframe;
   private UpstreamFormatChangedListener upstreamFormatChangeListener;
 
+  private final ReentrantLock lock = new ReentrantLock();
+
+  private ReplacementInfo replacement = null;
+  List<Allocation> replacementAllocations = null;
+  private Allocation replacementAllocation;
+  private int replacementAllocationOffset;
+
   /**
    * @param allocator An {@link Allocator} from which allocations for sample data can be obtained.
    *                  Must inherit from {@link UnboundedAllocator}.
    */
   public ReplacementTrackOutput(Allocator allocator) {
     this.allocator = (UnboundedAllocator) allocator;
-    infoQueue = new InfoQueue();
+    infoQueue = new InfoQueue(lock);
     ArrayList<Allocation> queue = new ArrayList<>();
     dataQueue = Collections.synchronizedList(queue);
     extrasHolder = new BufferExtrasHolder();
@@ -311,7 +321,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * The encryption data is written into {@link DecoderInputBuffer#cryptoInfo}, and
    * {@link BufferExtrasHolder#size} is adjusted to subtract the number of bytes that were read. The
    * same value is added to {@link BufferExtrasHolder#offset}.
-   *
+   * <p>
    * TODO: This is not working properly right now. Must be investigated and fixed to play DRM content.
    *
    * @param buffer       The buffer into which the encryption data should be written.
@@ -440,23 +450,33 @@ public final class ReplacementTrackOutput implements TrackOutput {
    *
    * @param relativeIndex The absolute position up to which allocations can be discarded.
    */
-  private synchronized void dropDownstreamTo(int relativeIndex) {
-    for (int i = 0; i < relativeIndex; i++) {
-      totalBytesDropped += dataQueue.get(0).data.length;
-      allocator.release(dataQueue.remove(0));
-      currentOffset = 0;
+  private void dropDownstreamTo(int relativeIndex) {
+    try {
+      //lock.lock();
+      for (int i = 0; i < relativeIndex; i++) {
+        totalBytesDropped += dataQueue.get(0).data.length;
+        allocator.release(dataQueue.remove(0));
+        currentOffset = 0;
+      }
+    }finally {
+      //lock.unlock();
     }
   }
 
-  private synchronized void dropDownstreamTo(long absolutePosition) {
-    while (dataQueue.size() > 0 && totalBytesDropped + dataQueue.get(0).data.length <= absolutePosition) {
-      totalBytesDropped += dataQueue.get(0).data.length;
-      allocator.release(dataQueue.remove(0));
-      if (currentOffset > 0) {
-        currentOffset = 0;
+  private void dropDownstreamTo(long absolutePosition) {
+    try {
+      //lock.lock();
+      while (dataQueue.size() > 0 && totalBytesDropped + dataQueue.get(0).data.length <= absolutePosition) {
+        totalBytesDropped += dataQueue.get(0).data.length;
+        allocator.release(dataQueue.remove(0));
+        if (currentOffset > 0) {
+          currentOffset = 0;
+        }
       }
+      currentOffset = absolutePosition - totalBytesDropped;
+    } finally {
+      //lock.unlock();
     }
-    currentOffset = absolutePosition - totalBytesDropped;
   }
 
   // Called by the loading thread.
@@ -494,63 +514,52 @@ public final class ReplacementTrackOutput implements TrackOutput {
     }
   }
 
-  public void replaceSample(ParsableByteArray buffer, int length, long timeUs,
+  public void replaceSample(List<Allocation> replacementData, int length, long timeUs,
                             @C.BufferFlags int flags, int size, byte[] encryptionKey) {
-    // Syncing both on the data and the info queue because we will be seeking and modifying a
-    // specific index in those queues. Don't want them to be changed elsewhere while we are working
-    // here !
-    
-    // Be aware of a potential flaw when locking happens while only part of the lists in the info queue
-    // have been treated by an addition or removal operation. Should be ok since everything should be locked
-    // against offsets.
-    synchronized (dataQueue) {
-      synchronized (infoQueue.offsets) {
-        int infoQueueIndex = infoQueue.findIndex(timeUs);
-        if (infoQueueIndex > 0) {
-          Allocation newAlloc = allocator.allocate(length);
-          int newAllocOffset = 0;
-          while (length > 0) {
-            int thisAppendLength = prepareForAppend(length);
-            buffer.readBytes(newAlloc.data, newAlloc.translateOffset(newAllocOffset),
-                    thisAppendLength);
-            newAllocOffset += thisAppendLength;
-            length -= thisAppendLength;
-          }
-          int dataQueueIndex = locateOffset(infoQueue.offsets.get(infoQueueIndex));
-          int amountToDiscard = infoQueue.sizes.get(infoQueueIndex);
-          while (amountToDiscard > 0) {
-            amountToDiscard -= dataQueue.get(dataQueueIndex).data.length;
-            if (amountToDiscard >= 0) {
-              allocator.release(dataQueue.get(dataQueueIndex));
-              dataQueue.remove(dataQueueIndex);
-            } else {
-              throw new RuntimeException("Shouldn't be discarding too much data.");
-            }
-          }
-          int offsetShift = size - infoQueue.sizes.get(infoQueueIndex);
-          dataQueue.add(dataQueueIndex, newAlloc);
-
-          // TODO: There might be issues when replacing with a new format. Need to investigate more.
-          if (pendingFormatAdjustment) {
-            format(lastUnadjustedFormat);
-          }
-          infoQueue.flags.set(infoQueueIndex, flags);
-          infoQueue.sizes.set(infoQueueIndex, size);
-          infoQueue.encryptionKeys.set(infoQueueIndex, encryptionKey);
-          infoQueue.formats.set(infoQueueIndex, infoQueue.upstreamFormat);
-
-          for (int index = infoQueueIndex + 1; index < infoQueue.offsets.size(); index++) {
-            infoQueue.offsets.set(index, infoQueue.offsets.get(index) + offsetShift);
+    try {
+      lock.lock();
+      int infoQueueIndex = infoQueue.findIndex(timeUs);
+      if (infoQueueIndex > 0) {
+        int dataQueueIndex = locateOffset(infoQueue.offsets.get(infoQueueIndex));
+        int amountToDiscard = infoQueue.sizes.get(infoQueueIndex);
+        while (amountToDiscard > 0) {
+          amountToDiscard -= dataQueue.get(dataQueueIndex).data.length;
+          if (amountToDiscard >= 0) {
+            allocator.release(dataQueue.get(dataQueueIndex));
+            dataQueue.remove(dataQueueIndex);
+          } else {
+            throw new RuntimeException("Shouldn't be discarding too much data.");
           }
         }
+
+        // TODO: There might be issues when replacing with a new format. Need to investigate more.
+        if (pendingFormatAdjustment) {
+          format(lastUnadjustedFormat);
+        }
+
+        int offsetShift = size - infoQueue.sizes.get(infoQueueIndex);
+        for (int i = replacementData.size() - 1; i >= 0; i--) {
+          dataQueue.add(dataQueueIndex, replacementData.get(i));
+        }
+
+        infoQueue.flags.set(infoQueueIndex, flags);
+        infoQueue.sizes.set(infoQueueIndex, size);
+        infoQueue.encryptionKeys.set(infoQueueIndex, encryptionKey);
+        infoQueue.formats.set(infoQueueIndex, infoQueue.upstreamFormat);
+
+        for (int index = infoQueueIndex + 1; index < infoQueue.offsets.size(); index++) {
+          infoQueue.offsets.set(index, infoQueue.offsets.get(index) + offsetShift);
+        }
       }
+    } finally {
+      lock.unlock();
     }
   }
 
   /**
    * Must be called from a block synchronized on the dataQueue.
    *
-   * @param offset The starting offset of the searche sample of the data queue
+   * @param offset The starting offset of the searched sample of the data queue
    * @return The index of the sample of the data queue starting with the provided offset
    */
   private int locateOffset(long offset) {
@@ -580,38 +589,37 @@ public final class ReplacementTrackOutput implements TrackOutput {
       return bytesSkipped;
     }
     try {
-      length = prepareForAppend(length);
-      int bytesAppended = input.read(lastAllocation.data,
-              lastAllocation.translateOffset(lastAllocationOffset), length);
-      if (bytesAppended == C.RESULT_END_OF_INPUT) {
-        if (allowEndOfInput) {
-          return C.RESULT_END_OF_INPUT;
-        }
-        throw new EOFException();
+      lock.lock();
+      if (replacement != null) {
+        return sampleForReplacement(input, length, allowEndOfInput);
       }
-      lastAllocationOffset += bytesAppended;
-      totalBytesWritten += bytesAppended;
-      return bytesAppended;
+      length = prepareForAppend(length);
+      return fillAllocation(input, length, allowEndOfInput, lastAllocation, lastAllocationOffset,
+              false);
     } finally {
       endWriteOperation();
+      lock.unlock();
     }
   }
 
   @Override
   public void sampleData(ParsableByteArray buffer, int length) {
-    if (!startWriteOperation()) {
-      buffer.skipBytes(length);
-      return;
+    try {
+      lock.lock();
+      if (!startWriteOperation()) {
+        buffer.skipBytes(length);
+        return;
+      }
+      if (replacement != null) {
+        sampleForReplacement(buffer, length);
+        return;
+      }
+      length = prepareForAppend(length);
+      fillAllocation(buffer, length, lastAllocation, lastAllocationOffset, false);
+    } finally {
+      endWriteOperation();
+      lock.unlock();
     }
-    while (length > 0) {
-      int thisAppendLength = prepareForAppend(length);
-      buffer.readBytes(lastAllocation.data, lastAllocation.translateOffset(lastAllocationOffset),
-              thisAppendLength);
-      lastAllocationOffset += thisAppendLength;
-      totalBytesWritten += thisAppendLength;
-      length -= thisAppendLength;
-    }
-    endWriteOperation();
   }
 
   @Override
@@ -625,6 +633,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
       return;
     }
     try {
+      lock.lock();
+      if (replacement != null) {
+        sampleMetadataForReplacement(timeUs, flags, size, offset, encryptionKey);
+        return;
+      }
       if (needKeyframe) {
         if ((flags & C.BUFFER_FLAG_KEY_FRAME) == 0) {
           return;
@@ -636,26 +649,104 @@ public final class ReplacementTrackOutput implements TrackOutput {
       infoQueue.commitSample(timeUs, flags, absoluteOffset, size, encryptionKey);
     } finally {
       endWriteOperation();
+      lock.unlock();
+    }
+  }
+
+  private int sampleForReplacement(ExtractorInput input, int length, boolean allowEndOfInput) throws IOException, InterruptedException {
+    Log.e("REPLACE", "sample for replace extractor " + length);
+    if (replacementAllocations == null) {
+      ArrayList<Allocation> queue = new ArrayList<>();
+      replacementAllocations = Collections.synchronizedList(queue);
+    }
+    length = prepareForReplacement(length);
+    return fillAllocation(input, length, allowEndOfInput, replacementAllocation,
+            replacementAllocationOffset, true);
+  }
+
+  private void sampleForReplacement(ParsableByteArray buffer, int length) {
+    Log.e("REPLACE", "sample for replace byte array " + length);
+    if (replacementAllocations == null) {
+      ArrayList<Allocation> queue = new ArrayList<>();
+      replacementAllocations = Collections.synchronizedList(queue);
+    }
+    length = prepareForReplacement(length);
+    fillAllocation(buffer, length, replacementAllocation, replacementAllocationOffset, true);
+  }
+
+  private void sampleMetadataForReplacement(long timeUs, int flags, int size, int offset, byte[] encryptionKey) {
+    Log.e("REPLACE", "sample metadata " + size);
+    //*
+    replaceSample(replacementAllocations, size, timeUs, flags, size, encryptionKey);
+    replacementAllocations = null;
+    replacement = null;
+    replacementAllocation = null;
+    replacementAllocationOffset = 0;
+    //*/
+  }
+
+  private int fillAllocation(ExtractorInput input, int length, boolean allowEndOfInput,
+                             Allocation allocation, int allocationOffset, boolean replacement) throws IOException, InterruptedException {
+    int bytesAppended = input.read(allocation.data,
+            allocation.translateOffset(allocationOffset), length);
+    if (bytesAppended == C.RESULT_END_OF_INPUT) {
+      if (allowEndOfInput) {
+        return C.RESULT_END_OF_INPUT;
+      }
+      throw new EOFException();
+    }
+    if (!replacement) {
+      totalBytesWritten += bytesAppended;
+      lastAllocationOffset += bytesAppended;
+    } else {
+      replacementAllocationOffset += bytesAppended;
+    }
+    return bytesAppended;
+  }
+
+  private void fillAllocation(ParsableByteArray buffer, int length, Allocation allocation,
+                              int offset, boolean replacement) {
+    while (length > 0) {
+      int thisAppendLength = replacement ? prepareForReplacement(length) : prepareForAppend(length);
+      buffer.readBytes(allocation.data, allocation.translateOffset(offset),
+              thisAppendLength);
+      if (!replacement) {
+        lastAllocationOffset += thisAppendLength;
+        totalBytesWritten += thisAppendLength;
+      } else {
+        replacementAllocationOffset += thisAppendLength;
+      }
+      offset += thisAppendLength;
+      length -= thisAppendLength;
     }
   }
 
   public void beginReplacement(long startTimeUs, long endTimeUs) {
-    int infoQueueStartIndex =  infoQueue.findIndex(startTimeUs);
-    int infoQueueEndINdex = infoQueue.findIndex(endTimeUs);
-
-    throw new RuntimeException("Not yet implemented.");
+    try {
+      lock.lock();
+      if (this.replacement == null) {
+        this.replacement = new ReplacementInfo(startTimeUs, endTimeUs);
+      } else {
+        throw new RuntimeException("Cannot have two replacements at the same time !");
+      }
+    } finally {
+      lock.unlock();
+    }
   }
 
   public void cancelReplacement() {
-    throw new RuntimeException("Not implemented yet.");
+    lock.lock();
+    replacement = null;
+    replacementAllocation = null;
+    lock.unlock();
   }
 
   // Private methods.
-  private synchronized boolean startWriteOperation() {
+  private boolean startWriteOperation() {
     return state.compareAndSet(STATE_ENABLED, STATE_ENABLED_WRITING);
   }
 
-  private synchronized void endWriteOperation() {
+  private void endWriteOperation() {
     if (!state.compareAndSet(STATE_ENABLED_WRITING, STATE_ENABLED)) {
       clearSampleData();
     }
@@ -683,6 +774,15 @@ public final class ReplacementTrackOutput implements TrackOutput {
       dataQueue.add(lastAllocation);
     }
     return lastAllocation.data.length - lastAllocationOffset;
+  }
+
+  private int prepareForReplacement(int length) {
+    if (replacementAllocation == null || replacementAllocationOffset >= replacementAllocation.data.length) {
+      replacementAllocationOffset = 0;
+      replacementAllocation = allocator.allocate(length);
+      replacementAllocations.add(replacementAllocation);
+    }
+    return replacementAllocation.data.length - replacementAllocationOffset;
   }
 
   /**
@@ -726,7 +826,9 @@ public final class ReplacementTrackOutput implements TrackOutput {
     private final int batchReadingLimit = 20;
     private int readCounter = 0;
 
-    public InfoQueue() {
+    private ReentrantLock lock;
+
+    public InfoQueue(ReentrantLock lock) {
       sourceIds = new ArrayList<>();
       offsets = new ArrayList<>();
       timesUs = new ArrayList<>();
@@ -744,10 +846,12 @@ public final class ReplacementTrackOutput implements TrackOutput {
       largestDequeuedTimestampUs = Long.MIN_VALUE;
       largestQueuedTimestampUs = Long.MIN_VALUE;
       upstreamFormatRequired = true;
+      this.lock = lock;
     }
 
     public void clearSampleData() {
-      synchronized (offsets) {
+      try {
+        //lock.lock();
         absoluteReadIndex = 0;
         sourceIds.clear();
         offsets.clear();
@@ -756,6 +860,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
         timesUs.clear();
         encryptionKeys.clear();
         formats.clear();
+      } finally {
+        //lock.unlock();
       }
     }
 
@@ -793,7 +899,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
           return 0;
         }
       } else {
-        synchronized (offsets) {
+        try {
+          //lock.lock();
           for (int j = 0; j < discardCount; j++) {
             int index = queueSize() - 1;
             sourceIds.remove(index);
@@ -804,6 +911,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
             encryptionKeys.remove(index);
             formats.remove(index);
           }
+        } finally {
+          //lock.unlock();
         }
 
         // Update the largest queued timestamp, assuming that the timestamps prior to a keyframe are
@@ -837,21 +946,36 @@ public final class ReplacementTrackOutput implements TrackOutput {
      * empty.
      */
     public int peekSourceId() {
-      return queueSize() == 0 ? upstreamSourceId : sourceIds.get(0);
+      try {
+        //lock.lock();
+        return queueSize() == 0 ? upstreamSourceId : sourceIds.get(0);
+      } finally {
+        //lock.unlock();
+      }
     }
 
     /**
      * Returns whether the queue is empty.
      */
-    public synchronized boolean isEmpty() {
-      return queueSize() == 0;
+    public boolean isEmpty() {
+      try {
+        //lock.lock();
+        return queueSize() == 0;
+      } finally {
+        //lock.unlock();
+      }
     }
 
     /**
      * Returns the upstream {@link Format} in which samples are being queued.
      */
-    public synchronized Format getUpstreamFormat() {
-      return upstreamFormatRequired ? null : upstreamFormat;
+    public Format getUpstreamFormat() {
+      try {
+        //lock.lock();
+        return upstreamFormatRequired ? null : upstreamFormat;
+      } finally {
+        //lock.unlock();
+      }
     }
 
     /**
@@ -864,7 +988,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
      * @return The largest sample timestamp that has been queued, or {@link Long#MIN_VALUE} if no
      * samples have been queued.
      */
-    public synchronized long getLargestQueuedTimestampUs() {
+    public long getLargestQueuedTimestampUs() {
       return Math.max(largestDequeuedTimestampUs, largestQueuedTimestampUs);
     }
 
@@ -890,10 +1014,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
      * or {@link C#RESULT_BUFFER_READ}.
      */
     @SuppressWarnings("ReferenceEquality")
-    public synchronized int readData(FormatHolder formatHolder, DecoderInputBuffer buffer,
+    public int readData(FormatHolder formatHolder, DecoderInputBuffer buffer,
                                      boolean formatRequired, boolean loadingFinished, Format downstreamFormat,
                                      BufferExtrasHolder extrasHolder) {
-      synchronized (offsets) {
+      try {
+        //lock.lock();
         if (queueSize() == 0) {
           if (loadingFinished) {
             buffer.setFlags(C.BUFFER_FLAG_END_OF_STREAM);
@@ -907,7 +1032,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
           }
         }
 
-        if (formatRequired || formats.get(0) != downstreamFormat) {
+        if (formatRequired /*|| formats.get(0) != downstreamFormat*/) {
           formatHolder.format = formats.get(0);
           return C.RESULT_FORMAT_READ;
         }
@@ -936,8 +1061,10 @@ public final class ReplacementTrackOutput implements TrackOutput {
         extrasHolder.nextOffset = queueSize() > 0 ? offsets.get(0)
                 : extrasHolder.offset + extrasHolder.size;
         readCounter++;
+        return C.RESULT_BUFFER_READ;
+      } finally {
+        //lock.unlock();
       }
-      return C.RESULT_BUFFER_READ;
     }
 
     /**
@@ -951,8 +1078,9 @@ public final class ReplacementTrackOutput implements TrackOutput {
      * @return The offset of the keyframe's data if the keyframe was present.
      * {@link C#POSITION_UNSET} otherwise.
      */
-    public synchronized long skipToKeyframeBefore(long timeUs, boolean allowTimeBeyondBuffer) {
-      synchronized (offsets) {
+    public long skipToKeyframeBefore(long timeUs, boolean allowTimeBeyondBuffer) {
+      try {
+        //lock.lock();
         if (queueSize() == 0 || timeUs < timesUs.get(0)) {
           return C.POSITION_UNSET;
         }
@@ -991,44 +1119,57 @@ public final class ReplacementTrackOutput implements TrackOutput {
           encryptionKeys.remove(0);
         }
         absoluteReadIndex += sampleCountToKeyframe;
-        return offsets.get(0);
+        long result = offsets.get(0);
+        return result;
+      } finally {
+        //lock.unlock();
       }
     }
 
     // Called by the loading thread.
 
-    public synchronized boolean format(Format format) {
-      if (format == null) {
-        upstreamFormatRequired = true;
-        return false;
-      }
-      upstreamFormatRequired = false;
-      if (Util.areEqual(format, upstreamFormat)) {
-        // Suppress changes between equal formats so we can use referential equality in readData.
-        return false;
-      } else {
-        upstreamFormat = format;
-        return true;
+    public boolean format(Format format) {
+      try {
+        //lock.lock();
+        if (format == null) {
+          upstreamFormatRequired = true;
+          return false;
+        }
+        upstreamFormatRequired = false;
+        if (Util.areEqual(format, upstreamFormat)) {
+          // Suppress changes between equal formats so we can use referential equality in readData.
+          return false;
+        } else {
+          upstreamFormat = format;
+          return true;
+        }
+      } finally {
+        //lock.unlock();
       }
     }
 
-    public synchronized void commitSample(long timeUs, @C.BufferFlags int sampleFlags, long offset,
+    public void commitSample(long timeUs, @C.BufferFlags int sampleFlags, long offset,
                                           int size, byte[] encryptionKey) {
       Assertions.checkState(!upstreamFormatRequired);
       commitSampleTimestamp(timeUs);
-      synchronized (offsets) {
-        timesUs.add(timeUs);
-        offsets.add(offset);
-        sizes.add(size);
-        flags.add(sampleFlags);
-        encryptionKeys.add(encryptionKey);
-        formats.add(upstreamFormat);
-        sourceIds.add(upstreamSourceId);
-      }
+      //lock.lock();
+      timesUs.add(timeUs);
+      offsets.add(offset);
+      sizes.add(size);
+      flags.add(sampleFlags);
+      encryptionKeys.add(encryptionKey);
+      formats.add(upstreamFormat);
+      sourceIds.add(upstreamSourceId);
+      //lock.unlock();
     }
 
-    public synchronized void commitSampleTimestamp(long timeUs) {
-      largestQueuedTimestampUs = Math.max(largestQueuedTimestampUs, timeUs);
+    public void commitSampleTimestamp(long timeUs) {
+      try {
+        //lock.lock();
+        largestQueuedTimestampUs = Math.max(largestQueuedTimestampUs, timeUs);
+      } finally {
+        //lock.unlock();
+      }
     }
 
     /**
@@ -1038,7 +1179,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
      * @return The index of the sample in the infoQueue if it was found, -1 else.
      */
     public int findIndex(long timeUs) {
-      synchronized (offsets) {
+      try {
+        //lock.lock();
         int index = 0;
         while (index < timesUs.size() && timesUs.get(index) < timeUs) {
           index++;
@@ -1047,6 +1189,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
           return index;
         }
         return -1;
+      } finally {
+        //lock.unlock();
       }
     }
   }
@@ -1055,11 +1199,28 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * Holds additional buffer information not held by {@link DecoderInputBuffer}.
    */
   private static final class BufferExtrasHolder {
-
     public int size;
     public long offset;
     public long nextOffset;
     public byte[] encryptionKeyId;
+  }
+
+  private final class ReplacementInfo {
+    private long startTime;
+    private long endTime;
+
+    public ReplacementInfo(long startTime, long endTime) {
+      this.startTime = startTime;
+      this.endTime = endTime;
+    }
+
+    public long getStartTime() {
+      return this.startTime;
+    }
+
+    public long getEndTime() {
+      return this.endTime;
+    }
   }
 
 }
