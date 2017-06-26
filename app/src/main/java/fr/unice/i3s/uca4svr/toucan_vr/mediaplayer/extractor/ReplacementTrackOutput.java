@@ -102,6 +102,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private Allocation replacementAllocation;
   private int replacementAllocationOffset;
 
+  private int dataQueueReadOffset = 0;
+
   private final int id;
 
   /**
@@ -466,9 +468,12 @@ public final class ReplacementTrackOutput implements TrackOutput {
     try {
       //lock.lock();
       for (int i = 0; i < relativeIndex; i++) {
-        totalBytesDropped += dataQueue.get(0).data.length;
-        allocator.release(dataQueue.remove(0));
-        currentOffset = 0;
+        synchronized (dataQueue) {
+          totalBytesDropped += dataQueue.get(0).data.length;
+          allocator.release(dataQueue.remove(0));
+          currentOffset = 0;
+          dataQueueReadOffset++;
+        }
       }
     }finally {
       //lock.unlock();
@@ -479,10 +484,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
     try {
       //lock.lock();
       while (dataQueue.size() > 0 && totalBytesDropped + dataQueue.get(0).data.length <= absolutePosition) {
-        totalBytesDropped += dataQueue.get(0).data.length;
-        allocator.release(dataQueue.remove(0));
-        if (currentOffset > 0) {
-          currentOffset = 0;
+        synchronized (dataQueue) {
+          totalBytesDropped += dataQueue.get(0).data.length;
+          allocator.release(dataQueue.remove(0));
+          if (currentOffset > 0) {
+            currentOffset = 0;
+          }
+          dataQueueReadOffset++;
         }
       }
       currentOffset = absolutePosition - totalBytesDropped;
@@ -531,43 +539,71 @@ public final class ReplacementTrackOutput implements TrackOutput {
                             @C.BufferFlags int flags, int size, byte[] encryptionKey) {
     try {
       lock.lock();
-      synchronized(infoQueue.offsets) {
-        Log.e("REPLACE", id + ": DOING IT RIGHT NOW " + replacement.startTime + " " + replacement.endTime);
-        int infoQueueIndex = infoQueue.findIndex(replacement.startTime);
-        if (infoQueueIndex > 0) {
-          int dataQueueIndex = locateOffset(infoQueue.offsets.get(infoQueueIndex));
-          int amountToDiscard = infoQueue.sizes.get(infoQueueIndex);
-          while (amountToDiscard > 0) {
-            amountToDiscard -= dataQueue.get(dataQueueIndex).data.length;
+      Log.e("REPLACE", id + ": DOING IT RIGHT NOW " + replacement.startTime + " " + replacement.endTime);
+      int infoQueueIndex = -1;
+      synchronized (infoQueue.timesUs) {
+        infoQueueIndex = infoQueue.findIndex(replacement.startTime);
+        if (infoQueueIndex != -1) {
+          infoQueueIndex += infoQueue.timesUsReadOffset;
+        }
+      }
+      if (infoQueueIndex > 0) {
+        int dataQueueIndex = -1;
+        synchronized (dataQueue) {
+          dataQueueIndex = locateOffset(infoQueue.offsets.get(infoQueueIndex)) + dataQueueReadOffset;
+        }
+        int amountToDiscard = -1;
+        synchronized (infoQueue.sizes) {
+          amountToDiscard = infoQueue.sizes.get(infoQueueIndex - infoQueue.sizesReadOffset);
+        }
+        while (amountToDiscard > 0) {
+          synchronized (dataQueue) {
+            amountToDiscard -= dataQueue.get(dataQueueIndex - dataQueueReadOffset).data.length;
             if (amountToDiscard >= 0) {
-              allocator.release(dataQueue.get(dataQueueIndex));
-              dataQueue.remove(dataQueueIndex);
+              allocator.release(dataQueue.get(dataQueueIndex - dataQueueReadOffset));
+              dataQueue.remove(dataQueueIndex - dataQueueReadOffset);
             } else {
               throw new RuntimeException("Shouldn't be discarding too much data.");
             }
           }
-
-          // TODO: There might be issues when replacing with a new format. Need to investigate more.
-          if (pendingFormatAdjustment) {
-            format(lastUnadjustedFormat);
-          }
-
-          int offsetShift = size - infoQueue.sizes.get(infoQueueIndex);
-          for (int i = replacementData.size() - 1; i >= 0; i--) {
-            dataQueue.add(dataQueueIndex, replacementData.get(i));
-          }
-
-          infoQueue.flags.set(infoQueueIndex, flags);
-          infoQueue.sizes.set(infoQueueIndex, size);
-          infoQueue.encryptionKeys.set(infoQueueIndex, encryptionKey);
-          infoQueue.formats.set(infoQueueIndex, infoQueue.upstreamFormat);
-          Log.e("REPLACE", id + ": " + infoQueue.upstreamFormat);
-
-          for (int index = infoQueueIndex + 1; index < infoQueue.offsets.size(); index++) {
-            infoQueue.offsets.set(index, infoQueue.offsets.get(index) + offsetShift);
-          }
-          totalBytesWritten += offsetShift;
         }
+
+        // TODO: There might be issues when replacing with a new format. Need to investigate more.
+        if (pendingFormatAdjustment) {
+          format(lastUnadjustedFormat);
+        }
+
+        int offsetShift = 0;
+        synchronized (infoQueue.sizes) {
+          offsetShift = size - infoQueue.sizes.get(infoQueueIndex - infoQueue.sizesReadOffset);
+        }
+        for (int i = replacementData.size() - 1; i >= 0; i--) {
+          synchronized (dataQueue) {
+            dataQueue.add(dataQueueIndex - dataQueueReadOffset, replacementData.get(i));
+          }
+        }
+
+        synchronized (infoQueue.flags) {
+          infoQueue.flags.set(infoQueueIndex - infoQueue.flagsReadOffset, flags);
+        }
+        synchronized (infoQueue.sizes) {
+          infoQueue.sizes.set(infoQueueIndex - infoQueue.sizesReadOffset, size);
+        }
+        synchronized (infoQueue.encryptionKeys) {
+          infoQueue.encryptionKeys.set(infoQueueIndex - infoQueue.encryptionKeysReadOffset, encryptionKey);
+        }
+        synchronized (infoQueue.formats) {
+          infoQueue.formats.set(infoQueueIndex - infoQueue.fomatsReadOffset, infoQueue.upstreamFormat);
+        }
+        Log.e("REPLACE", id + ": " + infoQueue.upstreamFormat);
+
+        for (int index = infoQueueIndex + 1; index < infoQueue.offsets.size(); index++) {
+          synchronized (infoQueue.offsets) {
+            infoQueue.offsets.set(index - infoQueue.offsetsReadOffset,
+                    infoQueue.offsets.get(index - infoQueue.offsetsReadOffset) + offsetShift);
+          }
+        }
+        totalBytesWritten += offsetShift;
       }
     } finally {
       lock.unlock();
@@ -776,10 +812,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private void clearSampleData() {
     infoQueue.clearSampleData();
     allocator.release(dataQueue.toArray(new Allocation[dataQueue.size()]));
-    dataQueue.clear();
+    synchronized (dataQueue) {
+      dataQueue.clear();
+      totalBytesDropped = 0;
+      totalBytesWritten = 0;
+      dataQueueReadOffset = 0;
+    }
     allocator.trim();
-    totalBytesDropped = 0;
-    totalBytesWritten = 0;
     lastAllocation = null;
     needKeyframe = true;
   }
@@ -836,6 +875,14 @@ public final class ReplacementTrackOutput implements TrackOutput {
     private List<byte[]> encryptionKeys;
     private List<Format> formats;
 
+    private int sourceIdsReadOffset = 0;
+    private int offsetsReadOffset = 0;
+    private int sizesReadOffset = 0;
+    private int flagsReadOffset = 0;
+    private int timesUsReadOffset = 0;
+    private int encryptionKeysReadOffset = 0;
+    private int fomatsReadOffset = 0;
+
     private int absoluteReadIndex;
 
     private long largestDequeuedTimestampUs;
@@ -873,14 +920,34 @@ public final class ReplacementTrackOutput implements TrackOutput {
     public void clearSampleData() {
       try {
         //lock.lock();
-        absoluteReadIndex = 0;
-        sourceIds.clear();
-        offsets.clear();
-        sizes.clear();
-        flags.clear();
-        timesUs.clear();
-        encryptionKeys.clear();
-        formats.clear();
+        synchronized (offsets) {
+          offsets.clear();
+          offsetsReadOffset  = 0;
+        }
+        synchronized (timesUs) {
+          timesUs.clear();
+          timesUsReadOffset = 0;
+        }
+        synchronized (flags) {
+          flags.clear();
+          flagsReadOffset = 0;
+        }
+        synchronized (sizes) {
+          sizes.clear();
+          sizesReadOffset = 0;
+        }
+        synchronized (encryptionKeys) {
+          encryptionKeys.clear();
+          encryptionKeysReadOffset = 0;
+        }
+        synchronized (formats) {
+          formats.clear();
+          fomatsReadOffset = 0;
+        }
+        synchronized (sourceIds) {
+          sourceIds.clear();
+          sourceIdsReadOffset = 0;
+        }
       } finally {
         //lock.unlock();
       }
@@ -1071,13 +1138,34 @@ public final class ReplacementTrackOutput implements TrackOutput {
 
         largestDequeuedTimestampUs = Math.max(largestDequeuedTimestampUs, buffer.timeUs);
 
-        offsets.remove(0);
-        timesUs.remove(0);
-        flags.remove(0);
-        sizes.remove(0);
-        encryptionKeys.remove(0);
-        formats.remove(0);
-        sourceIds.remove(0);
+        synchronized (offsets) {
+          offsets.remove(0);
+          offsetsReadOffset ++;
+        }
+        synchronized (timesUs) {
+          timesUs.remove(0);
+          timesUsReadOffset++;
+        }
+        synchronized (flags) {
+          flags.remove(0);
+          flagsReadOffset++;
+        }
+        synchronized (sizes) {
+          sizes.remove(0);
+          sizesReadOffset++;
+        }
+        synchronized (encryptionKeys) {
+          encryptionKeys.remove(0);
+          encryptionKeysReadOffset++;
+        }
+        synchronized (formats) {
+          formats.remove(0);
+          fomatsReadOffset++;
+        }
+        synchronized (sourceIds) {
+          sourceIds.remove(0);
+          sourceIdsReadOffset++;
+        }
 
         absoluteReadIndex++;
 
@@ -1135,11 +1223,34 @@ public final class ReplacementTrackOutput implements TrackOutput {
         }
 
         for (int i = 0; i < sampleCountToKeyframe; i++) {
-          timesUs.remove(0);
-          flags.remove(0);
-          sizes.remove(0);
-          offsets.remove(0);
-          encryptionKeys.remove(0);
+          synchronized (offsets) {
+            offsets.remove(0);
+            offsetsReadOffset ++;
+          }
+          synchronized (timesUs) {
+            timesUs.remove(0);
+            timesUsReadOffset++;
+          }
+          synchronized (flags) {
+            flags.remove(0);
+            flagsReadOffset++;
+          }
+          synchronized (sizes) {
+            sizes.remove(0);
+            sizesReadOffset++;
+          }
+          synchronized (encryptionKeys) {
+            encryptionKeys.remove(0);
+            encryptionKeysReadOffset++;
+          }
+          synchronized (formats) {
+            formats.remove(0);
+            fomatsReadOffset++;
+          }
+          synchronized (sourceIds) {
+            sourceIds.remove(0);
+            sourceIdsReadOffset++;
+          }
         }
         absoluteReadIndex += sampleCountToKeyframe;
         long result = offsets.get(0);
