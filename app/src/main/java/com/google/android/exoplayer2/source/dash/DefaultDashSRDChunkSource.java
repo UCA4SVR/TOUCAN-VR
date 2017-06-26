@@ -274,11 +274,83 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
     }
 
     public void getChunkToBeReplaced(int segmentNum, ChunkHolder out) {
-		//Force the quality to be the highest one
-		((PyramidalTrackSelection)trackSelection).forceSelectedTrack();
-		RepresentationHolder representationHolder = representationHolders[trackSelection.getSelectedIndex()];
-		out.chunk = newMediaChunk(representationHolder, dataSource, trackSelection.getSelectedFormat(),
-				trackSelection.getSelectionReason(), null, segmentNum, 1);
+        if (fatalError != null) {
+            return;
+        }
+
+        // Force the quality to be the highest.
+        if (trackSelection instanceof PyramidalTrackSelection)
+            ((PyramidalTrackSelection)trackSelection).forceSelectedTrack();
+        else
+            return;
+
+        RepresentationHolder representationHolder =
+                representationHolders[trackSelection.getSelectedIndex()];
+
+        if (representationHolder.extractorWrapper != null) {
+            Representation selectedRepresentation = representationHolder.representation;
+            RangedUri pendingInitializationUri = null;
+            RangedUri pendingIndexUri = null;
+            if (representationHolder.extractorWrapper.getSampleFormats() == null) {
+                pendingInitializationUri = selectedRepresentation.getInitializationUri();
+            }
+            if (representationHolder.segmentIndex == null) {
+                pendingIndexUri = selectedRepresentation.getIndexUri();
+            }
+            if (pendingInitializationUri != null || pendingIndexUri != null) {
+                // We have initialization and/or index requests to make.
+                out.chunk = newInitializationChunk(representationHolder, dataSource,
+                        trackSelection.getSelectedFormat(), trackSelection.getSelectionReason(),
+                        trackSelection.getSelectionData(), pendingInitializationUri, pendingIndexUri);
+                return;
+            }
+        }
+
+        long nowUs = getNowUnixTimeUs();
+        int availableSegmentCount = representationHolder.getSegmentCount();
+        if (availableSegmentCount == 0) {
+            // The index doesn't define any segments.
+            out.endOfStream = !manifest.dynamic || (periodIndex < manifest.getPeriodCount() - 1);
+            return;
+        }
+
+        int firstAvailableSegmentNum = representationHolder.getFirstSegmentNum();
+        int lastAvailableSegmentNum;
+        if (availableSegmentCount == DashSegmentIndex.INDEX_UNBOUNDED) {
+            // The index is itself unbounded. We need to use the current time to calculate the range of
+            // available segments.
+            long liveEdgeTimeUs = nowUs - manifest.availabilityStartTime * 1000;
+            long periodStartUs = manifest.getPeriod(periodIndex).startMs * 1000;
+            long liveEdgeTimeInPeriodUs = liveEdgeTimeUs - periodStartUs;
+            if (manifest.timeShiftBufferDepth != C.TIME_UNSET) {
+                long bufferDepthUs = manifest.timeShiftBufferDepth * 1000;
+                firstAvailableSegmentNum = Math.max(firstAvailableSegmentNum,
+                        representationHolder.getSegmentNum(liveEdgeTimeInPeriodUs - bufferDepthUs));
+            }
+            // getSegmentNum(liveEdgeTimestampUs) will not be completed yet, so subtract one to get the
+            // index of the last completed segment.
+            lastAvailableSegmentNum = representationHolder.getSegmentNum(liveEdgeTimeInPeriodUs) - 1;
+        } else {
+            lastAvailableSegmentNum = firstAvailableSegmentNum + availableSegmentCount - 1;
+        }
+
+        if (segmentNum < firstAvailableSegmentNum) {
+            // This is before the first chunk in the current manifest.
+            fatalError = new BehindLiveWindowException();
+            return;
+        }
+
+        if (segmentNum > lastAvailableSegmentNum
+                || (missingLastSegment && segmentNum >= lastAvailableSegmentNum)) {
+            // This is beyond the last chunk in the current manifest.
+            out.endOfStream = !manifest.dynamic || (periodIndex < manifest.getPeriodCount() - 1);
+            return;
+        }
+
+        int maxSegmentCount = Math.min(maxSegmentsPerLoad, lastAvailableSegmentNum - segmentNum + 1);
+        out.chunk = newMediaChunk(representationHolder, dataSource, trackSelection.getSelectedFormat(),
+                trackSelection.getSelectionReason(), trackSelection.getSelectionData(), segmentNum,
+                maxSegmentCount);
 	}
 
     public String getHighestFormatId() {

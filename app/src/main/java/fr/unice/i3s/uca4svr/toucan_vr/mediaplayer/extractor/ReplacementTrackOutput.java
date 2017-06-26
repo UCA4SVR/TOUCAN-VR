@@ -550,7 +550,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
       if (infoQueueIndex > 0) {
         int dataQueueIndex = -1;
         synchronized (dataQueue) {
-          dataQueueIndex = locateOffset(infoQueue.offsets.get(infoQueueIndex)) + dataQueueReadOffset;
+          long offset = 0;
+          synchronized (infoQueue.offsets) {
+            offset = infoQueue.offsets.get(infoQueueIndex - infoQueue.offsetsReadOffset);
+          }
+          dataQueueIndex = locateOffset(offset) + dataQueueReadOffset;
         }
         int amountToDiscard = -1;
         synchronized (infoQueue.sizes) {

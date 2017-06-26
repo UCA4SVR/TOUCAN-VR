@@ -409,9 +409,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
             mediaChunk.init(mediaChunkOutput);
             mediaChunks.remove(maybeReplaceIndex);
             mediaChunks.add(maybeReplaceIndex, mediaChunk);
+            mediaChunkOutput.startReplacement(loadable.startTimeUs, loadable.endTimeUs);
           }
 
-          mediaChunkOutput.startReplacement(loadable.startTimeUs, loadable.endTimeUs);
           long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
           eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
                   loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
