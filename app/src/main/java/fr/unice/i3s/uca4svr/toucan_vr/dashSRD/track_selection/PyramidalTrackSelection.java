@@ -21,6 +21,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
@@ -176,6 +178,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
+        isPicked = false;
         int currentSelectedIndex = selectedIndex;
         selectedIndex = determineIdealSelectedIndex(isPicked);
         if (selectedIndex != currentSelectedIndex) {
@@ -192,7 +195,10 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     }
 
     public void forceSelectedTrack() {
-        selectedIndex = 0;
+        if (selectedIndex != 0) {
+            selectedIndex = 0;
+            reason = C.SELECTION_REASON_ADAPTIVE;
+        }
     }
 
     @Override

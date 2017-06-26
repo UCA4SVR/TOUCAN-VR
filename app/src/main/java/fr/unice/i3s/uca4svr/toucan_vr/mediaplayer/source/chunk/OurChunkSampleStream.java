@@ -392,7 +392,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 			I've found the chunk that is currently playing in the buffer.
 			Checking if I can replace chunk starting two segments ahead of it.
 			 */
-      maybeReplaceIndex += 2;
+      maybeReplaceIndex += 4;
       if (maybeReplaceIndex < mediaChunks.size()) {
         maybeReplace = mediaChunks.get(maybeReplaceIndex);
         if (!maybeReplace.trackFormat.id.equals(highestFormatId)) {
