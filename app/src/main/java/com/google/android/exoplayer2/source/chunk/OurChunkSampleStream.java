@@ -13,32 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk;
+package com.google.android.exoplayer2.source.chunk;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
+import com.google.android.exoplayer2.extractor.DefaultTrackOutput;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
-import com.google.android.exoplayer2.source.chunk.Chunk;
-import com.google.android.exoplayer2.source.chunk.ChunkHolder;
-import com.google.android.exoplayer2.source.chunk.ChunkSource;
-import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.dash.DefaultDashSRDChunkSource;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.Loader;
 import com.google.android.exoplayer2.util.Assertions;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutput;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 /**
@@ -59,8 +54,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final ChunkHolder nextChunkHolder;
   private final LinkedList<BaseMediaChunk> mediaChunks;
   private final List<BaseMediaChunk> readOnlyMediaChunks;
-  private final ReplacementTrackOutput primarySampleQueue;
-  private final ReplacementTrackOutput[] embeddedSampleQueues;
+  private final DefaultTrackOutput primarySampleQueue;
+  private final DefaultTrackOutput[] embeddedSampleQueues;
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
   private DynamicEditingHolder dynamicEditingHolder;
@@ -102,17 +97,17 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     readOnlyMediaChunks = Collections.unmodifiableList(mediaChunks);
 
     int embeddedTrackCount = embeddedTrackTypes == null ? 0 : embeddedTrackTypes.length;
-    embeddedSampleQueues = new ReplacementTrackOutput[embeddedTrackCount];
+    embeddedSampleQueues = new DefaultTrackOutput[embeddedTrackCount];
     embeddedTracksSelected = new boolean[embeddedTrackCount];
     int[] trackTypes = new int[1 + embeddedTrackCount];
-    ReplacementTrackOutput[] sampleQueues = new ReplacementTrackOutput[1 + embeddedTrackCount];
+    DefaultTrackOutput[] sampleQueues = new DefaultTrackOutput[1 + embeddedTrackCount];
 
-    primarySampleQueue = new ReplacementTrackOutput(allocator);
+    primarySampleQueue = new DefaultTrackOutput(allocator);
     trackTypes[0] = primaryTrackType;
     sampleQueues[0] = primarySampleQueue;
 
     for (int i = 0; i < embeddedTrackCount; i++) {
-      ReplacementTrackOutput trackOutput = new ReplacementTrackOutput(allocator);
+      DefaultTrackOutput trackOutput = new DefaultTrackOutput(allocator);
       embeddedSampleQueues[i] = trackOutput;
       sampleQueues[i + 1] = trackOutput;
       trackTypes[i + 1] = embeddedTrackTypes[i];
@@ -209,7 +204,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       }
       // TODO: For this to work correctly, the embedded streams must not discard anything from their
       // sample queues beyond the current read position of the primary stream.
-      for (ReplacementTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
+      for (DefaultTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
         embeddedSampleQueue.skipToKeyframeBefore(positionUs);
       }
     } else {
@@ -221,7 +216,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
         loader.cancelLoading();
       } else {
         primarySampleQueue.reset(true);
-        for (ReplacementTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
+        for (DefaultTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
           embeddedSampleQueue.reset(true);
         }
       }
@@ -235,7 +230,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    */
   public void release() {
     primarySampleQueue.disable();
-    for (ReplacementTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
+    for (DefaultTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
       embeddedSampleQueue.disable();
     }
     loader.release();
@@ -293,7 +288,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
         loadable.bytesLoaded());
     if (!released) {
       primarySampleQueue.reset(true);
-      for (ReplacementTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
+      for (DefaultTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
         embeddedSampleQueue.reset(true);
       }
       callback.onContinueLoadingRequested(this);
@@ -535,10 +530,10 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
     public final OurChunkSampleStream<T> parent;
 
-    private final ReplacementTrackOutput sampleQueue;
+    private final DefaultTrackOutput sampleQueue;
     private final int index;
 
-    public EmbeddedSampleStream(OurChunkSampleStream<T> parent, ReplacementTrackOutput sampleQueue,
+    public EmbeddedSampleStream(OurChunkSampleStream<T> parent, DefaultTrackOutput sampleQueue,
                                 int index) {
       this.parent = parent;
       this.sampleQueue = sampleQueue;

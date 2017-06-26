@@ -23,8 +23,8 @@ package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
+import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.MediaPeriod;
-import com.google.android.exoplayer2.source.SRDCompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
 import com.google.android.exoplayer2.source.TrackGroup;
@@ -42,9 +42,8 @@ import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
-import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
+
+import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
 
 /**
  * A DASH {@link MediaPeriod}.
@@ -64,7 +63,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     private final int maxBufferMs;
 
     private Callback callback;
-    private SRDCompositeSequenceableLoader sequenceableLoader;
+    private CompositeSequenceableLoader sequenceableLoader;
     private OurChunkSampleStream<DashChunkSource>[] sampleStreams;
     private DashManifest manifest;
     private int periodIndex;
@@ -91,7 +90,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         this.maxBufferMs = maxBufferMs*1000;
         this.dynamicEditingHolder = dynamicEditingHolder;
         sampleStreams = newSampleStreamArray(0);
-        sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
+        sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
         trackGroups = buildTrackGroups(adaptationSets);
     }
@@ -161,7 +160,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         }
         sampleStreams = newSampleStreamArray(primarySampleStreams.size());
         primarySampleStreams.values().toArray(sampleStreams);
-        sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
+        sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         return positionUs;
     }
 
@@ -174,22 +173,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
 
     @Override
     public boolean continueLoading(long positionUs) {
-        long bufferedPosition = getBufferedPositionUs();
-        /*If the buffer is full and the playback has started, start replacing chunks.
-        It doesn't make sense to replace if the playback hasn't started: we have no information
-        from the picker */
-        if ((bufferedPosition-positionUs) > maxBufferMs) {
-            if (positionUs>0) {
-                if (!sequenceableLoader.replaceChunks(positionUs))
-                    callback.onContinueLoadingRequested(this);
-            } else {
-                //Nothing to do
-				callback.onContinueLoadingRequested(this);
-            }
-        } else {
-            sequenceableLoader.continueLoading(positionUs);
-        }
-        return true;
+
+        return sequenceableLoader.continueLoading(positionUs);
     }
 
     @Override
@@ -258,7 +243,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
                 manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
-        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex,adaptationSet.type,
+        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
                 eventDispatcher, dynamicEditingHolder);
         return stream;
