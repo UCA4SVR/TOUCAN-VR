@@ -18,7 +18,6 @@ package com.google.android.exoplayer2;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
 import com.google.android.exoplayer2.upstream.Allocator;
-import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.util.PriorityTaskManager;
 import com.google.android.exoplayer2.util.Util;
 
@@ -88,7 +87,7 @@ public final class SRDLoadControl implements LoadControl {
   /**
    * Constructs a new instance.
    *
-   * @param allocator                        The {@link DefaultAllocator} used by the loader.
+   * @param allocator                        The {@link UnboundedAllocator} used by the loader.
    * @param minBufferMs                      The minimum duration of media that the player will attempt to ensure is
    *                                         buffered at all times, in milliseconds.
    * @param maxBufferMs                      The maximum duration of media that the player will attempt buffer, in
@@ -108,7 +107,7 @@ public final class SRDLoadControl implements LoadControl {
   /**
    * Constructs a new instance.
    *
-   * @param allocator                        The {@link DefaultAllocator} used by the loader.
+   * @param allocator                        The {@link UnboundedAllocator} used by the loader.
    * @param minBufferMs                      The minimum duration of media that the player will attempt to ensure is
    *                                         buffered at all times, in milliseconds.
    * @param maxBufferMs                      The maximum duration of media that the player will attempt buffer, in

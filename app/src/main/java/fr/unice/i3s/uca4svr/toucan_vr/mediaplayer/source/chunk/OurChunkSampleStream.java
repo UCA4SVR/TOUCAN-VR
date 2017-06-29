@@ -271,6 +271,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   @Override
   public void onLoadCompleted(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs) {
+    //stopReplacing();
     chunkSource.onChunkLoadCompleted(loadable);
     eventDispatcher.loadCompleted(loadable.dataSpec, loadable.type, primaryTrackType,
             loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
@@ -282,6 +283,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   @Override
   public void onLoadCanceled(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs,
                              boolean released) {
+    //stopReplacing();
     eventDispatcher.loadCanceled(loadable.dataSpec, loadable.type, primaryTrackType,
             loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
             loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs,
@@ -298,6 +300,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   @Override
   public int onLoadError(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs,
                          IOException error) {
+    //stopReplacing();
     long bytesLoaded = loadable.bytesLoaded();
     boolean isMediaChunk = isMediaChunk(loadable);
     boolean cancelable = !isMediaChunk || bytesLoaded == 0 || mediaChunks.size() > 1;
