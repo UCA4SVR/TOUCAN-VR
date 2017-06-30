@@ -20,7 +20,6 @@
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor;
 
 import android.util.Log;
-import android.util.Pair;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
@@ -101,7 +100,7 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
   // holding information before the actual replacement
   private ReplacementInfo replacement = null;
   List<Allocation> replacementAllocations = null;
-  List<Pair<Integer, BufferExtrasHolder>> replacementMetaData = null;
+  List<BufferExtrasHolder> replacementMetaData = null;
 
   private Allocation replacementAllocation;
   private int replacementAllocationOffset;
@@ -485,7 +484,7 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
           dataQueueReadOffset++;
         }
       }
-    }finally {
+    } finally {
       //lock.unlock();
     }
   }
@@ -537,90 +536,10 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
   public void format(Format format) {
     Format adjustedFormat = getAdjustedSampleFormat(format, sampleOffsetUs);
     boolean formatChanged = infoQueue.format(adjustedFormat);
-    Log.e("FORMAT", id + ": " + format + " " + infoQueue.upstreamFormat);
     lastUnadjustedFormat = format;
     pendingFormatAdjustment = false;
     if (upstreamFormatChangeListener != null && formatChanged) {
       upstreamFormatChangeListener.onUpstreamFormatChanged(adjustedFormat);
-    }
-  }
-
-  public void replaceSample(List<Allocation> replacementData, int length, long timeUs,
-                            @C.BufferFlags int flags, int size, byte[] encryptionKey) {
-    try {
-      lock.lock();
-      Log.e("REPLACE", id + ": DOING IT RIGHT NOW " + replacement.startTime + " " + replacement.endTime);
-      int infoQueueIndex = -1;
-      synchronized (infoQueue.timesUs) {
-        infoQueueIndex = infoQueue.findIndex(replacement.startTime);
-        if (infoQueueIndex != -1) {
-          infoQueueIndex += infoQueue.timesUsReadOffset;
-        }
-      }
-      if (infoQueueIndex > 0) {
-        int dataQueueIndex = -1;
-        synchronized (dataQueue) {
-          long offset = 0;
-          synchronized (infoQueue.offsets) {
-            offset = infoQueue.offsets.get(infoQueueIndex - infoQueue.offsetsReadOffset);
-          }
-          dataQueueIndex = locateOffset(offset) + dataQueueReadOffset;
-        }
-        int amountToDiscard = -1;
-        synchronized (infoQueue.sizes) {
-          amountToDiscard = infoQueue.sizes.get(infoQueueIndex - infoQueue.sizesReadOffset);
-        }
-        while (amountToDiscard > 0) {
-          synchronized (dataQueue) {
-            amountToDiscard -= dataQueue.get(dataQueueIndex - dataQueueReadOffset).data.length;
-            if (amountToDiscard >= 0) {
-              allocator.release(dataQueue.get(dataQueueIndex - dataQueueReadOffset));
-              dataQueue.remove(dataQueueIndex - dataQueueReadOffset);
-            } else {
-              throw new RuntimeException("Shouldn't be discarding too much data.");
-            }
-          }
-        }
-
-        // TODO: There might be issues when replacing with a new format. Need to investigate more.
-        if (pendingFormatAdjustment) {
-          format(lastUnadjustedFormat);
-        }
-
-        int offsetShift = 0;
-        synchronized (infoQueue.sizes) {
-          offsetShift = size - infoQueue.sizes.get(infoQueueIndex - infoQueue.sizesReadOffset);
-        }
-        for (int i = replacementData.size() - 1; i >= 0; i--) {
-          synchronized (dataQueue) {
-            dataQueue.add(dataQueueIndex - dataQueueReadOffset, replacementData.get(i));
-          }
-        }
-
-        synchronized (infoQueue.flags) {
-          infoQueue.flags.set(infoQueueIndex - infoQueue.flagsReadOffset, flags);
-        }
-        synchronized (infoQueue.sizes) {
-          infoQueue.sizes.set(infoQueueIndex - infoQueue.sizesReadOffset, size);
-        }
-        synchronized (infoQueue.encryptionKeys) {
-          infoQueue.encryptionKeys.set(infoQueueIndex - infoQueue.encryptionKeysReadOffset, encryptionKey);
-        }
-        synchronized (infoQueue.formats) {
-          infoQueue.formats.set(infoQueueIndex - infoQueue.fomatsReadOffset, infoQueue.upstreamFormat);
-        }
-        Log.e("REPLACE", id + ": " + infoQueue.upstreamFormat);
-
-        for (int index = infoQueueIndex + 1; index < infoQueue.offsets.size(); index++) {
-          synchronized (infoQueue.offsets) {
-            infoQueue.offsets.set(index - infoQueue.offsetsReadOffset,
-                    infoQueue.offsets.get(index - infoQueue.offsetsReadOffset) + offsetShift);
-          }
-        }
-        totalBytesWritten += offsetShift;
-      }
-    } finally {
-      lock.unlock();
     }
   }
 
@@ -738,22 +657,244 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
   private void sampleForReplacement(ParsableByteArray buffer, int length) {
     Log.e("REPLACE", id + ": sample for replace byte array " + length);
     if (replacementAllocations == null) {
-      ArrayList<Allocation> queue = new ArrayList<>();
-      replacementAllocations = Collections.synchronizedList(queue);
+      // the replacement has been canceled, stop everything
+      return;
     }
     length = prepareForReplacement(length);
     fillAllocation(buffer, length, replacementAllocation, replacementAllocationOffset, true);
   }
 
   private void sampleMetadataForReplacement(long timeUs, int flags, int size, int offset, byte[] encryptionKey) {
-    Log.e("REPLACE", id + ": sample metadata " + size);
-    //*
-    replaceSample(replacementAllocations, size, timeUs, flags, size, encryptionKey);
-    replacementAllocations = null;
-    replacement = null;
-    replacementAllocation = null;
-    replacementAllocationOffset = 0;
-    //*/
+    try {
+
+      lock.lock();
+
+      // Get out if the replacement has been canceled
+      if (replacement == null) {
+        return;
+      }
+
+      // Don't know exactly why it is done in the classic sample metadata, copying to have a similar
+      // computation for the metadata...
+      timeUs += sampleOffsetUs;
+
+      // The format should be ok, it is checked if a change is needed before beginning downloading
+      // the segment. Lets use that to make sure it is in a good state.
+      if (pendingFormatAdjustment) {
+        format(lastUnadjustedFormat);
+      }
+
+      // The offset given in parameter is the amount of data written to the buffer since the last sample
+      // corresponding to the data associated with the current metadata has been written to the buffer.
+      // It is not the offset of the sample. It is always 0 with a fragmented mp4 and we don't need it
+      // in replacement anyway, the offset is based on the data preceding the the thing we are replacing.
+      long currentOffset = -1;
+      if (replacementMetaData.isEmpty()) {
+        synchronized (infoQueue.timesUs) {
+          synchronized (infoQueue.offsets) {
+            synchronized (infoQueue.sizes) {
+              int index = infoQueue.findIndex(replacement.startTime);
+              if(index == -1) {
+                Log.e("OMG", "STAP IT NAOW");
+              }
+              index += infoQueue.timesUsReadOffset;
+              currentOffset = infoQueue.offsets.get(index - infoQueue.offsetsReadOffset);
+              currentOffset += infoQueue.sizes.get(index - infoQueue.sizesReadOffset);
+            }
+          }
+        }
+      } else {
+        BufferExtrasHolder lastReplacement = replacementMetaData.get(replacementMetaData.size() - 1);
+        currentOffset = lastReplacement.offset + lastReplacement.size;
+      }
+
+      BufferExtrasHolder metaData = new BufferExtrasHolder();
+      metaData.timeUs = timeUs;
+      metaData.flag = flags;
+      metaData.size = size;
+      metaData.offset = currentOffset;
+      metaData.format = infoQueue.upstreamFormat;
+      Log.e("FORMAT", id + ": " + infoQueue.upstreamFormat);
+      metaData.encryptionKeyId = encryptionKey;
+      metaData.sourceId = infoQueue.upstreamSourceId;
+
+      replacementMetaData.add(metaData);
+
+      // The metadata are given to the track output after the data (at least for fragmented mp4 which
+      // is our case).
+      // So we can check if we got all the samples we need for the replacement here and fire the
+      // replacement if it is the case.
+      /*
+      long breakTime = -1;
+      synchronized (infoQueue.timesUs) {
+        int infoQueueIndex = infoQueue.findIndex(replacement.getEndTime());
+        if (infoQueueIndex == -1) {
+          breakTime = -1;
+        } else {
+          breakTime = infoQueue.timesUs.get(infoQueueIndex - 1);
+        }
+      }
+      */
+      if (timeUs >= replacement.getEndTime()) {
+        replaceSamples();
+        endReplacement();
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  public void replaceSamples() {
+    try {
+      lock.lock();
+      Log.e("REPLACE", id + ": DOING IT RIGHT NOW " + replacement.startTime + " " + replacement.endTime);
+      int startInfoQueueIndex = -1;
+      int endInfoQueueIndex = -1;
+      synchronized (infoQueue.timesUs) {
+        startInfoQueueIndex = infoQueue.findIndex(replacement.getStartTime());
+        if (startInfoQueueIndex != -1) {
+          startInfoQueueIndex += infoQueue.timesUsReadOffset;
+        }
+        endInfoQueueIndex = infoQueue.findIndex(replacement.getEndTime());
+        if (endInfoQueueIndex != -1) {
+          endInfoQueueIndex += infoQueue.timesUsReadOffset;
+        }
+      }
+
+      if (startInfoQueueIndex > 0 && endInfoQueueIndex > 0) {
+        // We found the starting and ending points in the info queue, lets do the replacement now
+        int startDataQueueIndex = -1;
+        int endDataQueueIndex = -1;
+        synchronized (dataQueue) {
+          long startOffset = 0;
+          long endOffset = 0;
+          synchronized (infoQueue.offsets) {
+            startOffset = infoQueue.offsets.get(startInfoQueueIndex - infoQueue.offsetsReadOffset);
+            endOffset = infoQueue.offsets.get(endInfoQueueIndex - infoQueue.offsetsReadOffset);
+          }
+          startDataQueueIndex = locateOffset(startOffset) + dataQueueReadOffset;
+          endDataQueueIndex = locateOffset(endOffset) + dataQueueReadOffset;
+        }
+
+        // Remove the old elements from the dataqueue
+        int removedSizeData = 0;
+        int amountToDiscard = endDataQueueIndex - startDataQueueIndex;
+        while (amountToDiscard > 0) {
+          synchronized (dataQueue) {
+            amountToDiscard --;
+            if (amountToDiscard >= 0) {
+              allocator.release(dataQueue.get(startDataQueueIndex - dataQueueReadOffset));
+              removedSizeData += dataQueue.get(startDataQueueIndex - dataQueueReadOffset).data.length;
+              dataQueue.remove(startDataQueueIndex - dataQueueReadOffset);
+            } else {
+              throw new RuntimeException("Shouldn't be discarding too much data.");
+            }
+          }
+        }
+
+        // And replace with the new ones
+        int addedSizeData = 0;
+        for (int i = replacementAllocations.size() - 1; i >= 0; i--) {
+          synchronized (dataQueue) {
+            dataQueue.add(startDataQueueIndex - dataQueueReadOffset, replacementAllocations.get(i));
+            addedSizeData += dataQueue.get(startDataQueueIndex - dataQueueReadOffset).data.length;
+          }
+        }
+
+        // Remove the old metadata and compute the size of removed data
+        amountToDiscard = endInfoQueueIndex - startInfoQueueIndex;
+        int removedSizeInfo = 0;
+        while(amountToDiscard > 0) {
+          amountToDiscard--;
+          if (amountToDiscard >= 0) {
+            synchronized (infoQueue.flags) {
+              infoQueue.flags.remove(startInfoQueueIndex - infoQueue.flagsReadOffset);
+            }
+            synchronized (infoQueue.sizes) {
+              removedSizeInfo += infoQueue.sizes.get(startInfoQueueIndex - infoQueue.sizesReadOffset);
+              infoQueue.sizes.remove(startInfoQueueIndex - infoQueue.sizesReadOffset);
+            }
+            synchronized (infoQueue.encryptionKeys) {
+              infoQueue.encryptionKeys.remove(startInfoQueueIndex - infoQueue.encryptionKeysReadOffset);
+            }
+            synchronized (infoQueue.formats) {
+              infoQueue.formats.remove(startInfoQueueIndex - infoQueue.fomatsReadOffset);
+            }
+            synchronized (infoQueue.offsets) {
+              infoQueue.offsets.remove(startInfoQueueIndex - infoQueue.offsetsReadOffset);
+            }
+            synchronized (infoQueue.sourceIds) {
+              infoQueue.sourceIds.remove(startInfoQueueIndex - infoQueue.sourceIdsReadOffset);
+            }
+            synchronized (infoQueue.timesUs) {
+              infoQueue.timesUs.remove(startInfoQueueIndex - infoQueue.timesUsReadOffset);
+            }
+          }
+        }
+
+        // And adding the new ones computing the size of all the additions
+        int addedSizeInfo = 0;
+        for (int i = replacementMetaData.size() - 1; i >= 0; i--) {
+          synchronized (infoQueue.flags) {
+            infoQueue.flags.add(startInfoQueueIndex - infoQueue.flagsReadOffset,
+                    replacementMetaData.get(i).flag);
+          }
+          synchronized (infoQueue.sizes) {
+            infoQueue.sizes.add(startInfoQueueIndex - infoQueue.sizesReadOffset,
+                    replacementMetaData.get(i).size);
+            addedSizeInfo += infoQueue.sizes.get(startInfoQueueIndex - infoQueue.sizesReadOffset);
+          }
+          synchronized (infoQueue.encryptionKeys) {
+            infoQueue.encryptionKeys.add(startInfoQueueIndex - infoQueue.encryptionKeysReadOffset,
+                    replacementMetaData.get(i).encryptionKeyId);
+          }
+          synchronized (infoQueue.formats) {
+            infoQueue.formats.add(startInfoQueueIndex - infoQueue.fomatsReadOffset,
+                    replacementMetaData.get(i).format);
+          }
+          synchronized (infoQueue.offsets) {
+            infoQueue.offsets.add(startInfoQueueIndex - infoQueue.offsetsReadOffset,
+                    replacementMetaData.get(i).offset);
+          }
+          synchronized (infoQueue.sourceIds) {
+            infoQueue.sourceIds.add(startInfoQueueIndex - infoQueue.sourceIdsReadOffset,
+                    replacementMetaData.get(i).sourceId);
+          }
+          synchronized (infoQueue.timesUs) {
+            infoQueue.timesUs.add(startInfoQueueIndex - infoQueue.timesUsReadOffset,
+                    replacementMetaData.get(i).timeUs);
+          }
+        }
+
+        for (int index = startInfoQueueIndex + replacementMetaData.size();
+             index < infoQueue.offsets.size(); index++) {
+          synchronized (infoQueue.offsets) {
+            synchronized (infoQueue.sizes) {
+              infoQueue.offsets.set(index - infoQueue.offsetsReadOffset,
+                      infoQueue.offsets.get(index - 1 - infoQueue.offsetsReadOffset) +
+                              infoQueue.sizes.get(index - 1 - infoQueue.sizesReadOffset));
+            }
+          }
+        }
+        if (addedSizeData != addedSizeInfo || removedSizeData != removedSizeInfo) {
+          Log.e("REPLACE", id + ": mismatch " + addedSizeData + " " + addedSizeInfo + " " +
+                  removedSizeData + " " + removedSizeInfo);
+        }
+        //totalBytesWritten += addedSizeInfo - removedSizeInfo;
+        synchronized (infoQueue.offsets) {
+          synchronized (infoQueue.sizes) {
+            totalBytesWritten = infoQueue.offsets.get(infoQueue.offsets.size()-1) +
+                    infoQueue.sizes.get(infoQueue.sizes.size()-1);
+          }
+        }
+        synchronized (dataQueue) {
+          lastAllocation = dataQueue.get(dataQueue.size() - 1);
+          lastAllocationOffset = lastAllocation.data.length;
+        }
+      }
+    } finally {
+      lock.unlock();
+    }
   }
 
   private int fillAllocation(ExtractorInput input, int length, boolean allowEndOfInput,
@@ -797,6 +938,10 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
       lock.lock();
       if (this.replacement == null) {
         this.replacement = new ReplacementInfo(startTimeUs, endTimeUs);
+        ArrayList<Allocation> queue = new ArrayList<>();
+        this.replacementAllocations = Collections.synchronizedList(queue);
+        ArrayList<BufferExtrasHolder> infos = new ArrayList<>();
+        this.replacementMetaData = Collections.synchronizedList(infos);
       } else {
         throw new RuntimeException("Cannot have two replacements at the same time !");
       }
@@ -805,19 +950,28 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
     }
   }
 
-  public void endReplacement(long timeUs, int flags, int size, int offset, byte[] encryptionKey) {
-    replaceSample(replacementAllocations, size, timeUs, flags, size, encryptionKey);
-    replacementAllocations = null;
-    replacement = null;
-    replacementAllocation = null;
-    replacementAllocationOffset = 0;
+  public void endReplacement() {
+    try {
+      lock.lock();
+      replacementAllocations = null;
+      replacement = null;
+      replacementAllocation = null;
+      replacementMetaData = null;
+      replacementAllocationOffset = 0;
+    } finally {
+      lock.unlock();
+    }
   }
 
   public void cancelReplacement() {
+    // the lock here ensures that we don't cancel the replacement if the chunck is already fully
+    // downloaded and we are currently replacing in the buffer.
     lock.lock();
     replacement = null;
     replacementAllocation = null;
+    replacementAllocations = null;
     replacementMetaData = null;
+    replacementAllocationOffset = 0;
     lock.unlock();
   }
 
@@ -945,7 +1099,7 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
         //lock.lock();
         synchronized (offsets) {
           offsets.clear();
-          offsetsReadOffset  = 0;
+          offsetsReadOffset = 0;
         }
         synchronized (timesUs) {
           timesUs.clear();
@@ -1126,8 +1280,8 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
      */
     @SuppressWarnings("ReferenceEquality")
     public int readData(FormatHolder formatHolder, DecoderInputBuffer buffer,
-                                     boolean formatRequired, boolean loadingFinished, Format downstreamFormat,
-                                     BufferExtrasHolder extrasHolder) {
+                        boolean formatRequired, boolean loadingFinished, Format downstreamFormat,
+                        BufferExtrasHolder extrasHolder) {
       try {
         //lock.lock();
         if (queueSize() == 0) {
@@ -1163,7 +1317,7 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
 
         synchronized (offsets) {
           offsets.remove(0);
-          offsetsReadOffset ++;
+          offsetsReadOffset++;
         }
         synchronized (timesUs) {
           timesUs.remove(0);
@@ -1248,7 +1402,7 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
         for (int i = 0; i < sampleCountToKeyframe; i++) {
           synchronized (offsets) {
             offsets.remove(0);
-            offsetsReadOffset ++;
+            offsetsReadOffset++;
           }
           synchronized (timesUs) {
             timesUs.remove(0);
@@ -1306,7 +1460,7 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
     }
 
     public void commitSample(long timeUs, @C.BufferFlags int sampleFlags, long offset,
-                                          int size, byte[] encryptionKey) {
+                             int size, byte[] encryptionKey) {
       Assertions.checkState(!upstreamFormatRequired);
       commitSampleTimestamp(timeUs);
       //lock.lock();
@@ -1336,19 +1490,15 @@ public final class ReplacementTrackOutput_bak implements TrackOutput {
      * @return The index of the sample in the infoQueue if it was found, -1 else.
      */
     public int findIndex(long timeUs) {
-      try {
-        //lock.lock();
-        int index = 0;
-        while (index < timesUs.size() && timesUs.get(index) < timeUs) {
-          index++;
-        }
-        if (index < timesUs.size() && timesUs.get(index) == timeUs) {
-          return index;
-        }
-        return -1;
-      } finally {
-        //lock.unlock();
+      //lock.lock();
+      int index = 0;
+      while (index < timesUs.size() && timesUs.get(index) < timeUs) {
+        index++;
       }
+      if (index < timesUs.size() && timesUs.get(index) == timeUs) {
+        return index;
+      }
+      return index;
     }
   }
 
