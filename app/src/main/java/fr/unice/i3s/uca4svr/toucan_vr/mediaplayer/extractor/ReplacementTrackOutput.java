@@ -37,10 +37,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A {@link TrackOutput} that buffers extracted samples in a queue and allows for consumption from
- * that queue.
+ * that queue. It also allows to replace part of the queue if it has not yet been consumed.
  */
 public final class ReplacementTrackOutput implements TrackOutput {
 
@@ -84,6 +85,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private UpstreamFormatChangedListener upstreamFormatChangeListener;
 
   // Variable for the replacement
+  private final ReentrantLock lock;
   private boolean isReplaceing = false;
   private final byte[] replacementData;
   private final BufferExtrasHolder[] replacementMetaData;
@@ -100,6 +102,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
    * @param allocator An {@link Allocator} from which allocations for sample data can be obtained.
    */
   public ReplacementTrackOutput(Allocator allocator) {
+    lock = new ReentrantLock();
     infoQueue = new InfoQueue();
     replacementMetaData = new BufferExtrasHolder[InfoQueue.SAMPLE_CAPACITY_INCREMENT/2];
     //1048576
@@ -546,12 +549,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
       return;
     }
     try {
-      if (isReplaceing && timeUs >= replacementEndTime) {
-        Log.e("REPLACE", id + " replacement canceled " + replacementStartTime + " " + replacementEndTime
-                + " " + replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs + " " + timeUs);
-        performReplacement();
-        cancelReplacement();
-      } else if (isReplaceing) {
+      if (isReplaceing) {
         sampleReplacementMetadata(timeUs, flags, size, offset, encryptionKey);
         return;
       }
@@ -663,15 +661,28 @@ public final class ReplacementTrackOutput implements TrackOutput {
   // Function for the replacement
   public void beginReplacement(long startTimeUs, long endTimeUs) {
     Log.e("REPLACE", id + ": replace starting " + startTimeUs + " " + endTimeUs);
-    if (!isReplaceing) {
-      isReplaceing = true;
-      replacementStartTime = startTimeUs;
-      replacementEndTime = endTimeUs;
+    lock.lock();
+    try {
+      if (!isReplaceing) {
+        isReplaceing = true;
+        replacementStartTime = startTimeUs;
+        replacementEndTime = endTimeUs;
+      }
+    } finally {
+      lock.unlock();
     }
   }
 
-  private void performReplacement() {
+  public void commitReplacement() {
+    lock.lock();
+    try {
+      // perform the replacement
 
+      // end the replacement
+      cancelReplacement();
+    } finally {
+      lock.unlock();
+    }
   }
 
   public void cancelReplacement() {

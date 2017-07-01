@@ -91,4 +91,9 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutp
     }
   }
 
+  public void commitReplacement() {
+    for (ReplacementTrackOutput trackOutput : trackOutputs) {
+      trackOutput.commitReplacement();
+    }
+  }
 }
