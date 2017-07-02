@@ -565,9 +565,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
         }
         needKeyframe = false;
       }
-      if (timeUs > 8000000) {
-        Log.e("REPLACE", "STOP");
-      }
       timeUs += sampleOffsetUs;
       long absoluteOffset = totalBytesWritten - size - offset;
       infoQueue.commitSample(timeUs, flags, absoluteOffset, size, encryptionKey);
@@ -674,9 +671,163 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   public void commitReplacement() {
+    if (!isReplaceing) {
+      return;
+    }
     lock.lock();
     try {
       // perform the replacement
+      // Identify where the replacement must happen
+      int startInfoIndex = infoQueue.findIndexAfterTime(replacementStartTime);
+      int endInfoIndex = infoQueue.findIndexAfterTime(replacementEndTime);
+      endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;
+      long dataStartOffset = infoQueue.offsets[startInfoIndex];
+      long dataEndOffset = infoQueue.offsets[endInfoIndex];
+      if (endInfoIndex == infoQueue.relativeWriteIndex) {
+        dataEndOffset = infoQueue.offsets[endInfoIndex != 0 ? endInfoIndex - 1 : infoQueue.capacity - 1] +
+            infoQueue.sizes[endInfoIndex != 0 ? endInfoIndex - 1 : infoQueue.capacity - 1];
+      }
+      // Copy data forward or backward if needed and update totalByteWritten
+//*
+      // First store the data into a temp array, we cannot copy in place we will override the data
+      // we want to copy before reading them.
+      byte[] temp = new byte[(int) (totalBytesWritten - dataEndOffset)];
+      int dataStartCopyIndex = (int) dataEndOffset % dataQueue.length;
+      int dataEndCopyIndex = (int) totalBytesWritten % dataQueue.length;
+      if (temp.length != 0) {
+        if (dataEndCopyIndex > dataStartCopyIndex) {
+          // The data doesn't reach the end of the array and wrap around
+          System.arraycopy(dataQueue, dataStartCopyIndex, temp, 0, (int) (totalBytesWritten - dataEndOffset));
+        } else {
+          // The data does reach the end of the buffer and wrap around
+          System.arraycopy(dataQueue, dataStartCopyIndex, temp, 0, dataQueue.length - dataStartCopyIndex);
+          System.arraycopy(dataQueue, 0, temp, dataQueue.length - dataStartCopyIndex, dataEndCopyIndex);
+        }
+
+        // Then perform the copy
+        dataStartCopyIndex = (int) (dataStartOffset + replacementTotalBytesWritten) % dataQueue.length;
+        if (dataStartCopyIndex + temp.length <= dataQueue.length) {
+          System.arraycopy(temp, 0, dataQueue, dataStartCopyIndex, temp.length);
+        } else {
+          System.arraycopy(temp, 0, dataQueue, dataStartCopyIndex, dataQueue.length - dataStartCopyIndex);
+          System.arraycopy(temp, dataQueue.length - dataStartCopyIndex, dataQueue, 0,
+              temp.length - dataQueue.length + dataStartCopyIndex);
+        }
+      }
+
+      totalBytesWritten = dataStartOffset + replacementTotalBytesWritten + temp.length;
+
+      // Copy the replacement data into the dataQueue
+      dataStartCopyIndex = (int) dataStartOffset % dataQueue.length;
+      if (dataStartCopyIndex + replacementTotalBytesWritten <= dataQueue.length) {
+        System.arraycopy(replacementData, 0, dataQueue, dataStartCopyIndex, (int) replacementTotalBytesWritten);
+      } else {
+        System.arraycopy(replacementData, 0, dataQueue, dataStartCopyIndex, dataQueue.length - dataStartCopyIndex);
+        System.arraycopy(replacementData, dataQueue.length - dataStartCopyIndex, dataQueue, 0,
+            (int) (replacementTotalBytesWritten - (dataQueue.length - dataStartCopyIndex)));
+      }
+//*/
+      // Copy the metadata forward or backward if needed in the info queue and update the write index
+      endInfoIndex = endInfoIndex >= startInfoIndex ? endInfoIndex : infoQueue.capacity + endInfoIndex;
+      int replacedSamplesSize = endInfoIndex - startInfoIndex;
+      if (replacementAbsoluteWriteIndex != replacedSamplesSize) {
+        // First put the meta data into temp arrays
+        int size = -1;
+        if (infoQueue.relativeWriteIndex < endInfoIndex) {
+          size = infoQueue.relativeWriteIndex + infoQueue.capacity - endInfoIndex;
+        } else {
+          size = infoQueue.relativeWriteIndex - endInfoIndex;
+        }
+
+        if (size != 0) {
+          int[] tempSourceIds = new int[size];
+          long[] tempOffsets = new long[size];
+          int[] tempSizes = new int[size];
+          int[] tempFlags = new int[size];
+          long[] tempTimesUs = new long[size];
+          byte[][] tempEncryptionKeys = new byte[size][];
+          Format[] tempFormats = new Format[size];
+
+          int relativeStartIndex = endInfoIndex % infoQueue.capacity;
+          if (relativeStartIndex + size <= infoQueue.capacity) {
+            System.arraycopy(infoQueue.sourceIds, relativeStartIndex, tempSourceIds, 0, size);
+            System.arraycopy(infoQueue.offsets, relativeStartIndex, tempOffsets, 0, size);
+            System.arraycopy(infoQueue.sizes, relativeStartIndex, tempSizes, 0, size);
+            System.arraycopy(infoQueue.flags, relativeStartIndex, tempFlags, 0, size);
+            System.arraycopy(infoQueue.timesUs, relativeStartIndex, tempTimesUs, 0, size);
+            System.arraycopy(infoQueue.encryptionKeys, relativeStartIndex, tempEncryptionKeys, 0, size);
+            System.arraycopy(infoQueue.formats, relativeStartIndex, tempFormats, 0, size);
+          } else {
+            // before wrap
+            System.arraycopy(infoQueue.sourceIds, relativeStartIndex, tempSourceIds, 0, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(infoQueue.offsets, relativeStartIndex, tempOffsets, 0, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(infoQueue.sizes, relativeStartIndex, tempSizes, 0, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(infoQueue.flags, relativeStartIndex, tempFlags, 0, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(infoQueue.timesUs, relativeStartIndex, tempTimesUs, 0, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(infoQueue.encryptionKeys, relativeStartIndex, tempEncryptionKeys, 0, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(infoQueue.formats, relativeStartIndex, tempFormats, 0, infoQueue.capacity - relativeStartIndex);
+            // after wrap
+            System.arraycopy(infoQueue.sourceIds, 0, tempSourceIds, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+            System.arraycopy(infoQueue.offsets, 0, tempOffsets, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+            System.arraycopy(infoQueue.sizes, 0, tempSizes, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+            System.arraycopy(infoQueue.flags, 0, tempFlags, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+            System.arraycopy(infoQueue.timesUs, 0, tempTimesUs, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+            System.arraycopy(infoQueue.encryptionKeys, 0, tempEncryptionKeys, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+            System.arraycopy(infoQueue.formats, 0, tempFormats, infoQueue.capacity - relativeStartIndex, infoQueue.relativeWriteIndex);
+          }
+
+
+          // Then copy them in the right position
+          relativeStartIndex = (startInfoIndex + replacementAbsoluteWriteIndex) % infoQueue.capacity;
+          if (relativeStartIndex + size <= infoQueue.capacity) {
+            System.arraycopy(tempSourceIds, 0, infoQueue.sourceIds, relativeStartIndex, size);
+            System.arraycopy(tempOffsets, 0, infoQueue.offsets, relativeStartIndex, size);
+            System.arraycopy(tempSizes, 0, infoQueue.sizes, relativeStartIndex, size);
+            System.arraycopy(tempFlags, 0, infoQueue.flags, relativeStartIndex, size);
+            System.arraycopy(tempTimesUs, 0, infoQueue.timesUs, relativeStartIndex, size);
+            System.arraycopy(tempEncryptionKeys, 0, infoQueue.encryptionKeys, relativeStartIndex, size);
+            System.arraycopy(tempFormats, 0, infoQueue.formats, relativeStartIndex, size);
+          } else {
+            // before wrap
+            System.arraycopy(tempSourceIds, 0, infoQueue.sourceIds, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(tempOffsets, 0, infoQueue.offsets, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(tempSizes, 0, infoQueue.sizes, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(tempFlags, 0, infoQueue.flags, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(tempTimesUs, 0, infoQueue.timesUs, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(tempEncryptionKeys, 0, infoQueue.encryptionKeys, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            System.arraycopy(tempFormats, 0, infoQueue.formats, relativeStartIndex, infoQueue.capacity - relativeStartIndex);
+            // after wrap
+            System.arraycopy(tempSourceIds, infoQueue.capacity - relativeStartIndex, infoQueue.sourceIds, 0, size - (infoQueue.capacity - relativeStartIndex));
+            System.arraycopy(tempOffsets, infoQueue.capacity - relativeStartIndex, infoQueue.offsets, 0, size - (infoQueue.capacity - relativeStartIndex));
+            System.arraycopy(tempSizes, infoQueue.capacity - relativeStartIndex, infoQueue.sizes, 0, size - (infoQueue.capacity - relativeStartIndex));
+            System.arraycopy(tempFlags, infoQueue.capacity - relativeStartIndex, infoQueue.flags, 0, size - (infoQueue.capacity - relativeStartIndex));
+            System.arraycopy(tempTimesUs, infoQueue.capacity - relativeStartIndex, infoQueue.timesUs, 0, size - (infoQueue.capacity - relativeStartIndex));
+            System.arraycopy(tempEncryptionKeys, infoQueue.capacity - relativeStartIndex, infoQueue.encryptionKeys, 0, size - (infoQueue.capacity - relativeStartIndex));
+            System.arraycopy(tempFormats, infoQueue.capacity - relativeStartIndex, infoQueue.formats, 0, size - (infoQueue.capacity - relativeStartIndex));
+          }
+        }
+
+        int shift = replacementAbsoluteWriteIndex - replacedSamplesSize;
+        infoQueue.queueSize += shift;
+        infoQueue.relativeWriteIndex = (infoQueue.relativeWriteIndex + shift) % infoQueue.capacity;
+
+      }
+
+      // Copy the replacement metadata into de infoqueue
+      for (int i = 0; i < replacementAbsoluteWriteIndex; i++) {
+        int infoQueueWriteIndex = (startInfoIndex + i) % infoQueue.capacity;
+        BufferExtrasHolder holder = replacementMetaData[i];
+        infoQueue.sourceIds[infoQueueWriteIndex] = holder.sourceId;
+        infoQueue.offsets[infoQueueWriteIndex] = holder.offset + dataStartOffset;
+        infoQueue.sizes[infoQueueWriteIndex] = holder.size;
+        infoQueue.flags[infoQueueWriteIndex] = holder.flag;
+        infoQueue.timesUs[infoQueueWriteIndex] = holder.timesUs;
+        infoQueue.encryptionKeys[infoQueueWriteIndex] = holder.encryptionKeyId;
+        infoQueue.formats[infoQueueWriteIndex] = holder.format;
+        infoQueue.commitSampleTimestamp(holder.timesUs);
+      }
+
+      Log.e("REPLACE", id + " : replaced " + replacementStartTime + " " + replacementEndTime);
 
       // end the replacement
       cancelReplacement();
@@ -884,7 +1035,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
         return C.RESULT_FORMAT_READ;
       }
 
-      Log.e("REPLACE", id + " read:" + timesUs[relativeReadIndex]);
       buffer.timeUs = timesUs[relativeReadIndex];
       buffer.setFlags(flags[relativeReadIndex]);
       extrasHolder.size = sizes[relativeReadIndex];
@@ -973,7 +1123,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
     public synchronized void commitSample(long timeUs, @C.BufferFlags int sampleFlags, long offset,
                                           int size, byte[] encryptionKey) {
       Assertions.checkState(!upstreamFormatRequired);
-      Log.e("REPLACE", id + " commit :" + timeUs);
+      //Log.e("REPLACE", id + " commit :" + timeUs);
       commitSampleTimestamp(timeUs);
       timesUs[relativeWriteIndex] = timeUs;
       offsets[relativeWriteIndex] = offset;
@@ -1052,6 +1202,18 @@ public final class ReplacementTrackOutput implements TrackOutput {
       }
       discardUpstreamSamples(absoluteReadIndex + retainCount);
       return true;
+    }
+
+    // Functions for the replacement
+    public int findIndexAfterTime(long timeUs) {
+      int result = -1;
+      for (int i = relativeReadIndex; i != relativeWriteIndex; i = (i+1) % capacity) {
+        if (timesUs[i] >= timeUs) {
+          result = i;
+          break;
+        }
+      }
+      return result;
     }
 
   }
