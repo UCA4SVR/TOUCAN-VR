@@ -19,15 +19,12 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
 import com.google.android.exoplayer2.decoder.DecoderInputBuffer;
 import com.google.android.exoplayer2.extractor.ExtractorInput;
 import com.google.android.exoplayer2.extractor.TrackOutput;
-import com.google.android.exoplayer2.upstream.Allocation;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.ParsableByteArray;
@@ -35,7 +32,6 @@ import com.google.android.exoplayer2.util.Util;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -586,16 +582,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     extras.sourceId = infoQueue.upstreamSourceId;
     replacementMetaData[writeIndex] = extras;
     replacementAbsoluteWriteIndex++;
-    Log.e("REPLACE", id + " replace metadata sample: " + timeUs);
-
-    /*
-    if (timeUs >= replacementEndTime) {
-      // TODO: Well actually perform the replacement.
-      Log.e("REPLACE", id + " replacement canceled " + replacementStartTime + " " + replacementEndTime
-      + " " + timeUs);
-      cancelReplacement();
-    }
-    */
   }
 
   // Private methods.
@@ -657,7 +643,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
 
   // Function for the replacement
   public void beginReplacement(long startTimeUs, long endTimeUs) {
-    Log.e("REPLACE", id + ": replace starting " + startTimeUs + " " + endTimeUs);
     lock.lock();
     try {
       if (!isReplaceing) {
@@ -680,16 +665,20 @@ public final class ReplacementTrackOutput implements TrackOutput {
       // Identify where the replacement must happen
       int startInfoIndex = infoQueue.findIndexAfterTime(replacementStartTime);
       int endInfoIndex = infoQueue.findIndexAfterTime(replacementEndTime);
+      // If the end index has not been found, we consider it to be the writing point because it means
+      // the searched time has not been buffered yet.
       endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;
       long dataStartOffset = infoQueue.offsets[startInfoIndex];
       long dataEndOffset = infoQueue.offsets[endInfoIndex];
       if (endInfoIndex == infoQueue.relativeWriteIndex) {
-        dataEndOffset = infoQueue.offsets[endInfoIndex != 0 ? endInfoIndex - 1 : infoQueue.capacity - 1] +
-            infoQueue.sizes[endInfoIndex != 0 ? endInfoIndex - 1 : infoQueue.capacity - 1];
+        // When endInfoIndex is the infoQueue writing point, we cannot rely on it to get a proper offset
+        // in the dataQueue. But the offset can be found using the offset and the size of the last
+        // registered data. We need to check that we don't need to wrap around though (if endInfoIndex ==0).
+        int lookAtIndex = endInfoIndex != 0 ? endInfoIndex - 1 : infoQueue.capacity - 1;
+        dataEndOffset = infoQueue.offsets[lookAtIndex] + infoQueue.sizes[lookAtIndex];
       }
       // Copy data forward or backward if needed and update totalByteWritten
-//*
-      // First store the data into a temp array, we cannot copy in place we will override the data
+      // First store the data into a temp array, we cannot copy in place it would override the data
       // we want to copy before reading them.
       byte[] temp = new byte[(int) (totalBytesWritten - dataEndOffset)];
       int dataStartCopyIndex = (int) dataEndOffset % dataQueue.length;
@@ -704,30 +693,43 @@ public final class ReplacementTrackOutput implements TrackOutput {
           System.arraycopy(dataQueue, 0, temp, dataQueue.length - dataStartCopyIndex, dataEndCopyIndex);
         }
 
+        // TODO: Check that this won't override the reading head, else cancel everything
         // Then perform the copy
+        // The starting point is after the data that we will insert
         dataStartCopyIndex = (int) (dataStartOffset + replacementTotalBytesWritten) % dataQueue.length;
         if (dataStartCopyIndex + temp.length <= dataQueue.length) {
+          // No wrap
           System.arraycopy(temp, 0, dataQueue, dataStartCopyIndex, temp.length);
         } else {
+          // Wrap
           System.arraycopy(temp, 0, dataQueue, dataStartCopyIndex, dataQueue.length - dataStartCopyIndex);
           System.arraycopy(temp, dataQueue.length - dataStartCopyIndex, dataQueue, 0,
               temp.length - dataQueue.length + dataStartCopyIndex);
         }
       }
 
+      // Update the totalBytesWritten to reflect the new position of the writing head after the shift
+      // and the insertion
       totalBytesWritten = dataStartOffset + replacementTotalBytesWritten + temp.length;
 
       // Copy the replacement data into the dataQueue
       dataStartCopyIndex = (int) dataStartOffset % dataQueue.length;
       if (dataStartCopyIndex + replacementTotalBytesWritten <= dataQueue.length) {
+        // No wrap
         System.arraycopy(replacementData, 0, dataQueue, dataStartCopyIndex, (int) replacementTotalBytesWritten);
       } else {
+        // Wrap
         System.arraycopy(replacementData, 0, dataQueue, dataStartCopyIndex, dataQueue.length - dataStartCopyIndex);
         System.arraycopy(replacementData, dataQueue.length - dataStartCopyIndex, dataQueue, 0,
             (int) (replacementTotalBytesWritten - (dataQueue.length - dataStartCopyIndex)));
       }
-//*/
+
       // Copy the metadata forward or backward if needed in the info queue and update the write index
+
+      // To get the amount of metadata to be copied I need to have the endInfoIndex and the writeInfoIndex
+      // expressed using the same reference. So if the endInfoIndex is not greater than the startInfoIndex
+      // this means that there is a wrap around in between so I add the infoQueue capacity to the
+      // end index  to have it expressed in the same referential as the start index.
       endInfoIndex = endInfoIndex >= startInfoIndex ? endInfoIndex : infoQueue.capacity + endInfoIndex;
       int replacedSamplesSize = endInfoIndex - startInfoIndex;
       if (replacementAbsoluteWriteIndex != replacedSamplesSize) {
@@ -748,6 +750,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
           byte[][] tempEncryptionKeys = new byte[size][];
           Format[] tempFormats = new Format[size];
 
+          // Come back to a relative index, removes the capacity that we might have added before
           int relativeStartIndex = endInfoIndex % infoQueue.capacity;
           if (relativeStartIndex + size <= infoQueue.capacity) {
             System.arraycopy(infoQueue.sourceIds, relativeStartIndex, tempSourceIds, 0, size);
@@ -827,7 +830,13 @@ public final class ReplacementTrackOutput implements TrackOutput {
         infoQueue.commitSampleTimestamp(holder.timesUs);
       }
 
-      Log.e("REPLACE", id + " : replaced " + replacementStartTime + " " + replacementEndTime);
+      // Shifting the offset of all subsequent metadata
+      for (int i = (startInfoIndex + replacementAbsoluteWriteIndex) % infoQueue.capacity;
+              i != infoQueue.relativeWriteIndex;
+              i = (i + 1) % infoQueue.capacity) {
+        int previousIndex = i == 0 ? infoQueue.capacity - 1 : i-1;
+        infoQueue.offsets[i] = infoQueue.offsets[previousIndex] + infoQueue.sizes[previousIndex];
+      }
 
       // end the replacement
       cancelReplacement();
@@ -1123,7 +1132,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     public synchronized void commitSample(long timeUs, @C.BufferFlags int sampleFlags, long offset,
                                           int size, byte[] encryptionKey) {
       Assertions.checkState(!upstreamFormatRequired);
-      //Log.e("REPLACE", id + " commit :" + timeUs);
       commitSampleTimestamp(timeUs);
       timesUs[relativeWriteIndex] = timeUs;
       offsets[relativeWriteIndex] = offset;
