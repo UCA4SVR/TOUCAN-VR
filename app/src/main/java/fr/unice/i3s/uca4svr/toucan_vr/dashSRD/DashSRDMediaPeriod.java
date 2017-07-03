@@ -23,6 +23,7 @@ package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
+import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.SRDCompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.SampleStream;
@@ -42,8 +43,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
-import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
 
 /**
@@ -70,10 +70,13 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
   private int periodIndex;
   private List<AdaptationSet> adaptationSets;
 
+  private DynamicEditingHolder dynamicEditingHolder;
+
   public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
                             DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                             EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
-                            LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs) {
+                            LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
+                            int minBufferMs, int maxBufferMs, DynamicEditingHolder dynamicEditingHolder) {
     this.id = id;
     this.manifest = manifest;
     this.periodIndex = periodIndex;
@@ -86,6 +89,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     //Buffers are provided in ms and then used in microseconds
     this.minBufferMs = minBufferMs * 1000;
     this.maxBufferMs = maxBufferMs * 1000;
+    this.dynamicEditingHolder = dynamicEditingHolder;
     sampleStreams = newSampleStreamArray(0);
     sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
     adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -242,7 +246,6 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
       }
       trackGroupArray[i] = new TrackGroup(formats);
     }
-
     return new TrackGroupArray(trackGroupArray);
   }
 
@@ -256,7 +259,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
             elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
     OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-            eventDispatcher);
+            eventDispatcher, dynamicEditingHolder);
     return stream;
   }
 

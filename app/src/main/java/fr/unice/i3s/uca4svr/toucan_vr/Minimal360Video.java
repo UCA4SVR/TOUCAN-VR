@@ -1,4 +1,4 @@
-/* Copyright 2015 Samsung Electronics Co., LTD
+/* Copyrpyright 2015 Samsung Electronics Co., LTD
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.graphics.Color;
+import android.util.Log;
 import android.view.Gravity;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -37,6 +38,7 @@ import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
 import org.gearvrf.GVRTexture;
+import org.gearvrf.GVRTransform;
 import org.gearvrf.scene_objects.GVRSphereSceneObject;
 import org.gearvrf.scene_objects.GVRTextViewSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
@@ -44,13 +46,17 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.Future;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.FreezingEventsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
+
+import static java.lang.Math.abs;
 
 public class Minimal360Video extends GVRMain {
 
@@ -70,17 +76,25 @@ public class Minimal360Video extends GVRMain {
 
     private boolean videoStarted = false;
 
+    //Info about the dynamic editing
+    private DynamicEditingHolder dynamicEditingHolder;
+
+
+    private GVRSceneObject videoHolder;
+
+
     // Info about the tiles, needed to properly build the sphere
     private int gridHeight;
     private int gridWidth;
     private String[] tiles;
 
     Minimal360Video(PlayerActivity.Status statusCode, String [] tiles,
-                    int gridWidth, int gridHeight) {
+                    int gridWidth, int gridHeight, DynamicEditingHolder dynamicEditingHolder) {
         this.statusCode = statusCode;
         this.tiles = tiles;
         this.gridWidth = gridWidth;
         this.gridHeight = gridHeight;
+        this.dynamicEditingHolder = dynamicEditingHolder;
     }
 
     public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -98,7 +112,6 @@ public class Minimal360Video extends GVRMain {
     @Override
     public void onInit(GVRContext gvrContext) {
         this.gvrContext = gvrContext;
-
         // We need to create the initial scene
         sceneDispatcher();
     }
@@ -180,6 +193,22 @@ public class Minimal360Video extends GVRMain {
             final PartitionedSphereMeshes sphereMeshes = new PartitionedSphereMeshes(gvrContext,
                     72, 144, gridHeight, gridWidth, listOfTiles, false);
 
+            // Create an holder objects for the video objects, attach it to the scene and rotate the object according the first snapchange
+            this.videoHolder = new GVRSceneObject(this.gvrContext);
+            scene.addSceneObject(videoHolder);
+
+            //Initial Rotation
+            if(dynamicEditingHolder.isDynamicEdited()) {
+                float currentAngle = getCurrentAngle();
+                float difference = currentAngle - dynamicEditingHolder.nextSCroiDegrees;
+                videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
+                Log.e("DYN", "Current init angle: " + currentAngle + " ROI init angle: " + dynamicEditingHolder.nextSCroiDegrees);
+                dynamicEditingHolder.advance(difference);
+            }
+
+            // need a final handle on the object for the thread
+            final GVRSceneObject videoHolderFinal = videoHolder;
+
             final GVRVideoSceneObject videos[] = new GVRVideoSceneObject[tiles.length/4];
 
             final TiledExoPlayer tiledPlayer = (TiledExoPlayer) videoSceneObjectPlayer.getPlayer();
@@ -200,7 +229,7 @@ public class Minimal360Video extends GVRMain {
                         videos[id].setName( "video_" + id );
                         videos[id].setTag("vd"+(id));
                         videos[id].attachCollider(new GVRMeshCollider(gvrContext, true));
-                        scene.addSceneObject( videos[id] );
+                        videoHolderFinal.addChildObject( videos[id] );
                     }
                 }).start();
             }
@@ -246,6 +275,11 @@ public class Minimal360Video extends GVRMain {
                              case PLAYBACK_ERROR:
                                  textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
                                          gvrContext.getActivity().getString(R.string.playback_error));
+                                 createScene(textObject);
+                                 break;
+                             case WRONGDYNED:
+                                 textObject = new GVRTextViewSceneObject(gvrContext, 1.2f, 2f,
+                                         gvrContext.getActivity().getString(R.string.dynamicEd_error));
                                  createScene(textObject);
                                  break;
                              case CHECKING_INTERNET:
@@ -310,13 +344,71 @@ public class Minimal360Video extends GVRMain {
 
     @Override
     public void onStep() {
-        // We only perform the tracking if the video is playing
+        // We only perform the tracking and the snapchanges if the video is playing
         if (statusCode == PlayerActivity.Status.PLAYING && videoSceneObjectPlayer != null) {
             final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             if (headMotionTracker != null)
                 headMotionTracker.track(gvrContext, player.getCurrentPosition());
             if (freezingEventsTracker != null)
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
+            //Dynamic Editing block
+            if(dynamicEditingHolder.isDynamicEdited()) {
+                if (abs(dynamicEditingHolder.nextSCMilliseconds - player.getCurrentPosition()) < dynamicEditingHolder.timeThreshold) {
+                    //Check if a SnapChange is needed
+                    float currentAngle = getCurrentAngle();
+                    float difference = currentAngle-dynamicEditingHolder.nextSCroiDegrees;
+                    float trigger = computeTrigger(dynamicEditingHolder.lastRotation, currentAngle, dynamicEditingHolder.nextSCroiDegrees);
+                    Log.e("DYN", "Trigger"+ trigger);
+                    if(trigger > dynamicEditingHolder.angleThreshold) {
+                        //Perform the SnapChange
+                        videoHolder.getTransform().setRotationByAxis(difference,0,1,0);
+                    }
+                    //Update for the next SnapChange
+                    dynamicEditingHolder.advance(difference);
+
+                }
+            }
+
         }
+    }
+
+    /**
+     * Gets the current user position angle (in degrees). It ranges between -180 and 180
+     * @return User position
+     */
+
+    private float getCurrentAngle() {
+        double angle = 0;
+        float[] lookAt = gvrContext.getMainScene().getMainCameraRig().getLookAt();
+        // cos = [0], sin = [2]
+        double norm = Math.sqrt(lookAt[0] * lookAt[0] + lookAt[2] * lookAt[2]);
+        double cos = lookAt[0] / norm;
+        cos = abs(cos) > 1 ? Math.signum(cos) : cos;
+        if (lookAt[2] == 0) {
+            angle = Math.acos(cos);
+        } else {
+            angle = Math.signum(lookAt[2]) * Math.acos(cos);
+        }
+        //From radiant to degree + orientation
+        return (float)(angle * 180 / Math.PI * -1);
+    }
+
+    /**
+     * Normalizes a given angle from a space between -360 and 360 to a space between -180 and 180
+     * @param angle Angle to be normalized
+     * @return Normalized angle
+     */
+    private float normalizeAngle(float angle) {
+        if((angle>=-180)&&(angle<=180))
+            return angle;
+        else
+            return -1*Math.signum(angle)*(360-abs(angle));
+    }
+
+    private float computeTrigger(float lastRotation, float currentUserPosition, float nextSCroiDegrees) {
+        float normalizedLastRotation = normalizeAngle(lastRotation);
+        float trigger = normalizeAngle(currentUserPosition-normalizedLastRotation);
+        trigger = normalizeAngle(trigger-nextSCroiDegrees);
+        return abs(trigger);
     }
 }

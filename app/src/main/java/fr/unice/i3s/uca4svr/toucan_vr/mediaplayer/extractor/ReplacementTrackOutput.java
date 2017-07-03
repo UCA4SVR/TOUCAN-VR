@@ -19,6 +19,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -646,6 +648,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
     lock.lock();
     try {
       if (!isReplaceing) {
+        Log.e("REPLACE", id + ": beginning a replacement " + startTimeUs + " " + endTimeUs);
         isReplaceing = true;
         replacementStartTime = startTimeUs;
         replacementEndTime = endTimeUs;
@@ -661,10 +664,12 @@ public final class ReplacementTrackOutput implements TrackOutput {
     }
     lock.lock();
     try {
+      Log.e("REPLACE", id + ": committing a replacement " + replacementStartTime + " " + replacementEndTime);
       // perform the replacement
       // Identify where the replacement must happen
       int startInfoIndex = infoQueue.findIndexAfterTime(replacementStartTime);
       int endInfoIndex = infoQueue.findIndexAfterTime(replacementEndTime);
+
       // If the end index has not been found, we consider it to be the writing point because it means
       // the searched time has not been buffered yet.
       endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;

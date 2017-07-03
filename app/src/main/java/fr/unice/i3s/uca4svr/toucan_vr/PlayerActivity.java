@@ -26,6 +26,7 @@ import android.text.TextUtils;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
 import com.google.android.exoplayer2.SRDLoadControl;
@@ -58,6 +59,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnection;
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnectionResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingParser;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
@@ -71,7 +74,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     enum Status {
         NO_INTENT, NO_INTERNET, NO_PERMISSION, CHECKING_INTERNET, CHECKING_PERMISSION,
         CHECKING_INTERNET_AND_PERMISSION, READY_TO_PLAY, PLAYING, PAUSED, PLAYBACK_ENDED,
-        PLAYBACK_ERROR, NULL
+        PLAYBACK_ERROR, WRONGDYNED, NULL
     }
 
     private static TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
@@ -81,6 +84,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer;
     private ExoPlayer player;
+    private boolean needPreparePlayer = true;
     private DefaultBandwidthMeter bandwidthMeter;
 
     // Player's parameters to fine tune as we need
@@ -106,6 +110,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private int gridWidth = 1;
     private int gridHeight = 1;
     private int numberOfTiles = 1;
+
+    private String dynamicEditingFN;
+    private DynamicEditingHolder dynamicEditingHolder;
 
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
@@ -137,7 +144,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // We can avoid providing the videoSceneObject at first. We will create it only if the
         // intent exists and every parameter specified in it can be activated.
-        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
         setMain(main, "gvr.xml");
 
         // The intent is required to run the app, if it has not been provided we can stop there.
@@ -163,7 +170,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 }
             }
 
-            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
             setMain(main, "gvr.xml");
 
             if (statusCode != Status.NO_INTENT) {
@@ -198,12 +205,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private void parseIntent() {
         mediaUri = intent.getStringExtra("videoLink");
         logPrefix = intent.getStringExtra("videoName");
-        minBufferMs = intent.getIntExtra("minBufferSize", SRDLoadControl.DEFAULT_MIN_BUFFER_MS);
-        maxBufferMs = intent.getIntExtra("maxBufferSize", SRDLoadControl.DEFAULT_MAX_BUFFER_MS);
+        minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
+        maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
         bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
-                SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
         bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
-                SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
         loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", false);
@@ -211,7 +218,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
         numberOfTiles = tiles.length / 4;
-        // changeStatus(Status.OK);
+        //Dynamic editing check
+        dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
+        if(dynamicEditingFN.length()>0)
+            dynamicEditingHolder = new DynamicEditingHolder(true);
+        else
+            dynamicEditingHolder = new DynamicEditingHolder(false);
     }
 
     /**
@@ -229,6 +241,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 videoSceneObjectPlayer.release();
                 videoSceneObjectPlayer = null;
                 player = null;
+                needPreparePlayer = true;
             }
         }
     }
@@ -248,13 +261,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private void checkInternetAndPermissions() {
         synchronized (this) {
             if (statusCode == Status.NO_INTENT) {
-                // If there is no intent, there is no need to check anything else
+                // If there is no intent there is no need to check anything else
                 return;
             }
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
-            if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion
-                    || loggingBandwidth || loggingFreezes) {
+            if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes
+                    || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -339,7 +353,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         if (videoSceneObjectPlayer != null) {
             final ExoPlayer exoPlayer = videoSceneObjectPlayer.getPlayer();
             if (exoPlayer != null) {
-                if (!play) {
+                if (needPreparePlayer)
+                    preparePlayer();
+                else if (!play) {
                     videoSceneObjectPlayer.pause();
                 } else {
                     videoSceneObjectPlayer.start();
@@ -373,7 +389,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     new PyramidalTrackSelection.Factory(
                             bandwidthMeter, maxInitialBitrate, minDurationForQualityIncreaseUs,
                             maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
-                            bandwidthFraction);
+                            bandwidthFraction, dynamicEditingHolder);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
@@ -388,29 +404,31 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // Instantiation of the ExoPlayer using our custom implementation.
             // The number of tiles and the other components created above are given as parameters.
             player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
-            player.setPlayWhenReady(false);
-        }
-
-        boolean needPreparePlayer = videoSceneObjectPlayer == null;
-        if (needPreparePlayer) {
-            // Creation of the data source
-            Uri[] uris;
-            String[] extensions;
-            uris = new Uri[] {Uri.parse(mediaUri)};
-            extensions = new String[1];
-
-            MediaSource[] mediaSources = new MediaSource[uris.length];
-            for (int i = 0; i < uris.length; i++) {
-                mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
-            }
-            MediaSource mediaSource = mediaSources.length == 1 ? mediaSources[0]
-                    : new ConcatenatingMediaSource(mediaSources);
-
-            // Prepare the player with the given data source
-            player.prepare(mediaSource);
         }
 
         return new ExoplayerSceneObject(player);
+    }
+
+    // Starts downloading chunks of video from the source
+    private void preparePlayer() {
+        // Creation of the data source
+        Uri[] uris;
+        String[] extensions;
+        uris = new Uri[] {Uri.parse(mediaUri)};
+        extensions = new String[1];
+
+        MediaSource[] mediaSources = new MediaSource[uris.length];
+        for (int i = 0; i < uris.length; i++) {
+            mediaSources[i] = buildMediaSource(uris[i], extensions[i]);
+        }
+        MediaSource mediaSource = mediaSources.length == 1 ? mediaSources[0]
+                : new ConcatenatingMediaSource(mediaSources);
+
+        needPreparePlayer = false;
+        player.setPlayWhenReady(true);
+
+        // Prepare the player with the given data source
+        player.prepare(mediaSource);
     }
 
     // Callback from the permission requests.
@@ -427,6 +445,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
                     if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
+                    if (dynamicEditingHolder.isDynamicEdited()) {
+                        parseDynamicEditing();
+                    }
                     switch (statusCode) {
                         case CHECKING_PERMISSION:
                             videoSceneObjectPlayer = makeVideoSceneObject();
@@ -543,6 +564,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 DashSRDMediaSource mediaSource = new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
+                mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
                 mediaSource.setBuffers(minBufferMs, maxBufferMs);
                 return mediaSource;
             case C.TYPE_HLS:
@@ -573,7 +595,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     /**
      * Helper method taken from the exoplayer demo app.
      *
-     * @param listener The transfert listener to be used. May be null.
+     * @param listener The transfer listener to be used. May be null.
      * @return A data source factory
      */
     private DataSource.Factory buildDataSourceFactory(TransferListener listener) {
@@ -589,5 +611,17 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      */
     private HttpDataSource.Factory buildHttpDataSourceFactory(TransferListener listener) {
         return new DefaultHttpDataSourceFactory(userAgent, listener);
+    }
+
+    /**
+     * Parse the dynamic editing XML file to retrieve snapchanges
+     */
+    private void parseDynamicEditing() {
+        DynamicEditingParser parser = new DynamicEditingParser(dynamicEditingFN);
+        try {
+            parser.parse(dynamicEditingHolder);
+        } catch (Exception e) {
+            changeStatus(Status.WRONGDYNED);
+        }
     }
 }
