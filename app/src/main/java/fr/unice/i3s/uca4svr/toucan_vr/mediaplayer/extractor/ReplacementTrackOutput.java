@@ -677,6 +677,14 @@ public final class ReplacementTrackOutput implements TrackOutput {
         int lookAtIndex = endInfoIndex != 0 ? endInfoIndex - 1 : infoQueue.capacity - 1;
         dataEndOffset = infoQueue.offsets[lookAtIndex] + infoQueue.sizes[lookAtIndex];
       }
+
+      // Check if we have room to put the replacement data into the dataQueue and the infoQueue
+      if (infoQueue.queueSize + replacementAbsoluteWriteIndex > infoQueue.capacity ||
+              totalBytesWritten + replacementTotalBytesWritten - totalBytesDropped > dataQueue.length) {
+        cancelReplacement();
+        return;
+      }
+
       // Copy data forward or backward if needed and update totalByteWritten
       // First store the data into a temp array, we cannot copy in place it would override the data
       // we want to copy before reading them.
@@ -693,7 +701,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
           System.arraycopy(dataQueue, 0, temp, dataQueue.length - dataStartCopyIndex, dataEndCopyIndex);
         }
 
-        // TODO: Check that this won't override the reading head, else cancel everything
         // Then perform the copy
         // The starting point is after the data that we will insert
         dataStartCopyIndex = (int) (dataStartOffset + replacementTotalBytesWritten) % dataQueue.length;
