@@ -105,6 +105,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingBandwidth = false;
     private boolean loggingHeadMotion = false;
     private boolean loggingFreezes = false;
+    private boolean loggingSnapchanges = false;
+    private boolean loggingRealTimeUserPosition = false;
+    private String serverIPAddress;
 
     private String[] tiles;
     private int gridWidth = 1;
@@ -214,6 +217,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
         loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", false);
+        loggingSnapchanges = intent.getBooleanExtra("snapchangeEventsLogging", false);
+        loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
+        serverIPAddress = intent.getStringExtra("serverIPAddress");
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -267,7 +273,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
             if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
-                    loggingHeadMotion || loggingBandwidth || loggingFreezes
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges
                     || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
@@ -276,10 +282,16 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             } else {
                 changeStatus(Status.CHECKING_INTERNET);
             }
-            if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
+            boolean isRemoteFile = !Util.isLocalFileUri(Uri.parse(mediaUri));
+            if (isRemoteFile || loggingRealTimeUserPosition) {
                 CheckConnection checkConnection = new CheckConnection(this);
                 checkConnection.response = this;
-                checkConnection.execute(mediaUri);
+                if(isRemoteFile && loggingRealTimeUserPosition)
+                    checkConnection.execute(mediaUri,serverIPAddress+"/cleanTables.php");
+                else if(isRemoteFile && !loggingRealTimeUserPosition)
+                    checkConnection.execute(mediaUri);
+                else if(!isRemoteFile && loggingRealTimeUserPosition)
+                    checkConnection.execute(serverIPAddress+"/cleanTables.php");
             } else {
                 if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
                     changeStatus(Status.CHECKING_PERMISSION);
@@ -357,8 +369,16 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     preparePlayer();
                 else if (!play) {
                     videoSceneObjectPlayer.pause();
+                    //Pushing the tap event
+                    if(loggingRealTimeUserPosition) {
+                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
+                    }
                 } else {
                     videoSceneObjectPlayer.start();
+                    //Pushing the tap event
+                    if(loggingRealTimeUserPosition) {
+                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
+                    }
                 }
             }
         }
@@ -445,6 +465,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
                     if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
+                    if (loggingSnapchanges)
+                        ((Minimal360Video) getMain()).initSnapchangeEventsTracker(logPrefix);
                     if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
                     }
@@ -498,6 +520,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     public void urlChecked(boolean exists) {
         synchronized (this) {
             if (exists) {
+                if (loggingRealTimeUserPosition)
+                    ((Minimal360Video) getMain()).initRealtimeEventPusher(getGVRContext(),serverIPAddress);
                 switch (statusCode) {
                     case CHECKING_INTERNET:
                         videoSceneObjectPlayer = makeVideoSceneObject();
