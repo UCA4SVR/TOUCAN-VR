@@ -219,7 +219,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         numberOfTiles = tiles.length / 4;
         //Dynamic editing check
         dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
-        if(dynamicEditingFN.length()>0)
+        if(dynamicEditingFN != null && dynamicEditingFN.length() > 0)
             dynamicEditingHolder = new DynamicEditingHolder(true);
         else
             dynamicEditingHolder = new DynamicEditingHolder(false);

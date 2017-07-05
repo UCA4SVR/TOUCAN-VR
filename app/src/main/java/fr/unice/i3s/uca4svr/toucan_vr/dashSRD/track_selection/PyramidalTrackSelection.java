@@ -167,7 +167,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
         this.dynamicEditingHolder = dynamicEditingHolder;
-        selectedIndex = determineIdealSelectedIndex(true);
+        selectedIndex = determineIdealSelectedIndex(false);
         reason = C.SELECTION_REASON_INITIAL;
     }
 
