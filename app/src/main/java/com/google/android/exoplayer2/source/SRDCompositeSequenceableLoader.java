@@ -15,6 +15,8 @@
  */
 package com.google.android.exoplayer2.source;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;

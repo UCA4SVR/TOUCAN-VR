@@ -107,6 +107,7 @@ public final class DashSRDMediaSource implements MediaSource {
     private final SparseArray<DashSRDMediaPeriod> periodsById;
     private final Runnable refreshManifestRunnable;
     private final Runnable simulateManifestRefreshRunnable;
+    private final boolean noReplacement;
 
     private Listener sourceListener;
     private DataSource dataSource;
@@ -136,9 +137,10 @@ public final class DashSRDMediaSource implements MediaSource {
      * @param eventListener A listener of events. May be null if delivery of events is not required.
      */
     public DashSRDMediaSource(DashManifest manifest, DashChunkSource.Factory chunkSourceFactory,
-                           Handler eventHandler, AdaptiveMediaSourceEventListener eventListener) {
+                           Handler eventHandler, AdaptiveMediaSourceEventListener eventListener,
+                              boolean noReplacement) {
         this(manifest, chunkSourceFactory, DEFAULT_MIN_LOADABLE_RETRY_COUNT, eventHandler,
-                eventListener);
+                eventListener, noReplacement);
     }
 
     /**
@@ -152,9 +154,10 @@ public final class DashSRDMediaSource implements MediaSource {
      */
     public DashSRDMediaSource(DashManifest manifest, DashChunkSource.Factory chunkSourceFactory,
                            int minLoadableRetryCount, Handler eventHandler, AdaptiveMediaSourceEventListener
-                                   eventListener) {
+                                   eventListener, boolean noReplacement) {
         this(manifest, null, null, null, chunkSourceFactory, minLoadableRetryCount,
-                DEFAULT_LIVE_PRESENTATION_DELAY_PREFER_MANIFEST_MS, eventHandler, eventListener);
+                DEFAULT_LIVE_PRESENTATION_DELAY_PREFER_MANIFEST_MS, eventHandler, eventListener,
+                noReplacement);
     }
 
     /**
@@ -170,10 +173,10 @@ public final class DashSRDMediaSource implements MediaSource {
      */
     public DashSRDMediaSource(Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
                            DashChunkSource.Factory chunkSourceFactory, Handler eventHandler,
-                           AdaptiveMediaSourceEventListener eventListener) {
+                           AdaptiveMediaSourceEventListener eventListener, boolean noReplacement) {
         this(manifestUri, manifestDataSourceFactory, chunkSourceFactory,
                 DEFAULT_MIN_LOADABLE_RETRY_COUNT, DEFAULT_LIVE_PRESENTATION_DELAY_PREFER_MANIFEST_MS,
-                eventHandler, eventListener);
+                eventHandler, eventListener, noReplacement);
     }
 
     /**
@@ -195,9 +198,10 @@ public final class DashSRDMediaSource implements MediaSource {
     public DashSRDMediaSource(Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
                            DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                            long livePresentationDelayMs, Handler eventHandler,
-                           AdaptiveMediaSourceEventListener eventListener) {
+                           AdaptiveMediaSourceEventListener eventListener, boolean noReplacement) {
         this(manifestUri, manifestDataSourceFactory, new DashSRDManifestParser(), chunkSourceFactory,
-                minLoadableRetryCount, livePresentationDelayMs, eventHandler, eventListener);
+                minLoadableRetryCount, livePresentationDelayMs, eventHandler, eventListener,
+                noReplacement);
     }
 
     /**
@@ -220,16 +224,17 @@ public final class DashSRDMediaSource implements MediaSource {
     public DashSRDMediaSource(Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
                            DashSRDManifestParser manifestParser, DashChunkSource.Factory chunkSourceFactory,
                            int minLoadableRetryCount, long livePresentationDelayMs, Handler eventHandler,
-                           AdaptiveMediaSourceEventListener eventListener) {
+                           AdaptiveMediaSourceEventListener eventListener, boolean noReplacement) {
         this(null, manifestUri, manifestDataSourceFactory, manifestParser, chunkSourceFactory,
-                minLoadableRetryCount, livePresentationDelayMs, eventHandler, eventListener);
+                minLoadableRetryCount, livePresentationDelayMs, eventHandler, eventListener,
+                noReplacement);
     }
 
     private DashSRDMediaSource(DashManifest manifest, Uri manifestUri,
                             DataSource.Factory manifestDataSourceFactory, DashSRDManifestParser manifestParser,
                             DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                             long livePresentationDelayMs, Handler eventHandler,
-                            AdaptiveMediaSourceEventListener eventListener) {
+                            AdaptiveMediaSourceEventListener eventListener, boolean noReplacement) {
         this.manifest = manifest;
         this.manifestUri = manifestUri;
         this.manifestDataSourceFactory = manifestDataSourceFactory;
@@ -237,6 +242,7 @@ public final class DashSRDMediaSource implements MediaSource {
         this.chunkSourceFactory = chunkSourceFactory;
         this.minLoadableRetryCount = minLoadableRetryCount;
         this.livePresentationDelayMs = livePresentationDelayMs;
+        this.noReplacement = noReplacement;
         sideloadedManifest = manifest != null;
         eventDispatcher = new EventDispatcher(eventHandler, eventListener);
         manifestUriLock = new Object();
@@ -302,7 +308,8 @@ public final class DashSRDMediaSource implements MediaSource {
                 manifest.getPeriod(periodIndex).startMs);
         DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(firstPeriodId + periodIndex, manifest,
                 periodIndex, chunkSourceFactory, minLoadableRetryCount, periodEventDispatcher,
-                elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, minBufferMs, maxBufferMs, dynamicEditingHolder);
+                elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, minBufferMs, maxBufferMs,
+                dynamicEditingHolder, noReplacement);
         periodsById.put(mediaPeriod.id, mediaPeriod);
         return mediaPeriod;
     }

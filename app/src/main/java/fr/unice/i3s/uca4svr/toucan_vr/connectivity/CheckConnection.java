@@ -70,7 +70,7 @@ public class CheckConnection extends AsyncTask<String,Integer,Boolean> {
                 HttpURLConnection urlc = (HttpURLConnection) (new URL(mediaUri).openConnection());
                 urlc.setRequestProperty("User-Agent", "Test");
                 urlc.setRequestProperty("Connection", "close");
-                urlc.setConnectTimeout(1500);
+                urlc.setConnectTimeout(3000);
                 urlc.connect();
                 return (urlc.getResponseCode() == 200);
             } catch (IOException e) {

@@ -117,6 +117,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private String dynamicEditingFN;
     private DynamicEditingHolder dynamicEditingHolder;
 
+    private boolean noReplacement = false;
+
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
     private Handler mainHandler;
@@ -230,6 +232,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             dynamicEditingHolder = new DynamicEditingHolder(true);
         else
             dynamicEditingHolder = new DynamicEditingHolder(false);
+        noReplacement = intent.getBooleanExtra("deactivateReplacement", false);
     }
 
     /**
@@ -587,7 +590,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             case C.TYPE_DASH:
                 DashSRDMediaSource mediaSource = new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
-                        /* eventListener */ null);
+                        /* eventListener */ null, noReplacement);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
                 mediaSource.setBuffers(minBufferMs, maxBufferMs);
                 return mediaSource;

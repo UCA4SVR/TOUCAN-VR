@@ -62,6 +62,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
   private final TrackGroupArray trackGroups;
   private final int minBufferMs;
   private final int maxBufferMs;
+  private final boolean noReplacement;
 
   private Callback callback;
   private SRDCompositeSequenceableLoader sequenceableLoader;
@@ -76,7 +77,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
                             DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                             EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
                             LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
-                            int minBufferMs, int maxBufferMs, DynamicEditingHolder dynamicEditingHolder) {
+                            int minBufferMs, int maxBufferMs, DynamicEditingHolder dynamicEditingHolder,
+                            boolean noReplacement) {
     this.id = id;
     this.manifest = manifest;
     this.periodIndex = periodIndex;
@@ -90,6 +92,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     this.minBufferMs = minBufferMs * 1000;
     this.maxBufferMs = maxBufferMs * 1000;
     this.dynamicEditingHolder = dynamicEditingHolder;
+    this.noReplacement = noReplacement;
     sampleStreams = newSampleStreamArray(0);
     sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
     adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -259,7 +262,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
             elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
     OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-            eventDispatcher, dynamicEditingHolder);
+            eventDispatcher, dynamicEditingHolder, noReplacement);
     return stream;
   }
 

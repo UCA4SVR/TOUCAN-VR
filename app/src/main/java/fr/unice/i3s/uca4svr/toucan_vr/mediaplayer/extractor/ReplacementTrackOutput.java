@@ -670,6 +670,12 @@ public final class ReplacementTrackOutput implements TrackOutput {
       int startInfoIndex = infoQueue.findIndexAfterTime(replacementStartTime);
       int endInfoIndex = infoQueue.findIndexAfterTime(replacementEndTime);
 
+      if (startInfoIndex == -1) {
+        // it's too late
+        cancelReplacement();
+        return;
+      }
+
       // If the end index has not been found, we consider it to be the writing point because it means
       // the searched time has not been buffered yet.
       endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;

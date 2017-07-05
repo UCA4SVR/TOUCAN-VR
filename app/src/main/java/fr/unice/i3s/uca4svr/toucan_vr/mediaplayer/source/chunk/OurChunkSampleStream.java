@@ -15,6 +15,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -62,6 +64,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final ReplacementTrackOutput[] embeddedSampleQueues;
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
+  private final boolean noReplacement;
+
   private DynamicEditingHolder dynamicEditingHolder;
 
   public final int adaptationSetIndex;
@@ -85,7 +89,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    */
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
-                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder) {
+                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder,
+                              boolean noReplacement) {
     this.adaptationSetIndex = adaptationSetIndex;
     this.dynamicEditingHolder = dynamicEditingHolder;
     //Getting the highest format for this tile
@@ -96,6 +101,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     this.callback = callback;
     this.eventDispatcher = eventDispatcher;
     this.minLoadableRetryCount = minLoadableRetryCount;
+    this.noReplacement = noReplacement;
     loader = new Loader("Loader:ChunkSampleStream");
     nextChunkHolder = new ChunkHolder();
     mediaChunks = new LinkedList<>();
@@ -374,7 +380,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   public boolean replace(long playbackPosition) {
     //Still buffering?
-    if (loader.isLoading()) {
+    if (loader.isLoading() || noReplacement) {
       return false;
     }
 
@@ -385,21 +391,36 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     starts two segments after
     */
     MediaChunk maybeReplace = null;
+    int currentIndex = 0;
     int maybeReplaceIndex = 0;
+    long currentClosest = Long.MAX_VALUE;
     for (MediaChunk mediaChunk : mediaChunks) {
       if ((mediaChunk.startTimeUs < playbackPosition) && (mediaChunk.endTimeUs > playbackPosition)) {
         maybeReplace = mediaChunk;
+        maybeReplaceIndex = currentIndex;
+        currentClosest = mediaChunk.startTimeUs - playbackPosition;
         break;
+      } else if (mediaChunk.startTimeUs - playbackPosition > 0 &&
+              mediaChunk.startTimeUs - playbackPosition < currentClosest) {
+        maybeReplace = mediaChunk;
+        currentClosest = mediaChunk.startTimeUs - playbackPosition;
+        maybeReplaceIndex = currentIndex;
       }
-      maybeReplaceIndex++;
+      currentIndex++;
     }
 
     if (maybeReplace != null) {
       /*
 			I've found the chunk that is currently playing in the buffer.
-			Checking if I can replace chunk starting two segments ahead of it.
+			Checking if I can replace chunk starting x segments ahead of it.
 			 */
-      maybeReplaceIndex += 4;
+      if (currentClosest < 4000000) {
+        int shift = (int) Math.ceil((4000000 - currentClosest) / 1000000);
+        maybeReplaceIndex += shift;
+      }
+      if (maybeReplaceIndex < 3) {
+        maybeReplaceIndex = 3;
+      }
       if (maybeReplaceIndex < mediaChunks.size()) {
         maybeReplace = mediaChunks.get(maybeReplaceIndex);
 
@@ -415,6 +436,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
                         is adopted when choosing the quality for downloading the chunks.
                         Do nothing!
                          */
+                        Log.e("REPLACE", "Dynamic prevents");
         } else {
           //The video is not dynamically edited or a snapchange occurs AFTER the beginning of the chunk: i'll base my analysis on the picker
           TilesPicker tilesPicker = TilesPicker.getPicker();
@@ -425,6 +447,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
         }
         //Should I replace?
         if(replaceFlag) {
+          Log.e("REPLACE", "Replacement launched in ChunkSampleStream");
           //Fire the download
           //First put into nextChunkHolder the correct Chunk
           ((DefaultDashSRDChunkSource)chunkSource).getChunkToBeReplaced(maybeReplace.chunkIndex,nextChunkHolder);
