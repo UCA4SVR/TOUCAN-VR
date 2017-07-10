@@ -662,6 +662,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
     if (!isReplaceing) {
       return;
     }
+    //*
     lock.lock();
     try {
       Log.e("REPLACE", id + ": committing a replacement " + replacementStartTime + " " + replacementEndTime);
@@ -861,6 +862,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
     } finally {
       lock.unlock();
     }
+    //*/
   }
 
   public void cancelReplacement() {
@@ -1255,9 +1257,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
     public byte[] encryptionKeyId;
 
     public int sourceId;
-    public long timesUs;;
+    public long timesUs;
     public int flag;
-    public int sizes;
     public Format format;
   }
 
