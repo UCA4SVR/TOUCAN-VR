@@ -668,8 +668,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
       Log.e("REPLACE", id + ": committing a replacement " + replacementStartTime + " " + replacementEndTime);
       // perform the replacement
       // Identify where the replacement must happen
-      int startInfoIndex = infoQueue.findIndexAfterTime(replacementStartTime);
-      int endInfoIndex = infoQueue.findIndexAfterTime(replacementEndTime);
+      int startInfoIndex = infoQueue.findClosestKeyFrame(replacementStartTime);
+      int endInfoIndex = infoQueue.findClosestKeyFrame(replacementEndTime);
 
       if (startInfoIndex == -1) {
         // it's too late
@@ -680,6 +680,16 @@ public final class ReplacementTrackOutput implements TrackOutput {
       // If the end index has not been found, we consider it to be the writing point because it means
       // the searched time has not been buffered yet.
       endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;
+      Log.e("REPLACE", "info indexes: " + startInfoIndex + " " + endInfoIndex);
+      long diff1 = replacementStartTime - infoQueue.timesUs[startInfoIndex];
+      long diff2 = replacementEndTime - infoQueue.timesUs[endInfoIndex];
+      Log.e("REPLACE", "times differences: " + diff1 + " " + diff2);
+      Log.e("REPLACE", "flags: " + infoQueue.flags[startInfoIndex] + " " + infoQueue.flags[endInfoIndex]);
+      int diff3 = endInfoIndex - startInfoIndex;
+      if (diff3 != 30) {
+        Log.e("REPLACE", "info size: " + diff3);
+      }
+
       long dataStartOffset = infoQueue.offsets[startInfoIndex];
       long dataEndOffset = infoQueue.offsets[endInfoIndex];
       if (endInfoIndex == infoQueue.relativeWriteIndex) {
@@ -1232,11 +1242,47 @@ public final class ReplacementTrackOutput implements TrackOutput {
       return true;
     }
 
+    public int findClosestKeyFrame(long timeUs) {
+      int result = -1;
+      long currentClosest = Long.MAX_VALUE;
+      for (int i = relativeReadIndex; i != relativeWriteIndex; i = (i+1) % capacity) {
+        long diff = Math.abs(timeUs - timesUs[i]);
+        if (flags[i] == 1 && diff < currentClosest) {
+          result = i;
+          currentClosest = diff;
+        }
+      }
+      return result;
+    }
+
     // Functions for the replacement
     public int findIndexAfterTime(long timeUs) {
       int result = -1;
       for (int i = relativeReadIndex; i != relativeWriteIndex; i = (i+1) % capacity) {
         if (timesUs[i] >= timeUs) {
+          result = i;
+          break;
+        }
+      }
+      return result;
+    }
+
+    public int findKeyFrameIndexAfterTime(long timeUs) {
+      int result = -1;
+      for (int i = relativeReadIndex; i != relativeWriteIndex; i = (i+1) % capacity) {
+        if (timesUs[i] >= timeUs && flags[i] == 1) {
+          result = i;
+          break;
+        }
+      }
+      return result;
+    }
+
+    public int findKeyFrameIndexBeforeTime(long timeUs) {
+      int result = -1;
+      for (int i = relativeReadIndex; i != relativeWriteIndex && timesUs[i] <= timeUs;
+           i = (i+1) % capacity) {
+        if (flags[i] == 1) {
           result = i;
           break;
         }

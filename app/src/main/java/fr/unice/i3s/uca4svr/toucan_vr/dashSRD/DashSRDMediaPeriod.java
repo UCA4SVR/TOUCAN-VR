@@ -175,7 +175,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     }
   }
 
-  private boolean replaced = false;
+  private int replaced = 0;
 
   @Override
   public boolean continueLoading(long positionUs) {
@@ -183,13 +183,13 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         /*If the buffer is full and the playback has started, start replacing chunks.
         It doesn't make sense to replace if the playback hasn't started: we have no information
         from the picker */
-    //* Temporary code to test replacement
-    if (positionUs > 250 && bufferedPosition > 9000 && positionUs < 8000 && !replaced) {
+    /* Temporary code to test replacement
+    if (positionUs > 250000 && bufferedPosition > 9000000 && positionUs < 8000000 && replaced < 9) {
       if (positionUs > 0) {
-        if (!sequenceableLoader.replaceChunks(positionUs)) {
+        if (!sequenceableLoader.replaceChunks(7900000)) {
           callback.onContinueLoadingRequested(this);
         } else {
-          replaced = true;
+          //replaced++;
         }
       } else {
         //Nothing to do
@@ -199,7 +199,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
       sequenceableLoader.continueLoading(positionUs);
     }
     //*/
-    /* The real code is bellow
+    //* The real code is bellow
     if ((bufferedPosition - positionUs) > maxBufferMs) {
       if (positionUs > 0) {
         if (!sequenceableLoader.replaceChunks(positionUs))
@@ -211,7 +211,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     } else {
       sequenceableLoader.continueLoading(positionUs);
     }
-    */
+    //*/
     return true;
   }
 
