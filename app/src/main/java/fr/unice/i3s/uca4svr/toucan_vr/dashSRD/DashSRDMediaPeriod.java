@@ -23,7 +23,6 @@ package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
-import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.MediaPeriod;
 import com.google.android.exoplayer2.source.SRDCompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.SampleStream;
@@ -209,7 +208,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         callback.onContinueLoadingRequested(this);
       }
     } else {
-      sequenceableLoader.continueLoading(positionUs);
+        sequenceableLoader.continueLoading(positionUs);
     }
     //*/
     return true;

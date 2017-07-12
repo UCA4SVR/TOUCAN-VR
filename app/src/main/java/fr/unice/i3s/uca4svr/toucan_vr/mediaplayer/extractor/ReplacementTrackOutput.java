@@ -563,6 +563,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
         }
         needKeyframe = false;
       }
+      Log.e("REPLACE", id + ": sample metadata" + timeUs + " " + flags);
       timeUs += sampleOffsetUs;
       long absoluteOffset = totalBytesWritten - size - offset;
       infoQueue.commitSample(timeUs, flags, absoluteOffset, size, encryptionKey);
@@ -573,6 +574,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   private void sampleReplacementMetadata(long timeUs, int flags, int size, int offset, byte[] encryptionKey) {
+    Log.e("REPLACE", id + ": sample replacement metadata" + timeUs + " " + flags);
     int writeIndex = replacementAbsoluteWriteIndex % replacementMetaData.length;
     BufferExtrasHolder extras = new BufferExtrasHolder();
     extras.timesUs = timeUs;
@@ -659,36 +661,40 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   public void commitReplacement() {
-    if (!isReplaceing) {
-      return;
-    }
     //*
     lock.lock();
     try {
-      Log.e("REPLACE", id + ": committing a replacement " + replacementStartTime + " " + replacementEndTime);
-      // perform the replacement
-      // Identify where the replacement must happen
-      int startInfoIndex = infoQueue.findClosestKeyFrame(replacementStartTime);
-      int endInfoIndex = infoQueue.findClosestKeyFrame(replacementEndTime);
+      if (!isReplaceing) {
+        return;
+      }
+      Log.e("REPLACE", id + ": committing a replacement " + replacementMetaData[0].timesUs + " "
+              + replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs);
+      if (replacementMetaData[0].timesUs == replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs) {
+        Log.e("REPLACE", id + ": end time equal start time.");
+      }
 
-      if (startInfoIndex == -1) {
+      if (infoQueue.largestDequeuedTimestampUs >= replacementMetaData[0].timesUs) {
         // it's too late
         cancelReplacement();
         return;
       }
+      // perform the replacement
+      // Identify where the replacement must happen
+      int startInfoIndex = infoQueue.findClosestKeyFrame(replacementMetaData[0].timesUs);
+      int endInfoIndex = infoQueue.findClosestKeyFrame(replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs);
 
       // If the end index has not been found, we consider it to be the writing point because it means
       // the searched time has not been buffered yet.
-      endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;
-      Log.e("REPLACE", "info indexes: " + startInfoIndex + " " + endInfoIndex);
-      long diff1 = replacementStartTime - infoQueue.timesUs[startInfoIndex];
-      long diff2 = replacementEndTime - infoQueue.timesUs[endInfoIndex];
-      Log.e("REPLACE", "times differences: " + diff1 + " " + diff2);
-      Log.e("REPLACE", "flags: " + infoQueue.flags[startInfoIndex] + " " + infoQueue.flags[endInfoIndex]);
-      int diff3 = endInfoIndex - startInfoIndex;
-      if (diff3 != 30) {
-        Log.e("REPLACE", "info size: " + diff3);
-      }
+      //endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;
+      //Log.e("REPLACE", "info indexes: " + startInfoIndex + " " + endInfoIndex);
+      //long diff1 = replacementStartTime - infoQueue.timesUs[startInfoIndex];
+      //long diff2 = replacementEndTime - infoQueue.timesUs[endInfoIndex];
+      //Log.e("REPLACE", "times differences: " + diff1 + " " + diff2);
+      //Log.e("REPLACE", "flags: " + infoQueue.flags[startInfoIndex] + " " + infoQueue.flags[endInfoIndex]);
+      //int diff3 = endInfoIndex - startInfoIndex;
+      //if (diff3 != 30) {
+      //  Log.e("REPLACE", "info size: " + diff3);
+      //}
 
       long dataStartOffset = infoQueue.offsets[startInfoIndex];
       long dataEndOffset = infoQueue.offsets[endInfoIndex];

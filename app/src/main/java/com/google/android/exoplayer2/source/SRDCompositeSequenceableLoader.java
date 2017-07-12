@@ -80,12 +80,12 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
     TilesPicker tilesPicker = TilesPicker.getPicker();
     //Need to replace: which one? choose the currently picked tiles!
     for (SequenceableLoader loader : loaders) {
-      //* test stuff
+      /* test stuff
       if (((OurChunkSampleStream) loader).adaptationSetIndex == 4) {
         madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
       }
       //*/
-      /* real stuff
+      //* real stuff
       if (tilesPicker.isPicked(((OurChunkSampleStream) loader).adaptationSetIndex)) {
         madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
       }
