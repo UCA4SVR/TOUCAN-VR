@@ -31,8 +31,8 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
     private GVRContext context;
     private PushResponse callback;
     private String serverIP;
-    private final static String pushForHeadMotion = "/logHeadMotion.php";
-    private final static String pushForTapEvent = "/logTapEvent.php";
+    private final static String pushForHeadMotion = "/";
+    private final static String pushForTapEvent = "/tapEvent";
 
 
     public PushRealtimeEvents(GVRContext context, String serverIP, PushResponse callback) {
@@ -59,8 +59,7 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
         if (event.eventType) {
             GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
             fullURI = serverIP + pushForHeadMotion +
-                    "?timestamp=" + event.timestamp +
-                    "&x=" + headTransform.getRotationPitch() +
+                    "?x=" + headTransform.getRotationPitch() +
                     "&y=" + headTransform.getRotationYaw() +
                     "&z=" + headTransform.getRotationRoll();
         } else {
