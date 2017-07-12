@@ -212,7 +212,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
                 float currentAngle = getCurrentAngle();
                 float difference = currentAngle - dynamicEditingHolder.nextSCroiDegrees;
                 videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
-                Log.e("DYN", "Current init angle: " + currentAngle + " ROI init angle: " + dynamicEditingHolder.nextSCroiDegrees);
                 dynamicEditingHolder.advance(difference);
             }
 

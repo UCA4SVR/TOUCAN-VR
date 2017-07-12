@@ -42,6 +42,7 @@ import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
 
@@ -61,6 +62,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
     private final TrackGroupArray trackGroups;
     private final int minBufferMs;
     private final int maxBufferMs;
+    private final TileQualityTracker tileQualityTracker;
 
     private Callback callback;
     private CompositeSequenceableLoader sequenceableLoader;
@@ -75,7 +77,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
                               DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                               EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
                               LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs,
-                              DynamicEditingHolder dynamicEditingHolder) {
+                              DynamicEditingHolder dynamicEditingHolder, TileQualityTracker tileQualityTracker) {
         this.id = id;
         this.manifest = manifest;
         this.periodIndex = periodIndex;
@@ -89,6 +91,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
         this.minBufferMs = minBufferMs*1000;
         this.maxBufferMs = maxBufferMs*1000;
         this.dynamicEditingHolder = dynamicEditingHolder;
+        this.tileQualityTracker = tileQualityTracker;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -245,7 +248,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
         OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-                eventDispatcher, dynamicEditingHolder);
+                eventDispatcher, dynamicEditingHolder, tileQualityTracker);
         return stream;
     }
 
