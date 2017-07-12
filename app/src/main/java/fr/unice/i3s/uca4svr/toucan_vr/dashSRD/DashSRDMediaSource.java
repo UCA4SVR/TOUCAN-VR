@@ -54,6 +54,8 @@ import java.util.Locale;
 import java.util.TimeZone;
 import com.google.android.exoplayer2.source.dash.manifest.DashSRDManifestParser;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+
 /**
  * A DASH {@link MediaSource}.
  */
@@ -119,6 +121,11 @@ public final class DashSRDMediaSource implements MediaSource {
     private long elapsedRealtimeOffsetMs;
 
     private int firstPeriodId;
+
+    private int minBufferMs;
+    private int maxBufferMs;
+
+    private DynamicEditingHolder dynamicEditingHolder;
 
     /**
      * Constructs an instance to play a given {@link DashManifest}, which must be static.
@@ -295,7 +302,7 @@ public final class DashSRDMediaSource implements MediaSource {
                 manifest.getPeriod(periodIndex).startMs);
         DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(firstPeriodId + periodIndex, manifest,
                 periodIndex, chunkSourceFactory, minLoadableRetryCount, periodEventDispatcher,
-                elapsedRealtimeOffsetMs, loaderErrorThrower, allocator);
+                elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, minBufferMs, maxBufferMs, dynamicEditingHolder);
         periodsById.put(mediaPeriod.id, mediaPeriod);
         return mediaPeriod;
     }
@@ -802,6 +809,15 @@ public final class DashSRDMediaSource implements MediaSource {
             }
         }
 
+    }
+
+    public void setBuffers(int minBufferMs, int maxBufferMs) {
+        this.minBufferMs = minBufferMs;
+        this.maxBufferMs = maxBufferMs;
+    }
+
+    public void setDynamicEditingHolder(DynamicEditingHolder dynamicEditingHolder) {
+        this.dynamicEditingHolder = dynamicEditingHolder;
     }
 
 }

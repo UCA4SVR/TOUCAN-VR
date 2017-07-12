@@ -30,8 +30,10 @@ import com.google.android.exoplayer2.trackselection.BaseTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 
+import java.util.Arrays;
 import java.util.List;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
@@ -54,6 +56,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int adaptationSetIndex;
     private long currentPlaybackPosition;
     private long chunkStartTime;
+    private DynamicEditingHolder dynamicEditingHolder;
 
     /**
      * Factory for {@link AdaptiveTrackSelection} instances.
@@ -66,6 +69,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         private final int maxDurationForQualityDecreaseMs;
         private final int minDurationToRetainAfterDiscardMs;
         private final float bandwidthFraction;
+        private DynamicEditingHolder dynamicEditingHolder;
 
         /**
          * @param bandwidthMeter Provides an estimate of the currently available bandwidth.
@@ -74,7 +78,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             this (bandwidthMeter, DEFAULT_MAX_INITIAL_BITRATE,
                     DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
                     DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
-                    DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, DEFAULT_BANDWIDTH_FRACTION);
+                    DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, DEFAULT_BANDWIDTH_FRACTION,
+                    null);
         }
 
         /**
@@ -92,23 +97,26 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
          * @param bandwidthFraction The fraction of the available bandwidth that the selection should
          *     consider available for use. Setting to a value less than 1 is recommended to account
          *     for inaccuracies in the bandwidth estimator.
+         * @param dynamicEditingHolder The object that holds the information about the snapchanges
          */
         public Factory(BandwidthMeter bandwidthMeter, int maxInitialBitrate,
                        int minDurationForQualityIncreaseMs, int maxDurationForQualityDecreaseMs,
-                       int minDurationToRetainAfterDiscardMs, float bandwidthFraction) {
+                       int minDurationToRetainAfterDiscardMs, float bandwidthFraction,
+                       DynamicEditingHolder dynamicEditingHolder) {
             this.bandwidthMeter = bandwidthMeter;
             this.maxInitialBitrate = maxInitialBitrate;
             this.minDurationForQualityIncreaseMs = minDurationForQualityIncreaseMs;
             this.maxDurationForQualityDecreaseMs = maxDurationForQualityDecreaseMs;
             this.minDurationToRetainAfterDiscardMs = minDurationToRetainAfterDiscardMs;
             this.bandwidthFraction = bandwidthFraction;
+            this.dynamicEditingHolder = dynamicEditingHolder;
         }
 
         @Override
         public PyramidalTrackSelection createTrackSelection(TrackGroup group, int... tracks) {
             return new PyramidalTrackSelection(group, tracks, bandwidthMeter, maxInitialBitrate,
                     minDurationForQualityIncreaseMs, maxDurationForQualityDecreaseMs,
-                    minDurationToRetainAfterDiscardMs, bandwidthFraction);
+                    minDurationToRetainAfterDiscardMs, bandwidthFraction, dynamicEditingHolder);
         }
 
     }
@@ -124,7 +132,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this (group, tracks, bandwidthMeter, DEFAULT_MAX_INITIAL_BITRATE,
                 DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
                 DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
-                DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, DEFAULT_BANDWIDTH_FRACTION);
+                DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, DEFAULT_BANDWIDTH_FRACTION, null);
     }
 
     /**
@@ -145,11 +153,12 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
      * @param bandwidthFraction The fraction of the available bandwidth that the selection should
      *     consider available for use. Setting to a value less than 1 is recommended to account
      *     for inaccuracies in the bandwidth estimator.
+     * @param dynamicEditingHolder The object that holds the information about the snapchanges
      */
     public PyramidalTrackSelection(TrackGroup group, int[] tracks, BandwidthMeter bandwidthMeter,
                                   int maxInitialBitrate, long minDurationForQualityIncreaseMs,
                                   long maxDurationForQualityDecreaseMs, long minDurationToRetainAfterDiscardMs,
-                                  float bandwidthFraction) {
+                                  float bandwidthFraction, DynamicEditingHolder dynamicEditingHolder) {
         super(group, tracks);
         this.bandwidthMeter = bandwidthMeter;
         this.maxInitialBitrate = maxInitialBitrate;
@@ -157,7 +166,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.maxDurationForQualityDecreaseUs = maxDurationForQualityDecreaseMs * 1000L;
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
-        selectedIndex = determineIdealSelectedIndex(true);
+        this.dynamicEditingHolder = dynamicEditingHolder;
+        selectedIndex = determineIdealSelectedIndex(false);
         reason = C.SELECTION_REASON_INITIAL;
     }
 
@@ -177,37 +187,28 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         int currentSelectedIndex = selectedIndex;
-        selectedIndex = determineIdealSelectedIndex(isPicked);
-
-        //long nowMs = SystemClock.elapsedRealtime();
-        // Get the current and ideal selections.
-
-        //Format currentFormat = getSelectedFormat();
-        //int idealSelectedIndex = determineIdealSelectedIndex(isPicked);
-        //Format idealFormat = getFormat(idealSelectedIndex);
-        // Assume we can switch to the ideal selection.
-        //selectedIndex = idealSelectedIndex;
-
-        /*
-        // Revert back to the current selection if conditions are not suitable for switching.
-        if (currentFormat != null && !isBlacklisted(selectedIndex, nowMs)) {
-            if (idealFormat.bitrate > currentFormat.bitrate
-                    && bufferedDurationUs < minDurationForQualityIncreaseUs) {
-                // The ideal track is a higher quality, but we have insufficient buffer to safely switch
-                // up. Defer switching up for now./selectedIndex = currentSelectedIndex;
-            } else if (idealFormat.bitrate < currentFormat.bitrate
-                    && bufferedDurationUs >= maxDurationForQualityDecreaseUs) {
-                // The ideal track is a lower quality, but we have sufficient buffer to defer switching
-                // down for now.
-                selectedIndex = currentSelectedIndex;
-            }
-        }
+        /*Checking if the tile has to be downloaded at the maximum or the minimum quality.
+        if the video is dynamically edited, the presence of a snapchange before the start of the segment
+        determines the quality to be chosen: the tile in the field of view are held by the dynamicEditingHolder object.
+        Otherwise, the tile picker is used
         */
-        // If we adapted, update the trigger.
+        if(dynamicEditingHolder.isDynamicEdited()) {
+            if(dynamicEditingHolder.nextSCMicroseconds<=chunkStartTime) {
+                selectedIndex = Arrays.binarySearch(dynamicEditingHolder.nextSCfoVTiles, adaptationSetIndex) >= 0 ? 0 : 1;
+            } else {
+                selectedIndex = determineIdealSelectedIndex(isPicked);
+            }
+        } else {
+            selectedIndex = determineIdealSelectedIndex(isPicked);
+        }
+
         if (selectedIndex != currentSelectedIndex) {
             reason = C.SELECTION_REASON_ADAPTIVE;
         }
+    }
 
+    public void forceSelectedTrack() {
+        selectedIndex = 0;
     }
 
     @Override
@@ -235,7 +236,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         if (bufferedDurationUs < minDurationToRetainAfterDiscardUs) {
             return queueSize;
         }
-        int idealSelectedIndex = determineIdealSelectedIndex(true);
+        int idealSelectedIndex = determineIdealSelectedIndex(false);
         Format idealFormat = getFormat(idealSelectedIndex);
         // If the chunks contain video, discard from the first SD chunk beyond
         // minDurationToRetainAfterDiscardUs whose resolution and bitrate are both lower than the ideal

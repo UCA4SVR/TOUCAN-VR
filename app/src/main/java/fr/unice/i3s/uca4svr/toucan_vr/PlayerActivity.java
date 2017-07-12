@@ -26,9 +26,9 @@ import android.text.TextUtils;
 import android.view.MotionEvent;
 
 import com.google.android.exoplayer2.C;
+import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
-import com.google.android.exoplayer2.SRDLoadControl;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
@@ -40,6 +40,7 @@ import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelector;
 import com.google.android.exoplayer2.upstream.DataSource;
+import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
@@ -57,10 +58,11 @@ import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnection;
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnectionResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelector;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingParser;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.UnboundedAllocator;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
@@ -71,7 +73,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     enum Status {
         NO_INTENT, NO_INTERNET, NO_PERMISSION, CHECKING_INTERNET, CHECKING_PERMISSION,
         CHECKING_INTERNET_AND_PERMISSION, READY_TO_PLAY, PLAYING, PAUSED, PLAYBACK_ENDED,
-        PLAYBACK_ERROR, NULL
+        PLAYBACK_ERROR, WRONGDYNED, NULL
     }
 
     private static TransferListenerBroadcaster MASTER_TRANSFER_LISTENER =
@@ -102,11 +104,17 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingBandwidth = false;
     private boolean loggingHeadMotion = false;
     private boolean loggingFreezes = false;
+    private boolean loggingSnapchanges = false;
+    private boolean loggingRealTimeUserPosition = false;
+    private String serverIPAddress;
 
     private String[] tiles;
     private int gridWidth = 1;
     private int gridHeight = 1;
     private int numberOfTiles = 1;
+
+    private String dynamicEditingFN;
+    private DynamicEditingHolder dynamicEditingHolder;
 
     private String userAgent;
     private DataSource.Factory mediaDataSourceFactory;
@@ -138,7 +146,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // We can avoid providing the videoSceneObject at first. We will create it only if the
         // intent exists and every parameter specified in it can be activated.
-        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
         setMain(main, "gvr.xml");
 
         // The intent is required to run the app, if it has not been provided we can stop there.
@@ -164,7 +172,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 }
             }
 
-            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight);
+            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
             setMain(main, "gvr.xml");
 
             if (statusCode != Status.NO_INTENT) {
@@ -199,20 +207,28 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private void parseIntent() {
         mediaUri = intent.getStringExtra("videoLink");
         logPrefix = intent.getStringExtra("videoName");
-        minBufferMs = intent.getIntExtra("minBufferSize", SRDLoadControl.DEFAULT_MIN_BUFFER_MS);
-        maxBufferMs = intent.getIntExtra("maxBufferSize", SRDLoadControl.DEFAULT_MAX_BUFFER_MS);
+        minBufferMs = intent.getIntExtra("minBufferSize", DefaultLoadControl.DEFAULT_MIN_BUFFER_MS);
+        maxBufferMs = intent.getIntExtra("maxBufferSize", DefaultLoadControl.DEFAULT_MAX_BUFFER_MS);
         bufferForPlaybackMs = intent.getIntExtra("bufferForPlayback",
-                SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS);
         bufferForPlaybackAfterRebufferMs = intent.getIntExtra("bufferForPlaybackAR",
-                SRDLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS);
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
         loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", false);
+        loggingSnapchanges = intent.getBooleanExtra("snapchangeEventsLogging", false);
+        loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
+        serverIPAddress = intent.getStringExtra("serverIPAddress");
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
         numberOfTiles = tiles.length / 4;
-        // changeStatus(Status.OK);
+        //Dynamic editing check
+        dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
+        if(dynamicEditingFN != null && dynamicEditingFN.length() > 0)
+            dynamicEditingHolder = new DynamicEditingHolder(true);
+        else
+            dynamicEditingHolder = new DynamicEditingHolder(false);
     }
 
     /**
@@ -250,13 +266,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private void checkInternetAndPermissions() {
         synchronized (this) {
             if (statusCode == Status.NO_INTENT) {
-                // If there is no intent, there is no need to check anything else
+                // If there is no intent there is no need to check anything else
                 return;
             }
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
-            if (Util.isLocalFileUri(Uri.parse(mediaUri)) || loggingHeadMotion
-                    || loggingBandwidth || loggingFreezes) {
+            if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges
+                    || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -264,10 +281,16 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             } else {
                 changeStatus(Status.CHECKING_INTERNET);
             }
-            if (!Util.isLocalFileUri(Uri.parse(mediaUri))) {
+            boolean isRemoteFile = !Util.isLocalFileUri(Uri.parse(mediaUri));
+            if (isRemoteFile || loggingRealTimeUserPosition) {
                 CheckConnection checkConnection = new CheckConnection(this);
                 checkConnection.response = this;
-                checkConnection.execute(mediaUri);
+                if(isRemoteFile && loggingRealTimeUserPosition)
+                    checkConnection.execute(mediaUri,serverIPAddress+"/cleanTables.php");
+                else if(isRemoteFile && !loggingRealTimeUserPosition)
+                    checkConnection.execute(mediaUri);
+                else if(!isRemoteFile && loggingRealTimeUserPosition)
+                    checkConnection.execute(serverIPAddress+"/cleanTables.php");
             } else {
                 if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
                     changeStatus(Status.CHECKING_PERMISSION);
@@ -345,8 +368,16 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     preparePlayer();
                 else if (!play) {
                     videoSceneObjectPlayer.pause();
+                    //Pushing the tap event
+                    if(loggingRealTimeUserPosition) {
+                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
+                    }
                 } else {
                     videoSceneObjectPlayer.start();
+                    //Pushing the tap event
+                    if(loggingRealTimeUserPosition) {
+                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
+                    }
                 }
             }
         }
@@ -377,12 +408,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     new PyramidalTrackSelection.Factory(
                             bandwidthMeter, maxInitialBitrate, minDurationForQualityIncreaseUs,
                             maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
-                            bandwidthFraction);
+                            bandwidthFraction, dynamicEditingHolder);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
             // The LoadControl, responsible for the buffering strategy
-            LoadControl loadControl = new SRDLoadControl(
-                    new UnboundedAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
+            LoadControl loadControl = new DefaultLoadControl(
+                    new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
                     minBufferMs,
                     maxBufferMs,
                     bufferForPlaybackMs,
@@ -433,6 +464,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
                     if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
+                    if (loggingSnapchanges)
+                        ((Minimal360Video) getMain()).initSnapchangeEventsTracker(logPrefix);
+                    if (dynamicEditingHolder.isDynamicEdited()) {
+                        parseDynamicEditing();
+                    }
                     switch (statusCode) {
                         case CHECKING_PERMISSION:
                             videoSceneObjectPlayer = makeVideoSceneObject();
@@ -483,6 +519,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     public void urlChecked(boolean exists) {
         synchronized (this) {
             if (exists) {
+                if (loggingRealTimeUserPosition)
+                    ((Minimal360Video) getMain()).initRealtimeEventPusher(getGVRContext(),serverIPAddress);
                 switch (statusCode) {
                     case CHECKING_INTERNET:
                         videoSceneObjectPlayer = makeVideoSceneObject();
@@ -546,9 +584,12 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultSsChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_DASH:
-                return new DashSRDMediaSource(uri, buildDataSourceFactory(false),
+                DashSRDMediaSource mediaSource = new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
+                mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
+                mediaSource.setBuffers(minBufferMs, maxBufferMs);
+                return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,
                         /* eventListener */ null);
@@ -593,5 +634,17 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
      */
     private HttpDataSource.Factory buildHttpDataSourceFactory(TransferListener listener) {
         return new DefaultHttpDataSourceFactory(userAgent, listener);
+    }
+
+    /**
+     * Parse the dynamic editing XML file to retrieve snapchanges
+     */
+    private void parseDynamicEditing() {
+        DynamicEditingParser parser = new DynamicEditingParser(dynamicEditingFN);
+        try {
+            parser.parse(dynamicEditingHolder);
+        } catch (Exception e) {
+            changeStatus(Status.WRONGDYNED);
+        }
     }
 }

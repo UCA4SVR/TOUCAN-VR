@@ -32,8 +32,10 @@ import com.google.android.exoplayer2.source.chunk.Chunk;
 import com.google.android.exoplayer2.source.chunk.ChunkExtractorWrapper;
 import com.google.android.exoplayer2.source.chunk.ChunkHolder;
 import com.google.android.exoplayer2.source.chunk.ChunkedTrackBlacklistUtil;
+import com.google.android.exoplayer2.source.chunk.ContainerMediaChunk;
 import com.google.android.exoplayer2.source.chunk.InitializationChunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
+import com.google.android.exoplayer2.source.chunk.SingleSampleMediaChunk;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
 import com.google.android.exoplayer2.source.dash.manifest.RangedUri;
@@ -50,8 +52,6 @@ import java.io.IOException;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.ContainerMediaChunk;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.SingleSampleMediaChunk;
 
 /**
  * A default {@link DashChunkSource} implementation.
@@ -88,6 +88,7 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
 
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int adaptationSetIndex;
+    private final String highestFormatId;
     private final TrackSelection trackSelection;
     private final RepresentationHolder[] representationHolders;
     private final DataSource dataSource;
@@ -125,6 +126,7 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
         this.manifest = manifest;
         this.adaptationSetIndex = adaptationSetIndex;
+        this.highestFormatId = trackSelection.getFormat(0).id;
         this.trackSelection = trackSelection;
         this.dataSource = dataSource;
         this.periodIndex = periodIndex;
@@ -269,6 +271,18 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         out.chunk = newMediaChunk(representationHolder, dataSource, trackSelection.getSelectedFormat(),
                 trackSelection.getSelectionReason(), trackSelection.getSelectionData(), segmentNum,
                 maxSegmentCount);
+    }
+
+    public void getChunkToBeReplaced(int segmentNum, ChunkHolder out) {
+		//Force the quality to be the highest one
+		((PyramidalTrackSelection)trackSelection).forceSelectedTrack();
+		RepresentationHolder representationHolder = representationHolders[trackSelection.getSelectedIndex()];
+		out.chunk = newMediaChunk(representationHolder, dataSource, trackSelection.getSelectedFormat(),
+				trackSelection.getSelectionReason(), null, segmentNum, 1);
+	}
+
+    public String getHighestFormatId() {
+        return this.highestFormatId;
     }
 
     @Override

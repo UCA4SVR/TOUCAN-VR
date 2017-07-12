@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package fr.unice.i3s.uca4svr.toucan_vr.connectivity;
+package fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition;
 
-public interface CheckConnectionResponse {
-    void urlChecked(boolean exists);
+public interface PushResponse {
+    void pushResponse(boolean exists);
 }

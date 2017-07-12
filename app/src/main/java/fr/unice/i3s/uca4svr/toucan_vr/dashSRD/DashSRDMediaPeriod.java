@@ -29,7 +29,6 @@ import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
-import com.google.android.exoplayer2.source.chunk.ChunkSampleStream;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
@@ -42,14 +41,15 @@ import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
-import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+
+import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
 
 /**
  * A DASH {@link MediaPeriod}.
  */
 /* package */ final class DashSRDMediaPeriod implements MediaPeriod,
-        SequenceableLoader.Callback<OurChunkSampleStream<DashChunkSource>> {
+    SequenceableLoader.Callback<OurChunkSampleStream<DashChunkSource>> {
 
     /* package */ final int id;
     private final DashChunkSource.Factory chunkSourceFactory;
@@ -59,18 +59,23 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final Allocator allocator;
     private final TrackGroupArray trackGroups;
+    private final int minBufferMs;
+    private final int maxBufferMs;
 
     private Callback callback;
-    private OurChunkSampleStream<DashChunkSource>[] sampleStreams;
     private CompositeSequenceableLoader sequenceableLoader;
+    private OurChunkSampleStream<DashChunkSource>[] sampleStreams;
     private DashManifest manifest;
     private int periodIndex;
     private List<AdaptationSet> adaptationSets;
 
+    private DynamicEditingHolder dynamicEditingHolder;
+
     public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
-                           DashChunkSource.Factory chunkSourceFactory,  int minLoadableRetryCount,
-                           EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
-                           LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator) {
+                              DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
+                              EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
+                              LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs,
+                              DynamicEditingHolder dynamicEditingHolder) {
         this.id = id;
         this.manifest = manifest;
         this.periodIndex = periodIndex;
@@ -80,6 +85,10 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         this.elapsedRealtimeOffset = elapsedRealtimeOffset;
         this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
         this.allocator = allocator;
+        //Buffers are provided in ms and then used in microseconds
+        this.minBufferMs = minBufferMs*1000;
+        this.maxBufferMs = maxBufferMs*1000;
+        this.dynamicEditingHolder = dynamicEditingHolder;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -127,7 +136,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         HashMap<Integer, OurChunkSampleStream<DashChunkSource>> primarySampleStreams = new HashMap<>();
 
         for (int i = 0; i < selections.length; i++) {
-            if (streams[i] instanceof ChunkSampleStream) {
+            if (streams[i] instanceof OurChunkSampleStream) {
                 @SuppressWarnings("unchecked")
                 OurChunkSampleStream<DashChunkSource> stream = (OurChunkSampleStream<DashChunkSource>) streams[i];
                 if (selections[i] == null || !mayRetainStreamFlags[i]) {
@@ -164,6 +173,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
 
     @Override
     public boolean continueLoading(long positionUs) {
+
         return sequenceableLoader.continueLoading(positionUs);
     }
 
@@ -233,9 +243,9 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
                 manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
-        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSet.type,
+        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-                eventDispatcher);
+                eventDispatcher, dynamicEditingHolder);
         return stream;
     }
 

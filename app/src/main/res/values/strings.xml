@@ -9,6 +9,8 @@
     <string name="remove_headset">Please remove the headset</string>
     <string name="playback_error">There was an error while playing the video.
         Please remove the headset</string>
+    <string name="dynamicEd_error">There was an error while decoding the dynamic editing information.
+        Please remove the headset</string>
     <string name="checking_url">Checking the URL...</string>
     <string name="checking_permissions">Checking permissions...</string>
     <string name="checking_url_permissions">Checking URL and permissions...</string>

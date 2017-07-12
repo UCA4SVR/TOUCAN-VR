@@ -13,8 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package fr.unice.i3s.uca4svr.toucan_vr.connectivity;
 
-public interface CheckConnectionResponse {
-    void urlChecked(boolean exists);
+package fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition;
+
+public class RealtimeEvent {
+
+    /* Three types of events:
+    eventType == true ----> Track Event
+    eventType == false ----> Tap Event
+    */
+
+    public boolean eventType;
+    public long timestamp;
+
 }
