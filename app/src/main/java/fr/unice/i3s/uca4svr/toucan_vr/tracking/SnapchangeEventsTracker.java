@@ -16,13 +16,8 @@
 package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 
 import android.os.Environment;
-import android.util.Log;
 
-import com.google.android.exoplayer2.util.Clock;
-import com.google.android.exoplayer2.util.SystemClock;
-
-import org.gearvrf.GVRContext;
-import org.gearvrf.GVRTransform;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -31,26 +26,21 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-import org.slf4j.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
 /**
- * Logs the pitch, yaw, roll angles from the HeadTransform of the main camera rig
- * from the context given at initialization. Logging is done into a file which name is
- * TAG_datetime.csv where TAG is given as a parameter of the constructor and datetime is formatted
- * as yyyy_MM_dd_HH_mm_ss.
- * The files is csv formatted, with 5 entries on each line:
- * the system clock, the playback position, the pitch (or X), yaw (or Y) and roll (or Z) rotation
- * Rotations are expressed as angles in degrees.
- * The logging happens each time the <code>track</code> method is called.
- * The file is located under the External Storage Public Directory in a directory name toucan/logs.
- *
- * @author Romaric Pighetti
+ * It tracks if the snapchange is executed or not (because the user was looking at the ROI when the snapchange occurred)
+ * Each entry in the csv file will have:
+ *  - the timestamp of the snapchange
+ *  - the timestamp at which the snapchange is activated
+ *  - the angle in degrees fixed after the snapchange
+ *  - the current user's angle
+ *  - boolean representing if the snapchange has been executed or not
  */
-public class HeadMotionTracker {
+public class SnapchangeEventsTracker {
 
     // Each logger must have a different ID,
     // so that creating a new logger won't override the previous one
@@ -58,19 +48,14 @@ public class HeadMotionTracker {
 
     private final Logger logger;
 
-    private final Clock clock;
-
     /**
-     * Initialize a HeadMotionTracker, that will record the angles of the HeadTransform
-     * from the main camera of the given context to a file name logFilePrefix_date.csv.
-     * Be aware that tracking is done by calling the <code>track</code> method every time
-     * and entry is needed.
+     * Main constructor of the tracker.
+     * It creates a log file named logFilePrefix_date.csv.
+     * Be aware that tracking is done by calling the <code>track</code> method in the onStep function.
      *
      * @param logFilePrefix The prefix for the log file name
      */
-    public HeadMotionTracker(String logFilePrefix) {
-
-        clock = new SystemClock();
+    public SnapchangeEventsTracker(String logFilePrefix) {
 
         String logFilePath = Environment.getExternalStoragePublicDirectory("toucan/logs/")
                 + File.separator
@@ -90,7 +75,7 @@ public class HeadMotionTracker {
         fileAppender.start();
 
         // getting the instanceof the logger
-        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.HeadMotionTracker"
+        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.SnapchangeEventsTracker"
                 + loggerNextID++);
         // I know the logger is from logback, this is the implementation i'm using below slf4j API.
         ((ch.qos.logback.classic.Logger) logger).addAppender(fileAppender);
@@ -104,21 +89,28 @@ public class HeadMotionTracker {
     private String createLogFileName(String logFilePrefix) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US);
         Date date = new Date();
-        return String.format("%s_headMotion_%s.csv", logFilePrefix, dateFormat.format(date));
+        return String.format("%s_snapchange_%s.csv", logFilePrefix, dateFormat.format(date));
     }
 
     /**
      * Outputs a track record to the log file.
-     * The same clock reference is used as for every tracker. Also the playback position is recorded.
+     * Each entry in the csv file will have:
+     *  - the timestamp of the snapchange
+     *  - the timestamp at which the snapchange is activated
+     *  - the angle in degrees fixed after the snapchange
+     *  - the current user's angle
+     *  - boolean representing if the snapchange has been executed or not
      *
-     * @param context The GearVR framework context from which we're logging the head motion
-     * @param playbackPosition The current position in the video playback
+     * @param expectedTS  The timestamp of the snapchange in the XML file
+     * @param currentTS The timestamp at which the snapchange is activated
+     * @param expectedAngle The angle in degrees fixed after the snapchange
+     * @param currentAngle The current user's angle
+     * @param activated If the snapchange has been executed or not
+     *
      */
-    public void track(GVRContext context, long playbackPosition) {
-        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-        String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.0f,%4$.0f,%5$.0f",
-                clock.elapsedRealtime(), playbackPosition, headTransform.getRotationPitch(),
-                headTransform.getRotationYaw(), headTransform.getRotationRoll());
-        logger.error(rotationsString);
+    public void track(long expectedTS, long currentTS, float expectedAngle, float currentAngle, boolean activated) {
+            logger.error(String.format(Locale.ENGLISH, "%d,%d,%f,%f,%b",
+                    expectedTS, currentTS,
+                    expectedAngle, currentAngle, activated));
     }
 }
