@@ -60,11 +60,15 @@ public class DynamicEditingHolder {
 		return isDynamicEdited;
 	}
 
-	public void getNextSC() {
+	public void getNextSnapChange() {
 		this.nextSCMilliseconds = snapchanges.get(0).getSCMilliseconds();
         this.nextSCMicroseconds = this.nextSCMilliseconds*1000;
 		this.nextSCroiDegrees = snapchanges.get(0).getSCroiDegrees();
 		this.nextSCfoVTiles = snapchanges.get(0).getSCfoVTiles();
+	}
+
+	public List<SnapChange> getSnapChanges() {
+		return snapchanges;
 	}
 
 	public void advance(float lastRotation) {
@@ -73,7 +77,7 @@ public class DynamicEditingHolder {
 		else {
 			this.lastRotation = lastRotation;
 			this.snapchanges.remove(0);
-			getNextSC();
+			getNextSnapChange();
 		}
 	}
 }

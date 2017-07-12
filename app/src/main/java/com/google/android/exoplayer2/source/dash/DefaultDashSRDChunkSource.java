@@ -202,7 +202,21 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         if (trackSelection instanceof PyramidalTrackSelection) {
             PyramidalTrackSelection pyramidalTrackSelection = (PyramidalTrackSelection)trackSelection;
             pyramidalTrackSelection.updatePlaybackPosition(playbackPositionUs);
-            pyramidalTrackSelection.updateNextChunkPosition(previous != null ? previous.endTimeUs : 0);
+            RepresentationHolder representationHolder =
+                    representationHolders[trackSelection.getSelectedIndex()];
+            int segmentIndex;
+            if (previous == null) {
+                int availableSegmentCount = representationHolder.getSegmentCount();
+                int firstAvailableSegmentNum = representationHolder.getFirstSegmentNum();
+                int lastAvailableSegmentNum = firstAvailableSegmentNum + availableSegmentCount - 1;
+                segmentIndex = Util.constrainValue(representationHolder.getSegmentNum(playbackPositionUs),
+                        firstAvailableSegmentNum, lastAvailableSegmentNum);
+            } else
+                segmentIndex = previous.getNextChunkIndex();
+            long nextChunkStartTime = representationHolder.getSegmentStartTimeUs(segmentIndex);
+            long nextChunkEndTime = representationHolder.getSegmentEndTimeUs(segmentIndex);
+            pyramidalTrackSelection.updateNextChunkStartTime(nextChunkStartTime);
+            pyramidalTrackSelection.updateNextChunkEndTime(nextChunkEndTime);
         }
 
         // Call the method to update the quality for the next chunk
