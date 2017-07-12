@@ -223,7 +223,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
 
     @Override
     public Object getSelectionData() {
-        return null;
+        return selectedIndex;
     }
 
     @Override

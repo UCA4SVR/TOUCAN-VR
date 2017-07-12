@@ -1,4 +1,4 @@
-/* Copyrpyright 2015 Samsung Electronics Co., LTD
+/* Copyright 2015 Samsung Electronics Co., LTD
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.graphics.Color;
-import android.util.Log;
 import android.view.Gravity;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -38,7 +37,6 @@ import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
 import org.gearvrf.GVRTexture;
-import org.gearvrf.GVRTransform;
 import org.gearvrf.scene_objects.GVRSphereSceneObject;
 import org.gearvrf.scene_objects.GVRTextViewSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
@@ -46,7 +44,6 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.concurrent.Future;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
@@ -212,7 +209,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
                 float currentAngle = getCurrentAngle();
                 float difference = currentAngle - dynamicEditingHolder.nextSCroiDegrees;
                 videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
-                Log.e("DYN", "Current init angle: " + currentAngle + " ROI init angle: " + dynamicEditingHolder.nextSCroiDegrees);
                 dynamicEditingHolder.advance(difference);
             }
 

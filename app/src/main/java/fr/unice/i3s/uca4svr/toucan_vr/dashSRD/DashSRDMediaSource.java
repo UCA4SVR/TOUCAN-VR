@@ -122,9 +122,6 @@ public final class DashSRDMediaSource implements MediaSource {
 
     private int firstPeriodId;
 
-    private int minBufferMs;
-    private int maxBufferMs;
-
     private DynamicEditingHolder dynamicEditingHolder;
 
     /**
@@ -302,7 +299,7 @@ public final class DashSRDMediaSource implements MediaSource {
                 manifest.getPeriod(periodIndex).startMs);
         DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(firstPeriodId + periodIndex, manifest,
                 periodIndex, chunkSourceFactory, minLoadableRetryCount, periodEventDispatcher,
-                elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, minBufferMs, maxBufferMs, dynamicEditingHolder);
+                elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, dynamicEditingHolder);
         periodsById.put(mediaPeriod.id, mediaPeriod);
         return mediaPeriod;
     }
@@ -809,11 +806,6 @@ public final class DashSRDMediaSource implements MediaSource {
             }
         }
 
-    }
-
-    public void setBuffers(int minBufferMs, int maxBufferMs) {
-        this.minBufferMs = minBufferMs;
-        this.maxBufferMs = maxBufferMs;
     }
 
     public void setDynamicEditingHolder(DynamicEditingHolder dynamicEditingHolder) {
