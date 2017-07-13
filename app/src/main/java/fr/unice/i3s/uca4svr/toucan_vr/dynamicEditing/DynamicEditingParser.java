@@ -93,7 +93,7 @@ public class DynamicEditingParser {
 				throw new XmlPullParserException("File is empty!");
 			} else {
 				//Snapchanges have been stored into the holder object. Preparing the first snapchange.
-				dynamicEditingHolder.getNextSC();
+				dynamicEditingHolder.getNextSnapChange();
 			}
 	}
 
