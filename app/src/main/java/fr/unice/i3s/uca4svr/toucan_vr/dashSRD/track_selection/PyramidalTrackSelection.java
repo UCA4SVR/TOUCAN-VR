@@ -44,7 +44,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
     public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
     public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 1000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 2000;
     public static final int DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS = 6000;
     public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
 
@@ -218,7 +218,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                 if (selectedIndex == 1 && closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs) {
                     // The snap change involves the current chunk. Provide a smooth transition when the snap change
                     // is forcing the quality to be low while the tile is still displayed to the user.
-                    Log.e("SRD"+(adaptationSetIndex+1), "Chunk between "+nextChunkStartTimeUs/1000000+" and "+nextChunkEndTimeUs/1000000);
                     selectedIndex = determineIdealSelectedIndex(isPicked);
                 }
             } else {
@@ -288,7 +287,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             }
 
         } else {
-            Log.e("SRD"+(adaptationSetIndex+1), "Not dynamic ");
             previousChunk = queue.get(queueSize - 1);
         }
 
