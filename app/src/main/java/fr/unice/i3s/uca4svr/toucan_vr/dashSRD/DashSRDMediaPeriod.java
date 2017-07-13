@@ -59,8 +59,6 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final Allocator allocator;
     private final TrackGroupArray trackGroups;
-    private final int minBufferMs;
-    private final int maxBufferMs;
 
     private Callback callback;
     private CompositeSequenceableLoader sequenceableLoader;
@@ -74,7 +72,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
     public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
                               DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                               EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
-                              LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator, int minBufferMs, int maxBufferMs,
+                              LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
                               DynamicEditingHolder dynamicEditingHolder) {
         this.id = id;
         this.manifest = manifest;
@@ -85,9 +83,6 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
         this.elapsedRealtimeOffset = elapsedRealtimeOffset;
         this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
         this.allocator = allocator;
-        //Buffers are provided in ms and then used in microseconds
-        this.minBufferMs = minBufferMs*1000;
-        this.maxBufferMs = maxBufferMs*1000;
         this.dynamicEditingHolder = dynamicEditingHolder;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
@@ -173,7 +168,6 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
 
     @Override
     public boolean continueLoading(long positionUs) {
-
         return sequenceableLoader.continueLoading(positionUs);
     }
 
