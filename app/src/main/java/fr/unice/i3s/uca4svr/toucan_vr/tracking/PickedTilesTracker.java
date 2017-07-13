@@ -38,12 +38,12 @@ import ch.qos.logback.core.FileAppender;
  * The class is used to log the tiles that are picked
  * The file is composed by (1+number of tiles) columns:
  *      1- the system time
- *      2- true if the tile number 1 is picked, false otherwise
- *      3- true if the tile number 2 is picked, false otherwise
+ *      2- 1 if the tile number 1 is picked, 0 otherwise
+ *      3- 1 if the tile number 2 is picked, 0 otherwise
  *      .
  *      .
  *      .
- *      (# of tiles)- true if the tile number (# of tiles) is picked, false otherwise
+ *      (# of tiles)- 1 if the tile number (# of tiles) is picked, 0 otherwise
  * The file is located under the External Storage Public Directory in a directory name toucan/logs.
  */
 public class PickedTilesTracker {

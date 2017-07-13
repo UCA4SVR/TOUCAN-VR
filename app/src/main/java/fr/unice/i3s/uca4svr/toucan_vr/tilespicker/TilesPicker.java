@@ -41,7 +41,7 @@ public class TilesPicker implements IPickEvents {
       pickedTiles[i] = pickedObjects[i] != null;
     //Logging
     if(this.loggingActivated) {
-      this.pickedTilesTracker.track(TextUtils.join(",", pickedTiles));
+      this.pickedTilesTracker.track((TextUtils.join(",", pickedTiles)).replace("true","1").replace("false","0"));
     }
   }
 
