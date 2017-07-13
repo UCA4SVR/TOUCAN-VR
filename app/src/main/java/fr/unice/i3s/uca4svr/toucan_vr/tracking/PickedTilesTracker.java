@@ -20,8 +20,6 @@ import android.os.Environment;
 import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.SystemClock;
 
-import org.gearvrf.GVRContext;
-import org.gearvrf.GVRTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,17 +35,18 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
 /**
- * The class is used to log the quality of the tiles when they are read by the decoder from the buffer: the log consists inthe actual quality displayed to the user.
- * The file is composed by six columns:
+ * The class is used to log the tiles that are picked
+ * The file is composed by (1+number of tiles) columns:
  *      1- the system time
- *      2- tile number starting from 0. Tiles are sorted using the row as major and the column as minor.
- *      3- segment index
- *      4- segment start position in microseconds
- *      5- segment end position in microseconds
- *      6- 1 or 0 respectively for high and low quality
+ *      2- true if the tile number 1 is picked, false otherwise
+ *      3- true if the tile number 2 is picked, false otherwise
+ *      .
+ *      .
+ *      .
+ *      (# of tiles)- true if the tile number (# of tiles) is picked, false otherwise
  * The file is located under the External Storage Public Directory in a directory name toucan/logs.
  */
-public class TileQualityTracker {
+public class PickedTilesTracker {
 
     // Each logger must have a different ID,
     // so that creating a new logger won't override the previous one
@@ -62,7 +61,7 @@ public class TileQualityTracker {
      *
      * @param logFilePrefix The prefix for the log file name
      */
-    public TileQualityTracker(String logFilePrefix) {
+    public PickedTilesTracker(String logFilePrefix) {
 
         clock = new SystemClock();
 
@@ -84,7 +83,7 @@ public class TileQualityTracker {
         fileAppender.start();
 
         // getting the instanceof the logger
-        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.TileQualityTracker"
+        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.PickedTilesTracker"
                 + loggerNextID++);
         // I know the logger is from logback, this is the implementation i'm using below slf4j API.
         ((ch.qos.logback.classic.Logger) logger).addAppender(fileAppender);
@@ -98,14 +97,14 @@ public class TileQualityTracker {
     private String createLogFileName(String logFilePrefix) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US);
         Date date = new Date();
-        return String.format("%s_tileQuality_%s.csv", logFilePrefix, dateFormat.format(date));
+        return String.format("%s_pickedTiles_%s.csv", logFilePrefix, dateFormat.format(date));
     }
 
     /**
      * Outputs a track record to the log file.
      * The same clock reference is used as for every tracker.
      */
-    public void track(int adaptationSet, int chunkIndex, long startPositionUs, long endPositionUs, int quality) {
-        logger.error(String.format(Locale.ENGLISH, "%d,%d,%d,%d,%d,%d", clock.elapsedRealtime(), adaptationSet, chunkIndex, startPositionUs, endPositionUs, quality));
+    public void track(String pickedTiles) {
+        logger.error(String.format(Locale.ENGLISH, "%d,%s", clock.elapsedRealtime(), pickedTiles));
     }
 }

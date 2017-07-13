@@ -65,6 +65,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneOb
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
@@ -469,6 +470,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
                     if (loggingSnapchanges)
                         ((Minimal360Video) getMain()).initSnapchangeEventsTracker(logPrefix);
+                    if (loggingQualityFoV) {
+                        //The TilesPicker is a singleton class so perhaps an object already exists but we want to refresh the logger inside with the proper prefix
+                        TilesPicker.getPicker().refreshLogger(logPrefix);
+                    } else {
+                        TilesPicker.getPicker().disableLogger();
+                    }
+
+
                     if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
                     }
