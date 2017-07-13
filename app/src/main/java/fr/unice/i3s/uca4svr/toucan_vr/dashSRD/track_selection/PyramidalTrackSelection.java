@@ -21,6 +21,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
@@ -43,6 +45,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
     public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
     public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 1000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS = 6000;
     public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
 
     private final BandwidthMeter bandwidthMeter;
@@ -50,6 +53,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private final long minDurationForQualityIncreaseUs;
     private final long maxDurationForQualityDecreaseUs;
     private final long minDurationToRetainAfterDiscardUs;
+    private final long minDurationToRetainBeforeSnapChangeUs = DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS * 1000;
     private final float bandwidthFraction;
 
     private int selectedIndex;
@@ -206,7 +210,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             List<SnapChange> snapChanges = dynamicEditingHolder.getSnapChanges();
             SnapChange closestSnapChange = null;
             // In case of multiple snap changes in the buffer, consider the last one when making decisions
-            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() <= nextChunkEndTimeUs; i++) {
+            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() < nextChunkEndTimeUs; i++) {
                 closestSnapChange = snapChanges.get(i);
             }
             if (closestSnapChange != null) {
@@ -214,6 +218,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                 if (selectedIndex == 1 && closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs) {
                     // The snap change involves the current chunk. Provide a smooth transition when the snap change
                     // is forcing the quality to be low while the tile is still displayed to the user.
+                    Log.e("SRD"+(adaptationSetIndex+1), "Chunk between "+nextChunkStartTimeUs/1000000+" and "+nextChunkEndTimeUs/1000000);
                     selectedIndex = determineIdealSelectedIndex(isPicked);
                 }
             } else {
@@ -264,22 +269,43 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         int queueSize = queue.size();
         long bufferedDurationUs = queue.get(queueSize - 1).endTimeUs - playbackPositionUs;
         if (bufferedDurationUs < minDurationToRetainAfterDiscardUs) {
+            // Not enough buffered data. Never discard in this case.
             return queueSize;
         }
-        int idealSelectedIndex = determineIdealSelectedIndex(false);
-        Format idealFormat = getFormat(idealSelectedIndex);
-        // Computes the desired queue length by searching the first chunk in the buffer after
-        // minDurationToRetainAfterDiscardUs that has lower quality than the ideal track.
-        for (int i = 0; i < queueSize; i++) {
-            MediaChunk chunk = queue.get(i);
-            Format format = chunk.trackFormat;
-            long durationBeforeThisChunkUs = chunk.startTimeUs - playbackPositionUs;
-            if (durationBeforeThisChunkUs >= minDurationToRetainAfterDiscardUs
-                    && format.bitrate < idealFormat.bitrate
-                    && format.height != Format.NO_VALUE && format.height < 720
-                    && format.width != Format.NO_VALUE && format.width < 1280
-                    && format.height < idealFormat.height) {
-                return i;
+
+        MediaChunk previousChunk = queue.get(0);
+        if(dynamicEditingHolder.isDynamicEdited() &&
+                dynamicEditingHolder.nextSCMicroseconds <= nextChunkEndTimeUs) {
+            long timeBeforeSnapChangeUs = dynamicEditingHolder.nextSCMicroseconds - playbackPositionUs;
+            if (timeBeforeSnapChangeUs < minDurationToRetainBeforeSnapChangeUs) {
+                // The snap change is too close to the playback position. It's not worth discarding.
+                Log.e("SRD"+(adaptationSetIndex+1), "Snap change too close ");
+                return queueSize;
+            }
+            // Check for the last chunk before the snap change position
+            for (int i = 1; i < queueSize && queue.get(i).endTimeUs < dynamicEditingHolder.nextSCMicroseconds; i++) {
+                previousChunk = queue.get(i);
+            }
+
+        } else {
+            Log.e("SRD"+(adaptationSetIndex+1), "Not dynamic ");
+            previousChunk = queue.get(queueSize - 1);
+        }
+
+        int idealQualityIndex = determineIdealSelectedIndex(TilesPicker.getPicker().isPicked(adaptationSetIndex));
+        int currentQualityIndex = (int)previousChunk.trackSelectionData;
+
+        // Lower index means better quality
+        if (idealQualityIndex < currentQualityIndex) {
+            // Computes the desired queue length by searching the first chunk in the buffer after
+            // minDurationToRetainAfterDiscardUs that has lower quality than the ideal track.
+            for (int i = 0; i < queueSize; i++) {
+                MediaChunk chunk = queue.get(i);
+                long durationBeforeThisChunkUs = chunk.startTimeUs - playbackPositionUs;
+                if (durationBeforeThisChunkUs >= minDurationToRetainAfterDiscardUs
+                        && (int)chunk.trackSelectionData == 1) {
+                    return i;
+                }
             }
         }
         return queueSize;

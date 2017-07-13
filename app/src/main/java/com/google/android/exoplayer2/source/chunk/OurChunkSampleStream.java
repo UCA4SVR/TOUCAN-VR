@@ -60,12 +60,13 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
   private DynamicEditingHolder dynamicEditingHolder;
-  public final int adaptationSetIndex;
+  private final int adaptationSetIndex;
 
   private Format primaryDownstreamTrackFormat;
   private long pendingResetPositionUs;
-  /* package */ long lastSeekPositionUs;
-  /* package */ boolean loadingFinished;
+  private long lastSeekPositionUs;
+  private boolean loadingFinished;
+  private boolean wasDiscarding = false;
 
   /**
    * @param adaptationSetIndex The index of the associated adaptation set.
@@ -274,10 +275,6 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   @Override
   public void onLoadCompleted(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs) {
     chunkSource.onChunkLoadCompleted(loadable);
-    if(isMediaChunk(loadable)) {
-      MediaChunk chunk = (MediaChunk)loadable;
-      Log.e("SRD"+(adaptationSetIndex+1), "Downloaded "+chunk.chunkIndex +" quality "+chunk.trackSelectionData);
-    }
     eventDispatcher.loadCompleted(loadable.dataSpec, loadable.type, primaryTrackType,
         loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
         loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs, loadDurationMs,
@@ -337,13 +334,14 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   // SequenceableLoader implementation
 
   @Override
-  public boolean continueLoading(long positionUs) {
+  public boolean continueLoading(long playbackPositionUs) {
     if (loadingFinished || loader.isLoading()) {
       return false;
     }
 
+    // Populate the chunk holder with the next chunk to download
     chunkSource.getNextChunk(mediaChunks.isEmpty() ? null : mediaChunks.getLast(),
-        pendingResetPositionUs != C.TIME_UNSET ? pendingResetPositionUs : positionUs,
+        pendingResetPositionUs != C.TIME_UNSET ? pendingResetPositionUs : playbackPositionUs,
         nextChunkHolder);
     boolean endOfStream = nextChunkHolder.endOfStream;
     Chunk loadable = nextChunkHolder.chunk;
@@ -362,6 +360,18 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     if (isMediaChunk(loadable)) {
       pendingResetPositionUs = C.TIME_UNSET;
       BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
+      if (mediaChunks.size() > 0) {
+        // Check whether some discarding is needed (i.e. a better quality in the FoV is desired)
+        if (!wasDiscarding && maybeDiscardUpstream(playbackPositionUs)) {
+          wasDiscarding = true;
+          // If discarding actually happens we shouldn't download the next chunk because it's the wrong one
+          callback.onContinueLoadingRequested(this);
+          return false;
+        } else {
+          wasDiscarding = false;
+        }
+      }
+
       mediaChunk.init(mediaChunkOutput);
       mediaChunks.add(mediaChunk);
     }
@@ -413,12 +423,13 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     if (mediaChunks.size() <= queueLength) {
       return false;
     }
+    Log.e("SRD"+(adaptationSetIndex+1), "Discard from "+queueLength);
     long startTimeUs = 0;
     long endTimeUs = mediaChunks.getLast().endTimeUs;
     BaseMediaChunk removed = null;
     while (mediaChunks.size() > queueLength) {
       removed = mediaChunks.removeLast();
-      Log.e("SRD"+(adaptationSetIndex+1), "Removed chunk "+removed.chunkIndex +" quality "+removed.trackSelectionData);
+      Log.e("SRD"+(adaptationSetIndex+1), "Discarded chunk "+removed.chunkIndex +" quality "+removed.trackSelectionData);
       startTimeUs = removed.startTimeUs;
       loadingFinished = false;
     }
@@ -433,8 +444,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private void discardDownstreamMediaChunks(int primaryStreamReadIndex) {
     while (mediaChunks.size() > 1
         && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
-      BaseMediaChunk removed = mediaChunks.removeFirst();
-      Log.e("SRD"+(adaptationSetIndex+1), "Chunk played "+removed.chunkIndex +" quality "+removed.trackSelectionData);
+      mediaChunks.removeFirst();
     }
     BaseMediaChunk currentChunk = mediaChunks.getFirst();
     Format trackFormat = currentChunk.trackFormat;
