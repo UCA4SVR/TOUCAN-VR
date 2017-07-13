@@ -188,7 +188,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
-        isPicked = false;
+        // isPicked = false;
         int currentSelectedIndex = selectedIndex;
         /*Checking if the tile has to be downloaded at the maximum or the minimum quality.
         if the video is dynamically edited, the presence of a snapchange before the start of the segment

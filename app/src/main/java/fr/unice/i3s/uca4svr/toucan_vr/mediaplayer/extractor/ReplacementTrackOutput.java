@@ -667,21 +667,33 @@ public final class ReplacementTrackOutput implements TrackOutput {
       if (!isReplaceing) {
         return;
       }
-      Log.e("REPLACE", id + ": committing a replacement " + replacementMetaData[0].timesUs + " "
-              + replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs);
-      if (replacementMetaData[0].timesUs == replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs) {
+
+      long startTime = Long.MAX_VALUE;
+      long endTime = Long.MIN_VALUE;
+      for (int i = 0; i < replacementAbsoluteWriteIndex; i++) {
+        long currentTime = replacementMetaData[i].timesUs;
+        if (currentTime < startTime) {
+          startTime = currentTime;
+        }
+        if (currentTime > endTime) {
+          endTime = currentTime;
+        }
+      }
+
+      Log.e("REPLACE", id + ": committing a replacement " + startTime + " " + endTime);
+      if (startTime == endTime) {
         Log.e("REPLACE", id + ": end time equal start time.");
       }
 
-      if (infoQueue.largestDequeuedTimestampUs >= replacementMetaData[0].timesUs) {
+      if (infoQueue.largestDequeuedTimestampUs >= startTime) {
         // it's too late
         cancelReplacement();
         return;
       }
       // perform the replacement
       // Identify where the replacement must happen
-      int startInfoIndex = infoQueue.findClosestKeyFrame(replacementMetaData[0].timesUs);
-      int endInfoIndex = infoQueue.findClosestKeyFrame(replacementMetaData[replacementAbsoluteWriteIndex-1].timesUs);
+      int startInfoIndex = infoQueue.findClosestKeyFrame(startTime);
+      int endInfoIndex = infoQueue.findClosestKeyFrame(endTime);
 
       // If the end index has not been found, we consider it to be the writing point because it means
       // the searched time has not been buffered yet.
