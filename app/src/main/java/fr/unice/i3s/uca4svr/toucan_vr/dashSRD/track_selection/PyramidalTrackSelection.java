@@ -42,7 +42,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
     public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
     public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 25000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 1000;
     public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
 
     private final BandwidthMeter bandwidthMeter;
@@ -249,6 +249,13 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         return selectedIndex;
     }
 
+    /**
+     * Returns the desired queue length to obtain after discarding low quality chunks.
+     *
+     * @param playbackPositionUs The current position in the playback.
+     * @param queue The list of media chunks currently in the buffer.
+     * @return The desired queue size.
+     */
     @Override
     public int evaluateQueueSize(long playbackPositionUs, List<? extends MediaChunk> queue) {
         if (queue.isEmpty()) {
@@ -261,9 +268,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
         int idealSelectedIndex = determineIdealSelectedIndex(false);
         Format idealFormat = getFormat(idealSelectedIndex);
-        // If the chunks contain video, discard from the first SD chunk beyond
-        // minDurationToRetainAfterDiscardUs whose resolution and bitrate are both lower than the ideal
-        // track.
+        // Computes the desired queue length by searching the first chunk in the buffer after
+        // minDurationToRetainAfterDiscardUs that has lower quality than the ideal track.
         for (int i = 0; i < queueSize; i++) {
             MediaChunk chunk = queue.get(i);
             Format format = chunk.trackFormat;
@@ -279,8 +285,10 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         return queueSize;
     }
 
-    /*
-    Modified version: if the tile is in the field of view, choose the highest quality otherwise choose the lowest
+    /**
+     * Determines the ideal quality for the next chunk.
+     * If the tile is in the field of view, the highest quality is selected,
+     * otherwise the lowest quality is chosen.
      */
     private int determineIdealSelectedIndex(boolean isPicked) {
         if(isPicked)
@@ -288,28 +296,4 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         else
             return 1;
     }
-
-    /*
-     * Original method
-     * Computes the ideal selected index ignoring buffer health.
-
-    private int determineIdealSelectedIndex(long nowMs) {
-        long bitrateEstimate = bandwidthMeter.getBitrateEstimate();
-        long effectiveBitrate = bitrateEstimate == BandwidthMeter.NO_ESTIMATE
-                ? maxInitialBitrate : (long) (bitrateEstimate * bandwidthFraction);
-        int lowestBitrateNonBlacklistedIndex = 0;
-        for (int i = 0; i < length; i++) {
-            if (nowMs == Long.MIN_VALUE || !isBlacklisted(i, nowMs)) {
-                Format format = getFormat(i);
-                if (format.bitrate <= effectiveBitrate) {
-                    return i;
-                } else {
-                    lowestBitrateNonBlacklistedIndex = i;
-                }
-            }
-        }
-        return lowestBitrateNonBlacklistedIndex;
-    }
-    */
-
 }
