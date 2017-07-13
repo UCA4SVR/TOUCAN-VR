@@ -18,20 +18,23 @@ package fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition;
 
 
 import android.os.AsyncTask;
+import android.util.Log;
 
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRTransform;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean> {
 
     private GVRContext context;
     private PushResponse callback;
     private String serverIP;
-    private final static String pushForHeadMotion = "/";
+    private final static String pushForHeadMotion = "";
     private final static String pushForTapEvent = "/tapEvent";
 
 
@@ -56,22 +59,33 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
 
     private Boolean push(RealtimeEvent event) {
         String fullURI = "";
+        String urlParameters = "";
         if (event.eventType) {
             GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-            fullURI = serverIP + pushForHeadMotion +
-                    "?x=" + headTransform.getRotationPitch() +
+            urlParameters = "x=" + headTransform.getRotationPitch() +
                     "&y=" + headTransform.getRotationYaw() +
                     "&z=" + headTransform.getRotationRoll();
+            fullURI = serverIP + pushForHeadMotion;
+
         } else {
-            fullURI = serverIP + pushForTapEvent +
-                    "?timestamp=" + event.timestamp;
+            urlParameters = "?timestamp=" + event.timestamp;
+            fullURI = serverIP + pushForTapEvent;
+
         }
         if(fullURI.length()>0) {
             try {
                 HttpURLConnection urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
-                urlc.setRequestProperty("User-Agent", "Test");
-                urlc.setRequestProperty("Connection", "close");
-                urlc.setConnectTimeout(1500);
+                byte[] postData = urlParameters.getBytes( StandardCharsets.UTF_8 );
+                urlc.setDoOutput(true);
+                urlc.setInstanceFollowRedirects(false);
+                urlc.setRequestMethod("POST");
+                urlc.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                urlc.setRequestProperty("charset", "utf-8");
+                urlc.setRequestProperty("Content-Length", Integer.toString(postData.length));
+                urlc.setUseCaches(false);
+                try(DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
+                    wr.write( postData );
+                }
                 urlc.connect();
                 return (urlc.getResponseCode() == 200);
             } catch (IOException e) {
