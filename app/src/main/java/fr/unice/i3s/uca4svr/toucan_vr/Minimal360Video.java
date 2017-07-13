@@ -378,8 +378,8 @@ public class Minimal360Video extends GVRMain implements PushResponse {
             if (freezingEventsTracker != null)
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
             if (realtimeEventPusher != null) {
-                if(realtimeEvent==null)
-                    realtimeEvent = new RealtimeEvent();
+                realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP(), this);
+                realtimeEvent = new RealtimeEvent();
                 realtimeEvent.eventType = true;//TODO realtimeEvent was null here
                 realtimeEvent.timestamp = player.getCurrentPosition();
                 realtimeEventPusher.execute(realtimeEvent);

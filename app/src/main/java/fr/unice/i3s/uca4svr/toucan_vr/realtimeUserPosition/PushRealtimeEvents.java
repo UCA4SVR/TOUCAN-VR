@@ -95,4 +95,8 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
             return false;
         }
     }
+
+    public String getServerIP() {
+        return serverIP;
+    }
 }
