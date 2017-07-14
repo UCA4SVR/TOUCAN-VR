@@ -44,7 +44,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
     public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
     public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 2000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 1000;
+    public static final int DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 5000;
     public static final int DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS = 6000;
     public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
 
@@ -53,7 +54,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private final long minDurationForQualityIncreaseUs;
     private final long maxDurationForQualityDecreaseUs;
     private final long minDurationToRetainAfterDiscardUs;
-    private final long minDurationToRetainBeforeSnapChangeUs = DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS * 1000;
+    private final long maxDurationToRetainAfterDiscardUs = DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS * 1000L;
+    private final long minDurationToRetainBeforeSnapChangeUs = DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS * 1000L;
     private final float bandwidthFraction;
 
     private int selectedIndex;
@@ -267,7 +269,10 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
         int queueSize = queue.size();
         long bufferedDurationUs = queue.get(queueSize - 1).endTimeUs - playbackPositionUs;
-        if (bufferedDurationUs < minDurationToRetainAfterDiscardUs) {
+        int bufferSize = 10000000;
+        double adjustedThreshold = bufferedDurationUs/bufferSize*(maxDurationToRetainAfterDiscardUs - minDurationToRetainAfterDiscardUs);
+        long safeMargin = maxDurationToRetainAfterDiscardUs - (long)adjustedThreshold;
+        if (bufferedDurationUs < safeMargin) {
             // Not enough buffered data. Never discard in this case.
             return queueSize;
         }
@@ -278,7 +283,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             long timeBeforeSnapChangeUs = dynamicEditingHolder.nextSCMicroseconds - playbackPositionUs;
             if (timeBeforeSnapChangeUs < minDurationToRetainBeforeSnapChangeUs) {
                 // The snap change is too close to the playback position. It's not worth discarding.
-                Log.e("SRD"+(adaptationSetIndex+1), "Snap change too close ");
                 return queueSize;
             }
             // Check for the last chunk before the snap change position
@@ -300,7 +304,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             for (int i = 0; i < queueSize; i++) {
                 MediaChunk chunk = queue.get(i);
                 long durationBeforeThisChunkUs = chunk.startTimeUs - playbackPositionUs;
-                if (durationBeforeThisChunkUs >= minDurationToRetainAfterDiscardUs
+                if (durationBeforeThisChunkUs >= safeMargin
                         && (int)chunk.trackSelectionData == 1) {
                     return i;
                 }
