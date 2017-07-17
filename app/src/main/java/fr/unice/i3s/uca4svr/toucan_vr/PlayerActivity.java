@@ -94,9 +94,10 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private int bufferForPlaybackAfterRebufferMs;
     //Second section
     private int maxInitialBitrate = PyramidalTrackSelection.DEFAULT_MAX_INITIAL_BITRATE;
-    private int minDurationForQualityIncreaseUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
-    private int maxDurationForQualityDecreaseUs = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
-    private int minDurationToRetainAfterDiscardUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
+    private int minDurationForQualityIncrease = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
+    private int maxDurationForQualityDecrease = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
+    private int minDurationToRetainAfterDiscard = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
+    private int maxDurationToRetainAfterDiscard = PyramidalTrackSelection.DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
     private float bandwidthFraction = PyramidalTrackSelection.DEFAULT_BANDWIDTH_FRACTION;
 
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
@@ -406,8 +407,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new PyramidalTrackSelection.Factory(
-                            bandwidthMeter, maxInitialBitrate, minDurationForQualityIncreaseUs,
-                            maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
+                            bandwidthMeter, maxInitialBitrate, maxBufferMs,
+                            minDurationForQualityIncrease, maxDurationForQualityDecrease,
+                            minDurationToRetainAfterDiscard, maxDurationToRetainAfterDiscard,
                             bandwidthFraction, dynamicEditingHolder);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 

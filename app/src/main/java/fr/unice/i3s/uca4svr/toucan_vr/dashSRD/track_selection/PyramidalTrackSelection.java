@@ -24,7 +24,6 @@ package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 import android.util.Log;
 
 import com.google.android.exoplayer2.C;
-import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection;
@@ -41,21 +40,21 @@ import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
 
+    public static final int DEFAULT_MAX_BUFFER_SIZE = 10000000;
     public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
     public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
     public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 1000;
-    public static final int DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 5000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS = 6000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 2000;
+    public static final int DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 6000;
     public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
 
     private final BandwidthMeter bandwidthMeter;
     private final int maxInitialBitrate;
+    private final int bufferSize;
     private final long minDurationForQualityIncreaseUs;
     private final long maxDurationForQualityDecreaseUs;
     private final long minDurationToRetainAfterDiscardUs;
-    private final long maxDurationToRetainAfterDiscardUs = DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS * 1000L;
-    private final long minDurationToRetainBeforeSnapChangeUs = DEFAULT_MIN_DURATION_TO_RETAIN_BEFORE_SNAP_CHANGE_MS * 1000L;
+    private final long maxDurationToRetainAfterDiscardUs;
     private final float bandwidthFraction;
 
     private int selectedIndex;
@@ -73,22 +72,13 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
 
         private final BandwidthMeter bandwidthMeter;
         private final int maxInitialBitrate;
+        private final int bufferSizeMs;
         private final int minDurationForQualityIncreaseMs;
         private final int maxDurationForQualityDecreaseMs;
         private final int minDurationToRetainAfterDiscardMs;
+        private final int maxDurationToRetainAfterDiscardMs;
         private final float bandwidthFraction;
         private DynamicEditingHolder dynamicEditingHolder;
-
-        /**
-         * @param bandwidthMeter Provides an estimate of the currently available bandwidth.
-         */
-        public Factory(BandwidthMeter bandwidthMeter) {
-            this (bandwidthMeter, DEFAULT_MAX_INITIAL_BITRATE,
-                    DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
-                    DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
-                    DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, DEFAULT_BANDWIDTH_FRACTION,
-                    null);
-        }
 
         /**
          * @param bandwidthMeter Provides an estimate of the currently available bandwidth.
@@ -107,15 +97,17 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
          *     for inaccuracies in the bandwidth estimator.
          * @param dynamicEditingHolder The object that holds the information about the snapchanges
          */
-        public Factory(BandwidthMeter bandwidthMeter, int maxInitialBitrate,
+        public Factory(BandwidthMeter bandwidthMeter, int maxInitialBitrate, int bufferSizeMs,
                        int minDurationForQualityIncreaseMs, int maxDurationForQualityDecreaseMs,
-                       int minDurationToRetainAfterDiscardMs, float bandwidthFraction,
-                       DynamicEditingHolder dynamicEditingHolder) {
+                       int minDurationToRetainAfterDiscardMs, int maxDurationToRetainAfterDiscardMs,
+                       float bandwidthFraction, DynamicEditingHolder dynamicEditingHolder) {
             this.bandwidthMeter = bandwidthMeter;
             this.maxInitialBitrate = maxInitialBitrate;
+            this.bufferSizeMs = bufferSizeMs;
             this.minDurationForQualityIncreaseMs = minDurationForQualityIncreaseMs;
             this.maxDurationForQualityDecreaseMs = maxDurationForQualityDecreaseMs;
             this.minDurationToRetainAfterDiscardMs = minDurationToRetainAfterDiscardMs;
+            this.maxDurationToRetainAfterDiscardMs = maxDurationToRetainAfterDiscardMs;
             this.bandwidthFraction = bandwidthFraction;
             this.dynamicEditingHolder = dynamicEditingHolder;
         }
@@ -123,24 +115,10 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         @Override
         public PyramidalTrackSelection createTrackSelection(TrackGroup group, int... tracks) {
             return new PyramidalTrackSelection(group, tracks, bandwidthMeter, maxInitialBitrate,
-                    minDurationForQualityIncreaseMs, maxDurationForQualityDecreaseMs,
-                    minDurationToRetainAfterDiscardMs, bandwidthFraction, dynamicEditingHolder);
+                    bufferSizeMs, minDurationForQualityIncreaseMs, maxDurationForQualityDecreaseMs,
+                    minDurationToRetainAfterDiscardMs, maxDurationToRetainAfterDiscardMs,
+                    bandwidthFraction, dynamicEditingHolder);
         }
-
-    }
-
-    /**
-     * @param group The {@link TrackGroup}.
-     * @param tracks The indices of the selected tracks within the {@link TrackGroup}. Must not be
-     *     empty. May be in any order.
-     * @param bandwidthMeter Provides an estimate of the currently available bandwidth.
-     */
-    public PyramidalTrackSelection(TrackGroup group, int[] tracks,
-                                  BandwidthMeter bandwidthMeter) {
-        this (group, tracks, bandwidthMeter, DEFAULT_MAX_INITIAL_BITRATE,
-                DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS,
-                DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
-                DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS, DEFAULT_BANDWIDTH_FRACTION, null);
     }
 
     /**
@@ -150,6 +128,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
      * @param bandwidthMeter Provides an estimate of the currently available bandwidth.
      * @param maxInitialBitrate The maximum bitrate in bits per second that should be assumed when a
      *     bandwidth estimate is unavailable.
+     * @param bufferSizeMs The max size of the buffer in milliseconds.
      * @param minDurationForQualityIncreaseMs The minimum duration of buffered data required for the
      *     selected track to switch to one of higher quality.
      * @param maxDurationForQualityDecreaseMs The maximum duration of buffered data required for the
@@ -157,22 +136,29 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
      * @param minDurationToRetainAfterDiscardMs When switching to a track of significantly higher
      *     quality, the selection may indicate that media already buffered at the lower quality can
      *     be discarded to speed up the switch. This is the minimum duration of media that must be
-     *     retained at the lower quality.
+     *     retained at the lower quality (aka the minimum duration of the safe margin).
+     * @param maxDurationToRetainAfterDiscardMs When switching to a track of significantly higher
+     *     quality, the selection may indicate that media already buffered at the lower quality can
+     *     be discarded to speed up the switch. This is the maximum duration of media that must be
+     *     retained at the lower quality (aka the maximum duration of the safe margin).
      * @param bandwidthFraction The fraction of the available bandwidth that the selection should
      *     consider available for use. Setting to a value less than 1 is recommended to account
      *     for inaccuracies in the bandwidth estimator.
      * @param dynamicEditingHolder The object that holds the information about the snapchanges
      */
-    public PyramidalTrackSelection(TrackGroup group, int[] tracks, BandwidthMeter bandwidthMeter,
-                                  int maxInitialBitrate, long minDurationForQualityIncreaseMs,
-                                  long maxDurationForQualityDecreaseMs, long minDurationToRetainAfterDiscardMs,
-                                  float bandwidthFraction, DynamicEditingHolder dynamicEditingHolder) {
+    public PyramidalTrackSelection(TrackGroup group, int[] tracks,
+                                   BandwidthMeter bandwidthMeter, int maxInitialBitrate, int bufferSizeMs,
+                                   long minDurationForQualityIncreaseMs, long maxDurationForQualityDecreaseMs,
+                                   long minDurationToRetainAfterDiscardMs, long maxDurationToRetainAfterDiscardMs,
+                                   float bandwidthFraction, DynamicEditingHolder dynamicEditingHolder) {
         super(group, tracks);
         this.bandwidthMeter = bandwidthMeter;
         this.maxInitialBitrate = maxInitialBitrate;
+        this.bufferSize = bufferSizeMs * 1000;
         this.minDurationForQualityIncreaseUs = minDurationForQualityIncreaseMs * 1000L;
         this.maxDurationForQualityDecreaseUs = maxDurationForQualityDecreaseMs * 1000L;
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
+        this.maxDurationToRetainAfterDiscardUs = maxDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
         this.dynamicEditingHolder = dynamicEditingHolder;
         selectedIndex = determineIdealSelectedIndex(false);
@@ -216,12 +202,13 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                 closestSnapChange = snapChanges.get(i);
             }
             if (closestSnapChange != null) {
-                selectedIndex = Arrays.binarySearch(closestSnapChange.getSCfoVTiles(), adaptationSetIndex) >= 0 ? 0 : 1;
-                if (selectedIndex == 1 && closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs) {
+                int desiredIndex = Arrays.binarySearch(closestSnapChange.getSCfoVTiles(), adaptationSetIndex) >= 0 ? 0 : 1;
+                if (closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
                     // The snap change involves the current chunk. Provide a smooth transition when the snap change
                     // is forcing the quality to be low while the tile is still displayed to the user.
-                    selectedIndex = determineIdealSelectedIndex(isPicked);
+                    desiredIndex = selectedIndex;
                 }
+                selectedIndex = desiredIndex;
             } else {
                 // No snap changes in the buffer
                 selectedIndex = determineIdealSelectedIndex(isPicked);
@@ -269,20 +256,25 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
         int queueSize = queue.size();
         long bufferedDurationUs = queue.get(queueSize - 1).endTimeUs - playbackPositionUs;
-        int bufferSize = 10000000;
-        double adjustedThreshold = bufferedDurationUs/bufferSize*(maxDurationToRetainAfterDiscardUs - minDurationToRetainAfterDiscardUs);
+        Log.e("SRD"+(adaptationSetIndex+1), "Buffered duration "+bufferedDurationUs);
+        Log.e("SRD"+(adaptationSetIndex+1), "Queue size "+queueSize*1000000);
+        double bufferedPercentage = (double)bufferedDurationUs/bufferSize;
+        double adjustedThreshold = bufferedPercentage*(maxDurationToRetainAfterDiscardUs - minDurationToRetainAfterDiscardUs);
         long safeMargin = maxDurationToRetainAfterDiscardUs - (long)adjustedThreshold;
+        if (safeMargin < minDurationToRetainAfterDiscardUs)
+            safeMargin = minDurationToRetainAfterDiscardUs;
         if (bufferedDurationUs < safeMargin) {
             // Not enough buffered data. Never discard in this case.
             return queueSize;
         }
+        //Log.e("SRD"+adaptationSetIndex, "Maybe discard: margin "+safeMargin +" buffer "+bufferedDurationUs);
 
         MediaChunk previousChunk = queue.get(0);
         if(dynamicEditingHolder.isDynamicEdited() &&
                 dynamicEditingHolder.nextSCMicroseconds <= nextChunkEndTimeUs) {
             long timeBeforeSnapChangeUs = dynamicEditingHolder.nextSCMicroseconds - playbackPositionUs;
-            if (timeBeforeSnapChangeUs < minDurationToRetainBeforeSnapChangeUs) {
-                // The snap change is too close to the playback position. It's not worth discarding.
+            if (timeBeforeSnapChangeUs < maxDurationToRetainAfterDiscardUs) {
+                // The snap change is close to the playback position. It's not worth discarding.
                 return queueSize;
             }
             // Check for the last chunk before the snap change position
@@ -304,7 +296,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             for (int i = 0; i < queueSize; i++) {
                 MediaChunk chunk = queue.get(i);
                 long durationBeforeThisChunkUs = chunk.startTimeUs - playbackPositionUs;
-                if (durationBeforeThisChunkUs >= safeMargin
+                if (durationBeforeThisChunkUs > safeMargin
                         && (int)chunk.trackSelectionData == 1) {
                     return i;
                 }
