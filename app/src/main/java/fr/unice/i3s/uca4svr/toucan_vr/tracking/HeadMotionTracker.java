@@ -16,7 +16,6 @@
 package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 
 import android.os.Environment;
-import android.util.Log;
 
 import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.SystemClock;

@@ -601,7 +601,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         /* eventListener */ null);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
                 mediaSource.setTileQualityTracker(new TileQualityTracker(logPrefix));
-                mediaSource.setBuffers(minBufferMs, maxBufferMs);
                 return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,
