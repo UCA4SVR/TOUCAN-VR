@@ -19,8 +19,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -563,7 +561,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
         }
         needKeyframe = false;
       }
-      Log.e("REPLACE", id + ": sample metadata" + timeUs + " " + flags);
+      //Log.e("REPLACE", id + ": sample metadata" + timeUs + " " + flags);
       timeUs += sampleOffsetUs;
       long absoluteOffset = totalBytesWritten - size - offset;
       infoQueue.commitSample(timeUs, flags, absoluteOffset, size, encryptionKey);
@@ -574,7 +572,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   private void sampleReplacementMetadata(long timeUs, int flags, int size, int offset, byte[] encryptionKey) {
-    Log.e("REPLACE", id + ": sample replacement metadata" + timeUs + " " + flags);
     int writeIndex = replacementAbsoluteWriteIndex % replacementMetaData.length;
     BufferExtrasHolder extras = new BufferExtrasHolder();
     extras.timesUs = timeUs;
@@ -650,7 +647,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     lock.lock();
     try {
       if (!isReplaceing) {
-        Log.e("REPLACE", id + ": beginning a replacement " + startTimeUs + " " + endTimeUs);
         isReplaceing = true;
         replacementStartTime = startTimeUs;
         replacementEndTime = endTimeUs;
@@ -661,13 +657,16 @@ public final class ReplacementTrackOutput implements TrackOutput {
   }
 
   public void commitReplacement() {
-    //*
     lock.lock();
     try {
       if (!isReplaceing) {
         return;
       }
 
+      // Compute the lowest and the highest timestamps contained in the replacement data
+      // Those are considered as the starting and the ending point of the replacement.
+      // This ensures that even if data contained in the chunk object or passed from callers are
+      // wrong, we still do the replacement with respect to what has actually been downloaded.
       long startTime = Long.MAX_VALUE;
       long endTime = Long.MIN_VALUE;
       for (int i = 0; i < replacementAbsoluteWriteIndex; i++) {
@@ -680,33 +679,25 @@ public final class ReplacementTrackOutput implements TrackOutput {
         }
       }
 
-      Log.e("REPLACE", id + ": committing a replacement " + startTime + " " + endTime);
-      if (startTime == endTime) {
-        Log.e("REPLACE", id + ": end time equal start time.");
-      }
-
       if (infoQueue.largestDequeuedTimestampUs >= startTime) {
-        // it's too late
+        // it's too late,
+        // we have already dequeued samples further than the starting point of the replacement
         cancelReplacement();
         return;
       }
       // perform the replacement
       // Identify where the replacement must happen
+      // The replacement is based on keyframes, it starts at a keyframe (included) and stops at
+      // another one (excluded).
       int startInfoIndex = infoQueue.findClosestKeyFrame(startTime);
       int endInfoIndex = infoQueue.findClosestKeyFrame(endTime);
 
-      // If the end index has not been found, we consider it to be the writing point because it means
-      // the searched time has not been buffered yet.
-      //endInfoIndex = endInfoIndex == -1 ? infoQueue.relativeWriteIndex : endInfoIndex;
-      //Log.e("REPLACE", "info indexes: " + startInfoIndex + " " + endInfoIndex);
-      //long diff1 = replacementStartTime - infoQueue.timesUs[startInfoIndex];
-      //long diff2 = replacementEndTime - infoQueue.timesUs[endInfoIndex];
-      //Log.e("REPLACE", "times differences: " + diff1 + " " + diff2);
-      //Log.e("REPLACE", "flags: " + infoQueue.flags[startInfoIndex] + " " + infoQueue.flags[endInfoIndex]);
-      //int diff3 = endInfoIndex - startInfoIndex;
-      //if (diff3 != 30) {
-      //  Log.e("REPLACE", "info size: " + diff3);
-      //}
+      // It may happen that we want to replace the last chunk in the buffer.
+      // In this condition, the starting keyframe will be identified as the last keyframe of the buffer.
+      // Indeed, the keyframe for the next chunk has not been downloaded yet.
+      // In this condition, the ending keyframe identified will be the same as the starting one.
+      // We might check this particular case and affect the write index to the endInfoIndex if needed
+      // and possible.
 
       long dataStartOffset = infoQueue.offsets[startInfoIndex];
       long dataEndOffset = infoQueue.offsets[endInfoIndex];
@@ -890,7 +881,6 @@ public final class ReplacementTrackOutput implements TrackOutput {
     } finally {
       lock.unlock();
     }
-    //*/
   }
 
   public void cancelReplacement() {

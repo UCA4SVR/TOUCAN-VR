@@ -47,15 +47,7 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
 
   @Override
   public boolean continueLoading(long positionUs) {
-  /* I need to buffer again: if I was replacing I have to stop the process */
-	/*
-    if (this.imReplacing) {
-      for (SequenceableLoader loader : loaders) {
-        ((OurChunkSampleStream) loader).stopReplacing();
-      }
-      this.imReplacing = false;
-    }
-    */
+    /* I need to buffer again: if I was replacing I have to stop the process */
     boolean madeProgress = false;
     boolean madeProgressThisIteration;
     do {
@@ -80,16 +72,9 @@ public final class SRDCompositeSequenceableLoader implements SequenceableLoader 
     TilesPicker tilesPicker = TilesPicker.getPicker();
     //Need to replace: which one? choose the currently picked tiles!
     for (SequenceableLoader loader : loaders) {
-      /* test stuff
-      if (((OurChunkSampleStream) loader).adaptationSetIndex == 4) {
-        madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
-      }
-      //*/
-      //* real stuff
       if (tilesPicker.isPicked(((OurChunkSampleStream) loader).adaptationSetIndex)) {
         madeProgress |= ((OurChunkSampleStream) loader).replace(playbackPosition);
       }
-      //*/
     }
     return madeProgress;
   }

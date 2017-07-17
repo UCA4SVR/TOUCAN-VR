@@ -176,20 +176,6 @@ public final class SRDLoadControl implements LoadControl {
 
   @Override
   public boolean shouldContinueLoading(long bufferedDurationUs) {
-    /*int bufferTimeState = getBufferTimeState(bufferedDurationUs);
-    int totalBytesAllocated = allocator.getTotalBytesAllocated();
-    boolean targetBufferSizeReached =  totalBytesAllocated >= targetBufferSize;
-    boolean wasBuffering = isBuffering;
-    isBuffering = bufferTimeState == BELOW_LOW_WATERMARK
-            || (bufferTimeState == BETWEEN_WATERMARKS && isBuffering && !targetBufferSizeReached);
-    if (priorityTaskManager != null && isBuffering != wasBuffering) {
-        if (isBuffering) {
-            priorityTaskManager.add(C.PRIORITY_PLAYBACK);
-        } else {
-            priorityTaskManager.remove(C.PRIORITY_PLAYBACK);
-        }
-    }*/
-    //return isBuffering;
     return true;
   }
 

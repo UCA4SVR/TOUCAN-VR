@@ -411,7 +411,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
     if (maybeReplace != null) {
       /*
-			I've found the chunk that is currently playing in the buffer.
+			I've found the chunk that is the closest to the playing position in the buffer.
 			Checking if I can replace chunk starting x segments ahead of it.
 			 */
       if (currentClosest < 4000000) {
@@ -479,8 +479,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       }
     } else {
 			/*
-			I've not found the chunk that is now playing in the buffer
-			Should I do the replacement anyway?
+			I've not found the chunk that is the closest to the playing position in the buffer.
+			This means that the buffer is empty and should not happen. We will exit the replacement
+			without doing anything.
 			*/
       return false;
     }
