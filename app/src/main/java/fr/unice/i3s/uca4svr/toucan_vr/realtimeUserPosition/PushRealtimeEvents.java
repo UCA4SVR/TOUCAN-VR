@@ -29,7 +29,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean> {
+public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolean> {
 
     private GVRContext context;
     private PushResponse callback;
@@ -46,8 +46,8 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
 
     @Override
     protected Boolean doInBackground(RealtimeEvent... events) {
-        for(RealtimeEvent event : events) {
-            if(!push(event)) return false;
+        for (RealtimeEvent event : events) {
+            if (!push(event)) return false;
         }
         return true;
     }
@@ -68,14 +68,15 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
             fullURI = serverIP + pushForHeadMotion;
 
         } else {
-            urlParameters = "?timestamp=" + event.timestamp;
-            fullURI = serverIP + pushForTapEvent;
+            //TODO re-enable when the server will be able to handle it
+//            urlParameters = "?timestamp=" + event.timestamp;
+//            fullURI = serverIP + pushForTapEvent;
 
         }
-        if(fullURI.length()>0) {
+        if (fullURI.length() > 0) {
             try {
                 HttpURLConnection urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
-                byte[] postData = urlParameters.getBytes( StandardCharsets.UTF_8 );
+                byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
                 urlc.setDoOutput(true);
                 urlc.setInstanceFollowRedirects(false);
                 urlc.setRequestMethod("POST");
@@ -83,8 +84,8 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
                 urlc.setRequestProperty("charset", "utf-8");
                 urlc.setRequestProperty("Content-Length", Integer.toString(postData.length));
                 urlc.setUseCaches(false);
-                try(DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
-                    wr.write( postData );
+                try (DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
+                    wr.write(postData);
                 }
                 urlc.connect();
                 return (urlc.getResponseCode() == 200);
