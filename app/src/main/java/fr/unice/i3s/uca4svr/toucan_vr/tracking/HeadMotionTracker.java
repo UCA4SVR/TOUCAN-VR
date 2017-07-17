@@ -114,11 +114,11 @@ public class HeadMotionTracker {
      * @param context The GearVR framework context from which we're logging the head motion
      * @param playbackPosition The current position in the video playback
      */
-    public void track(GVRContext context, long playbackPosition) {
+    public void track(GVRContext context, long playbackPosition, float x, float y) {
         GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-        String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.0f,%4$.0f,%5$.0f",
+        String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.0f,%4$.0f,%5$.0f,%6$.0f,%7$.0f",
                 clock.elapsedRealtime(), playbackPosition, headTransform.getRotationPitch(),
-                headTransform.getRotationYaw(), headTransform.getRotationRoll());
+                headTransform.getRotationYaw(), headTransform.getRotationRoll(),x,y);
         logger.error(rotationsString);
     }
 }
