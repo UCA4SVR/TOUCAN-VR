@@ -68,6 +68,7 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
             fullURI = serverIP + pushForHeadMotion;
 
         } else {
+            return true;
             //TODO re-enable when the server will be able to handle it
 //            urlParameters = "?timestamp=" + event.timestamp;
 //            fullURI = serverIP + pushForTapEvent;
