@@ -35,6 +35,7 @@ import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 /**
  * A {@link SampleStream} that loads media in {@link Chunk}s, obtained from a {@link ChunkSource}.
@@ -58,6 +59,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final DefaultTrackOutput[] embeddedSampleQueues;
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
+  private TileQualityTracker tileQualityTracker;
+  private BaseMediaChunk lastLoggedChunk;
+  private int qualityLogged;
   private DynamicEditingHolder dynamicEditingHolder;
   public final int adaptationSetIndex;
 
@@ -80,9 +84,10 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    */
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
-                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder) {
+                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder, TileQualityTracker tileQualityTracker) {
     this.adaptationSetIndex = adaptationSetIndex;
     this.dynamicEditingHolder = dynamicEditingHolder;
+    this.tileQualityTracker = tileQualityTracker;
     //Getting the highest format for this tile
     this.highestFormatId = ((DefaultDashSRDChunkSource)chunkSource).getHighestFormatId();
     this.primaryTrackType = primaryTrackType;
@@ -488,6 +493,14 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       mediaChunks.removeFirst();
     }
     BaseMediaChunk currentChunk = mediaChunks.getFirst();
+    //Logging of the quality
+    if(tileQualityTracker !=null && currentChunk.trackFormat.width > 0) {
+      if(!currentChunk.equals(this.lastLoggedChunk)) {
+        qualityLogged = currentChunk.trackFormat.id.equals(this.highestFormatId) ? 1 : 0;
+        tileQualityTracker.track(adaptationSetIndex, currentChunk.chunkIndex, currentChunk.startTimeUs, currentChunk.endTimeUs, qualityLogged);
+        this.lastLoggedChunk = currentChunk;
+      }
+    }
     Format trackFormat = currentChunk.trackFormat;
     if (!trackFormat.equals(primaryDownstreamTrackFormat)) {
       eventDispatcher.downstreamFormatChanged(primaryTrackType, trackFormat,

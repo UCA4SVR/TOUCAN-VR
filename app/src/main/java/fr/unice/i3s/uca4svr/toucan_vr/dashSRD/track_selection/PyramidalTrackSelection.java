@@ -206,7 +206,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
             List<SnapChange> snapChanges = dynamicEditingHolder.getSnapChanges();
             SnapChange closestSnapChange = null;
             // In case of multiple snap changes in the buffer, consider the last one when making decisions
-            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() <= nextChunkEndTimeUs; i++) {
+            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() < nextChunkEndTimeUs; i++) {
                 closestSnapChange = snapChanges.get(i);
             }
             if (closestSnapChange != null) {

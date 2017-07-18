@@ -20,8 +20,7 @@ import android.os.Environment;
 import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.SystemClock;
 
-import org.gearvrf.GVRContext;
-import org.gearvrf.GVRTransform;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -30,26 +29,24 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-import org.slf4j.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
 /**
- * Logs the pitch, yaw, roll angles from the HeadTransform of the main camera rig
- * from the context given at initialization. Logging is done into a file which name is
- * TAG_datetime.csv where TAG is given as a parameter of the constructor and datetime is formatted
- * as yyyy_MM_dd_HH_mm_ss.
- * The files is csv formatted, with 5 entries on each line:
- * the system clock, the playback position, the pitch (or X), yaw (or Y) and roll (or Z) rotation
- * Rotations are expressed as angles in degrees.
- * The logging happens each time the <code>track</code> method is called.
+ * The class is used to log the tiles that are picked
+ * The file is composed by (1+number of tiles) columns:
+ *      1- the system time
+ *      2- 1 if the tile number 1 is picked, 0 otherwise
+ *      3- 1 if the tile number 2 is picked, 0 otherwise
+ *      .
+ *      .
+ *      .
+ *      (# of tiles)- 1 if the tile number (# of tiles) is picked, 0 otherwise
  * The file is located under the External Storage Public Directory in a directory name toucan/logs.
- *
- * @author Romaric Pighetti
  */
-public class HeadMotionTracker {
+public class PickedTilesTracker {
 
     // Each logger must have a different ID,
     // so that creating a new logger won't override the previous one
@@ -60,14 +57,11 @@ public class HeadMotionTracker {
     private final Clock clock;
 
     /**
-     * Initialize a HeadMotionTracker, that will record the angles of the HeadTransform
-     * from the main camera of the given context to a file name logFilePrefix_date.csv.
-     * Be aware that tracking is done by calling the <code>track</code> method every time
-     * and entry is needed.
+     * Initialize a Picked TilesTracker, that will record picked tiles to a file name logFilePrefix_date.csv.
      *
      * @param logFilePrefix The prefix for the log file name
      */
-    public HeadMotionTracker(String logFilePrefix) {
+    public PickedTilesTracker(String logFilePrefix) {
 
         clock = new SystemClock();
 
@@ -89,7 +83,7 @@ public class HeadMotionTracker {
         fileAppender.start();
 
         // getting the instanceof the logger
-        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.HeadMotionTracker"
+        logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.PickedTilesTracker"
                 + loggerNextID++);
         // I know the logger is from logback, this is the implementation i'm using below slf4j API.
         ((ch.qos.logback.classic.Logger) logger).addAppender(fileAppender);
@@ -103,21 +97,14 @@ public class HeadMotionTracker {
     private String createLogFileName(String logFilePrefix) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy_MM_dd_HH_mm_ss", Locale.US);
         Date date = new Date();
-        return String.format("%s_headMotion_%s.csv", logFilePrefix, dateFormat.format(date));
+        return String.format("%s_pickedTiles_%s.csv", logFilePrefix, dateFormat.format(date));
     }
 
     /**
      * Outputs a track record to the log file.
-     * The same clock reference is used as for every tracker. Also the playback position is recorded.
-     *
-     * @param context The GearVR framework context from which we're logging the head motion
-     * @param playbackPosition The current position in the video playback
+     * The same clock reference is used as for every tracker.
      */
-    public void track(GVRContext context, long playbackPosition, float x, float y) {
-        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-        String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.0f,%4$.0f,%5$.0f,%6$.0f,%7$.0f",
-                clock.elapsedRealtime(), playbackPosition, headTransform.getRotationPitch(),
-                headTransform.getRotationYaw(), headTransform.getRotationRoll(),x,y);
-        logger.error(rotationsString);
+    public void track(String pickedTiles) {
+        logger.error(String.format(Locale.ENGLISH, "%d,%s", clock.elapsedRealtime(), pickedTiles));
     }
 }
