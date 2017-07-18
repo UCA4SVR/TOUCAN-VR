@@ -21,8 +21,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
@@ -256,8 +254,6 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
         int queueSize = queue.size();
         long bufferedDurationUs = queue.get(queueSize - 1).endTimeUs - playbackPositionUs;
-        Log.e("SRD"+(adaptationSetIndex+1), "Buffered duration "+bufferedDurationUs);
-        Log.e("SRD"+(adaptationSetIndex+1), "Queue size "+queueSize*1000000);
         double bufferedPercentage = (double)bufferedDurationUs/bufferSize;
         double adjustedThreshold = bufferedPercentage*(maxDurationToRetainAfterDiscardUs - minDurationToRetainAfterDiscardUs);
         long safeMargin = maxDurationToRetainAfterDiscardUs - (long)adjustedThreshold;

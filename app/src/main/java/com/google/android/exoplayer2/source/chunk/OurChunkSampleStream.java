@@ -15,8 +15,6 @@
  */
 package com.google.android.exoplayer2.source.chunk;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -356,7 +354,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       return false;
     }
 
-    // Make sure the chunk to download is not an initialization chunk
+    // Make sure the chunk is not an initialization chunk
     if (isMediaChunk(loadable)) {
       pendingResetPositionUs = C.TIME_UNSET;
       BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
@@ -423,13 +421,11 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     if (mediaChunks.size() <= queueLength) {
       return false;
     }
-    Log.e("SRD"+(adaptationSetIndex+1), "Discard from "+queueLength);
     long startTimeUs = 0;
     long endTimeUs = mediaChunks.getLast().endTimeUs;
     BaseMediaChunk removed = null;
     while (mediaChunks.size() > queueLength) {
       removed = mediaChunks.removeLast();
-      Log.e("SRD"+(adaptationSetIndex+1), "Discarded chunk "+removed.chunkIndex +" quality "+removed.trackSelectionData);
       startTimeUs = removed.startTimeUs;
       loadingFinished = false;
     }
