@@ -65,8 +65,10 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneOb
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
+import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
 
@@ -108,6 +110,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingSnapchanges = false;
     private boolean loggingRealTimeUserPosition = false;
     private String serverIPAddress;
+    private boolean loggingQualityFoV = false;
 
     private String[] tiles;
     private int gridWidth = 1;
@@ -220,6 +223,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         loggingSnapchanges = intent.getBooleanExtra("snapchangeEventsLogging", false);
         loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
         serverIPAddress = intent.getStringExtra("serverIPAddress");
+        loggingQualityFoV = intent.getBooleanExtra("loggingQualityFoV", false);
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -273,7 +277,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
             if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
-                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges || loggingQualityFoV
                     || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
@@ -468,6 +472,14 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
                     if (loggingSnapchanges)
                         ((Minimal360Video) getMain()).initSnapchangeEventsTracker(logPrefix);
+                    if (loggingQualityFoV) {
+                        //The TilesPicker is a singleton class so perhaps an object already exists but we want to refresh the logger inside with the proper prefix
+                        TilesPicker.getPicker().refreshLogger(logPrefix);
+                    } else {
+                        TilesPicker.getPicker().disableLogger();
+                    }
+
+
                     if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
                     }
@@ -590,6 +602,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
+                mediaSource.setTileQualityTracker(new TileQualityTracker(logPrefix));
                 return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,

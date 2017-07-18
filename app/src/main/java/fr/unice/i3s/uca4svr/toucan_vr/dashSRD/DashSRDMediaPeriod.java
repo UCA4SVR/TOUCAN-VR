@@ -42,6 +42,7 @@ import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
 
@@ -68,12 +69,13 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
     private List<AdaptationSet> adaptationSets;
 
     private DynamicEditingHolder dynamicEditingHolder;
+    private final TileQualityTracker tileQualityTracker;
 
     public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
                               DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                               EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
                               LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
-                              DynamicEditingHolder dynamicEditingHolder) {
+                              DynamicEditingHolder dynamicEditingHolder, TileQualityTracker tileQualityTracker) {
         this.id = id;
         this.manifest = manifest;
         this.periodIndex = periodIndex;
@@ -84,6 +86,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
         this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
         this.allocator = allocator;
         this.dynamicEditingHolder = dynamicEditingHolder;
+        this.tileQualityTracker = tileQualityTracker;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -239,7 +242,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
         OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-                eventDispatcher, dynamicEditingHolder);
+                eventDispatcher, dynamicEditingHolder, tileQualityTracker);
         return stream;
     }
 
