@@ -257,13 +257,10 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         double bufferedPercentage = (double)bufferedDurationUs/bufferSize;
         double adjustedThreshold = bufferedPercentage*(maxDurationToRetainAfterDiscardUs - minDurationToRetainAfterDiscardUs);
         long safeMargin = maxDurationToRetainAfterDiscardUs - (long)adjustedThreshold;
-        if (safeMargin < minDurationToRetainAfterDiscardUs)
-            safeMargin = minDurationToRetainAfterDiscardUs;
         if (bufferedDurationUs < safeMargin) {
             // Not enough buffered data. Never discard in this case.
             return queueSize;
         }
-        //Log.e("SRD"+adaptationSetIndex, "Maybe discard: margin "+safeMargin +" buffer "+bufferedDurationUs);
 
         MediaChunk previousChunk = queue.get(0);
         if(dynamicEditingHolder.isDynamicEdited() &&
