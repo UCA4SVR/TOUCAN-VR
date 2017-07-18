@@ -15,8 +15,6 @@
  */
 package com.google.android.exoplayer2.source.chunk;
 
-import android.util.Log;
-
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
