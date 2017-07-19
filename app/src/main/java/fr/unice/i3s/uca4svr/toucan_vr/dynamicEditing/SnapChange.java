@@ -52,6 +52,10 @@ public class SnapChange {
 		return this.milliseconds;
 	}
 
+    public long getSCMicroseconds() {
+        return this.milliseconds*1000;
+    }
+
 	public int getSCroiDegrees() {
 		return this.roiDegrees;
 	}

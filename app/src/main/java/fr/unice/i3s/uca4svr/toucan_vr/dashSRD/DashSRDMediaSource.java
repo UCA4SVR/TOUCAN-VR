@@ -55,13 +55,12 @@ import java.util.TimeZone;
 import com.google.android.exoplayer2.source.dash.manifest.DashSRDManifestParser;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 /**
- * A DASH {@link MediaSource}.
+ * A DASH {@link MediaSource} supporting tiled videos.
+ * This class has very few changes on the original DashMediaSource.
  */
-
-// N.B. this class has not been changed from the original DashMediaSource,
-//      except for the manifestParser
 
 public final class DashSRDMediaSource implements MediaSource {
 
@@ -127,6 +126,7 @@ public final class DashSRDMediaSource implements MediaSource {
     private int maxBufferMs;
 
     private DynamicEditingHolder dynamicEditingHolder;
+    private TileQualityTracker tileQualityTracker;
 
     /**
      * Constructs an instance to play a given {@link DashManifest}, which must be static.
@@ -309,7 +309,7 @@ public final class DashSRDMediaSource implements MediaSource {
         DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(firstPeriodId + periodIndex, manifest,
                 periodIndex, chunkSourceFactory, minLoadableRetryCount, periodEventDispatcher,
                 elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, minBufferMs, maxBufferMs,
-                dynamicEditingHolder, noReplacement);
+                dynamicEditingHolder, tileQualityTracker, noReplacement);
         periodsById.put(mediaPeriod.id, mediaPeriod);
         return mediaPeriod;
     }
@@ -825,6 +825,10 @@ public final class DashSRDMediaSource implements MediaSource {
 
     public void setDynamicEditingHolder(DynamicEditingHolder dynamicEditingHolder) {
         this.dynamicEditingHolder = dynamicEditingHolder;
+    }
+
+    public void setTileQualityTracker(TileQualityTracker tileQualityTracker) {
+        this.tileQualityTracker = tileQualityTracker;
     }
 
 }

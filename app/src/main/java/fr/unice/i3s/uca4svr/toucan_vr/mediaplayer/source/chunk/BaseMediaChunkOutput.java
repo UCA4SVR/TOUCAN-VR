@@ -35,7 +35,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutp
   private final ReplacementTrackOutput[] trackOutputs;
 
   /**
-   * @param trackTypes The track types of the individual track outputs.
+   * @param trackTypes   The track types of the individual track outputs.
    * @param trackOutputs The individual track outputs.
    */
   public BaseMediaChunkOutput(int[] trackTypes, ReplacementTrackOutput[] trackOutputs) {

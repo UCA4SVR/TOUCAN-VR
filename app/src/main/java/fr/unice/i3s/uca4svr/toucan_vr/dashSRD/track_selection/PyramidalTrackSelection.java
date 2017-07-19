@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.SnapChange;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
@@ -57,7 +58,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     private int reason;
     private int adaptationSetIndex;
     private long currentPlaybackPosition;
-    private long chunkStartTime;
+    private long nextChunkStartTimeUs;
+    private long nextChunkEndTimeUs;
     private DynamicEditingHolder dynamicEditingHolder;
 
     /**
@@ -169,7 +171,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.minDurationToRetainAfterDiscardUs = minDurationToRetainAfterDiscardMs * 1000L;
         this.bandwidthFraction = bandwidthFraction;
         this.dynamicEditingHolder = dynamicEditingHolder;
-        selectedIndex = determineIdealSelectedIndex(true);
+        selectedIndex = determineIdealSelectedIndex(false);
         reason = C.SELECTION_REASON_INITIAL;
     }
 
@@ -181,27 +183,48 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         this.currentPlaybackPosition = playbackPositionUs;
     }
 
-    public void updateNextChunkPosition(long chunkStartTime) {
-        this.chunkStartTime = chunkStartTime;
+    public void updateNextChunkStartTime(long chunkStartTimeUs) {
+        this.nextChunkStartTimeUs = chunkStartTimeUs;
     }
 
+    public void updateNextChunkEndTime(long chunkEndTimeUs) {
+        this.nextChunkEndTimeUs = chunkEndTimeUs;
+    }
+
+    /**
+     * Updates the selected quality for the next chunk to download in the current chunk stream.
+     * Quality is based either on the current Field of View, provided by the TilesPicker,
+     * or on the snap changes included in the DynamicEditingHolder.
+     * When the index selected is 1 the quality requested is low, otherwise is high.
+     *
+     * @param bufferedDurationUs Amount of data currently stored in the buffer.
+     */
     @Override
     public void updateSelectedTrack(long bufferedDurationUs) {
         boolean isPicked = TilesPicker.getPicker().isPicked(adaptationSetIndex);
         // isPicked = false;
         int currentSelectedIndex = selectedIndex;
-        /*Checking if the tile has to be downloaded at the maximum or the minimum quality.
-        if the video is dynamically edited, the presence of a snapchange before the start of the segment
-        determines the quality to be chosen: the tile in the field of view are held by the dynamicEditingHolder object.
-        Otherwise, the tile picker is used
-        */
+
         if(dynamicEditingHolder.isDynamicEdited()) {
-            if(dynamicEditingHolder.nextSCMicroseconds<=chunkStartTime) {
-                selectedIndex = Arrays.binarySearch(dynamicEditingHolder.nextSCfoVTiles, adaptationSetIndex) >= 0 ? 0 : 1;
+            List<SnapChange> snapChanges = dynamicEditingHolder.getSnapChanges();
+            SnapChange closestSnapChange = null;
+            // In case of multiple snap changes in the buffer, consider the last one when making decisions
+            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() < nextChunkEndTimeUs; i++) {
+                closestSnapChange = snapChanges.get(i);
+            }
+            if (closestSnapChange != null) {
+                selectedIndex = Arrays.binarySearch(closestSnapChange.getSCfoVTiles(), adaptationSetIndex) >= 0 ? 0 : 1;
+                if (selectedIndex == 1 && closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs) {
+                    // The snap change involves the current chunk. Provide a smooth transition when the snap change
+                    // is forcing the quality to be low while the tile is still displayed to the user.
+                    selectedIndex = determineIdealSelectedIndex(isPicked);
+                }
             } else {
+                // No snap changes in the buffer
                 selectedIndex = determineIdealSelectedIndex(isPicked);
             }
         } else {
+            // No dynamic editing
             selectedIndex = determineIdealSelectedIndex(isPicked);
         }
 
@@ -229,7 +252,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
 
     @Override
     public Object getSelectionData() {
-        return null;
+        return selectedIndex;
     }
 
     @Override

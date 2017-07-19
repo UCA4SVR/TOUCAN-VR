@@ -44,6 +44,8 @@ import java.util.List;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
+
 
 /**
  * A DASH {@link MediaPeriod}.
@@ -59,8 +61,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
   private final LoaderErrorThrower manifestLoaderErrorThrower;
   private final Allocator allocator;
   private final TrackGroupArray trackGroups;
-  private final int minBufferMs;
-  private final int maxBufferMs;
+  private final TileQualityTracker tileQualityTracker;
   private final boolean noReplacement;
 
   private Callback callback;
@@ -69,15 +70,19 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
   private DashManifest manifest;
   private int periodIndex;
   private List<AdaptationSet> adaptationSets;
-
   private DynamicEditingHolder dynamicEditingHolder;
+
+  private int replacementBufferHighWatermark;
+  private int replacementBufferLowWatermark;
+  private boolean isReplacing;
 
   public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
                             DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                             EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
                             LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
-                            int minBufferMs, int maxBufferMs, DynamicEditingHolder dynamicEditingHolder,
-                            boolean noReplacement) {
+                            int replacementBufferLowWatermark, int replacementBufferHighWatermark,
+                            DynamicEditingHolder dynamicEditingHolder,
+                            TileQualityTracker tileQualityTracker, boolean noReplacement) {
     this.id = id;
     this.manifest = manifest;
     this.periodIndex = periodIndex;
@@ -87,11 +92,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
     this.elapsedRealtimeOffset = elapsedRealtimeOffset;
     this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
     this.allocator = allocator;
-    //Buffers are provided in ms and then used in microseconds
-    this.minBufferMs = minBufferMs * 1000;
-    this.maxBufferMs = maxBufferMs * 1000;
     this.dynamicEditingHolder = dynamicEditingHolder;
+    this.tileQualityTracker = tileQualityTracker;
     this.noReplacement = noReplacement;
+    this.replacementBufferLowWatermark = replacementBufferLowWatermark * 1000;
+    this.replacementBufferHighWatermark = replacementBufferHighWatermark * 1000;
+    this.isReplacing = false;
     sampleStreams = newSampleStreamArray(0);
     sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
     adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
@@ -177,10 +183,21 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
   @Override
   public boolean continueLoading(long positionUs) {
     long bufferedPosition = getBufferedPositionUs();
-        /*If the buffer is full and the playback has started, start replacing chunks.
-        It doesn't make sense to replace if the playback hasn't started: we have no information
-        from the picker */
-    if ((bufferedPosition - positionUs) > maxBufferMs) {
+
+    /*
+     * If the buffer falls bellow the low watermark, stop replacement and buffer content again.
+     */
+    if ((bufferedPosition - positionUs) < replacementBufferLowWatermark) {
+      isReplacing = false;
+    }
+        /*
+         * If the buffer is full and the playback has started, start replacing chunks.
+         * It doesn't make sense to replace if the playback hasn't started: we have no information
+         * from the picker.
+         * If we are still replacing (the buffer has not depleted that much), continue replacing.
+         */
+    if ((bufferedPosition - positionUs) > replacementBufferHighWatermark || isReplacing) {
+      isReplacing = true;
       if (positionUs > 0) {
         if (!sequenceableLoader.replaceChunks(positionUs))
           callback.onContinueLoadingRequested(this);
@@ -189,7 +206,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
         callback.onContinueLoadingRequested(this);
       }
     } else {
-        sequenceableLoader.continueLoading(positionUs);
+      sequenceableLoader.continueLoading(positionUs);
     }
     return true;
   }
@@ -260,8 +277,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStr
             manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
             elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
     OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
-                /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-            eventDispatcher, dynamicEditingHolder, noReplacement);
+            /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
+            eventDispatcher, dynamicEditingHolder, tileQualityTracker, noReplacement);
     return stream;
   }
 
