@@ -68,6 +68,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
@@ -111,6 +112,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingRealTimeUserPosition = false;
     private String serverIPAddress;
     private boolean loggingQualityFoV = false;
+    private boolean loggingReplacements = false;
 
     private String[] tiles;
     private int gridWidth = 1;
@@ -602,7 +604,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
-                mediaSource.setTileQualityTracker(new TileQualityTracker(logPrefix));
+                mediaSource.setTileQualityTracker(loggingQualityFoV ? new TileQualityTracker(logPrefix) : null);
+                mediaSource.setReplacementTracker(new ReplacementTracker(logPrefix));
                 return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,

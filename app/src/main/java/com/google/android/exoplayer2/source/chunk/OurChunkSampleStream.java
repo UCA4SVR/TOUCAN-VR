@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 /**
@@ -59,6 +60,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
   private TileQualityTracker tileQualityTracker;
+  private ReplacementTracker replacementTracker;
   private BaseMediaChunk lastLoggedChunk;
   private int qualityLogged;
   private DynamicEditingHolder dynamicEditingHolder;
@@ -85,10 +87,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    */
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
-                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder, TileQualityTracker tileQualityTracker) {
+                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder,
+                              TileQualityTracker tileQualityTracker, ReplacementTracker replacementTracker) {
     this.adaptationSetIndex = adaptationSetIndex;
     this.dynamicEditingHolder = dynamicEditingHolder;
     this.tileQualityTracker = tileQualityTracker;
+    this.replacementTracker = replacementTracker;
     //Getting the highest format for this tile
     this.highestFormatId = ((DefaultDashSRDChunkSource)chunkSource).getHighestFormatId();
     this.primaryTrackType = primaryTrackType;
@@ -433,6 +437,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       removed = mediaChunks.removeLast();
       startTimeUs = removed.startTimeUs;
       loadingFinished = false;
+      // Logging of the chunks being discarded
+      if (replacementTracker != null)
+        replacementTracker.track(startTimeUs, adaptationSetIndex, (int)removed.trackSelectionData == 1 ? 0 : 1);
     }
     primarySampleQueue.discardUpstreamSamples(removed.getFirstSampleIndex(0));
     for (int i = 0; i < embeddedSampleQueues.length; i++) {
