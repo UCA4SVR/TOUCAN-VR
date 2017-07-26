@@ -16,24 +16,23 @@
 
 package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 
-        import android.os.Environment;
+import android.os.Environment;
 
-        import com.google.android.exoplayer2.ExoPlayer;
-        import com.google.android.exoplayer2.util.Clock;
-        import com.google.android.exoplayer2.util.SystemClock;
+import com.google.android.exoplayer2.util.Clock;
+import com.google.android.exoplayer2.util.SystemClock;
 
-        import java.io.File;
-        import java.text.DateFormat;
-        import java.text.SimpleDateFormat;
-        import java.util.Date;
-        import java.util.Locale;
+import java.io.File;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
-        import org.slf4j.Logger;
-        import org.slf4j.LoggerFactory;
-        import ch.qos.logback.classic.LoggerContext;
-        import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
-        import ch.qos.logback.classic.spi.ILoggingEvent;
-        import ch.qos.logback.core.FileAppender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.FileAppender;
 
 /**
  * It tracks the number of chunks being replaced in the buffers.
@@ -56,7 +55,7 @@ public class ReplacementTracker {
     /**
      * Main constructor of the tracker.
      * It creates a log file named logFilePrefix_date.csv.
-     * Be aware that tracking is done by calling the <code>track</code> method in the onStep function.
+     * Tracking is done by calling the <code>track</code> method.
      *
      * @param logFilePrefix The prefix for the log file name
      */
@@ -81,7 +80,7 @@ public class ReplacementTracker {
         fileAppender.setEncoder(encoder1);
         fileAppender.start();
 
-        // getting the instance of the logger
+        // Getting the instance of the logger
         logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.ReplacementTracker"
                 + loggerNextID++);
         // I know the logger is from logback, this is the implementation i'm using below slf4j API.
@@ -113,7 +112,6 @@ public class ReplacementTracker {
      */
     public void track(long chunkStartTime, int tileIndex, int qualityIndex) {
         logger.error(String.format(Locale.ENGLISH, "%d,%d,%d,%d",
-                clock.elapsedRealtime(), chunkStartTime,
-                tileIndex, qualityIndex));
+                clock.elapsedRealtime(), chunkStartTime, tileIndex, qualityIndex));
     }
 }

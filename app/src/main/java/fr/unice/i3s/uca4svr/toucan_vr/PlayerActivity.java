@@ -112,7 +112,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingRealTimeUserPosition = false;
     private String serverIPAddress;
     private boolean loggingQualityFoV = false;
-    private boolean loggingReplacements = false;
+    private boolean loggingReplacement = false;
 
     private String[] tiles;
     private int gridWidth = 1;
@@ -226,6 +226,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
         serverIPAddress = intent.getStringExtra("serverIPAddress");
         loggingQualityFoV = intent.getBooleanExtra("loggingQualityFoV", false);
+        loggingReplacement = intent.getBooleanExtra("loggingReplacement", false);
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -279,8 +280,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
             if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
-                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges || loggingQualityFoV
-                    || dynamicEditingHolder.isDynamicEdited()) {
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges
+                    || loggingQualityFoV || loggingReplacement || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -480,8 +481,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     } else {
                         TilesPicker.getPicker().disableLogger();
                     }
-
-
                     if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
                     }
@@ -605,7 +604,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         /* eventListener */ null);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
                 mediaSource.setTileQualityTracker(loggingQualityFoV ? new TileQualityTracker(logPrefix) : null);
-                mediaSource.setReplacementTracker(new ReplacementTracker(logPrefix));
+                mediaSource.setReplacementTracker(loggingReplacement ? new ReplacementTracker(logPrefix) : null);
                 return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,
