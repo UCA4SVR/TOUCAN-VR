@@ -19,6 +19,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor;
 
+import android.util.Log;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.FormatHolder;
@@ -34,6 +36,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 
 /**
  * A {@link TrackOutput} that buffers extracted samples in a queue and allows for consumption from
@@ -90,6 +93,8 @@ public final class ReplacementTrackOutput implements TrackOutput {
   private long replacementTotalBytesWritten;
   private int replacementAbsoluteWriteIndex;
 
+  private ReplacementTracker tracker;
+
   // logs
   private static int nextIndex = 0;
   private int id;
@@ -97,7 +102,9 @@ public final class ReplacementTrackOutput implements TrackOutput {
   /**
    * @param allocator An {@link Allocator} from which allocations for sample data can be obtained.
    */
-  public ReplacementTrackOutput(Allocator allocator) {
+  public ReplacementTrackOutput(Allocator allocator, ReplacementTracker tracker) {
+    this.tracker = tracker;
+
     lock = new ReentrantLock();
     infoQueue = new InfoQueue();
     replacementMetaData = new BufferExtrasHolder[InfoQueue.SAMPLE_CAPACITY_INCREMENT/2];
@@ -677,6 +684,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
         if (currentTime > endTime) {
           endTime = currentTime;
         }
+      }
+
+      Log.e("REPLACE", id + " commit " + startTime + " " + endTime);
+      if(tracker != null) {
+        tracker.track(startTime, id, 1);
       }
 
       if (infoQueue.largestDequeuedTimestampUs >= startTime) {

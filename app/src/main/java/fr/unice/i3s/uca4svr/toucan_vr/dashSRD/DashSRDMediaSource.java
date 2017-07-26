@@ -55,6 +55,7 @@ import java.util.TimeZone;
 import com.google.android.exoplayer2.source.dash.manifest.DashSRDManifestParser;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 /**
@@ -127,6 +128,7 @@ public final class DashSRDMediaSource implements MediaSource {
 
     private DynamicEditingHolder dynamicEditingHolder;
     private TileQualityTracker tileQualityTracker;
+    private ReplacementTracker replacementTracker;
 
     /**
      * Constructs an instance to play a given {@link DashManifest}, which must be static.
@@ -309,7 +311,7 @@ public final class DashSRDMediaSource implements MediaSource {
         DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(firstPeriodId + periodIndex, manifest,
                 periodIndex, chunkSourceFactory, minLoadableRetryCount, periodEventDispatcher,
                 elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, minBufferMs, maxBufferMs,
-                dynamicEditingHolder, tileQualityTracker, noReplacement);
+                dynamicEditingHolder, tileQualityTracker, replacementTracker, noReplacement);
         periodsById.put(mediaPeriod.id, mediaPeriod);
         return mediaPeriod;
     }
@@ -829,6 +831,10 @@ public final class DashSRDMediaSource implements MediaSource {
 
     public void setTileQualityTracker(TileQualityTracker tileQualityTracker) {
         this.tileQualityTracker = tileQualityTracker;
+    }
+
+    public void setReplacementTracker(ReplacementTracker replacementTracker) {
+        this.replacementTracker = replacementTracker;
     }
 
 }

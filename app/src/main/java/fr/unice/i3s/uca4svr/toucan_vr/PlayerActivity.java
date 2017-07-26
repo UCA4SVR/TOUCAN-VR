@@ -69,6 +69,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
@@ -111,6 +112,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
   private boolean loggingRealTimeUserPosition = false;
   private String serverIPAddress;
   private boolean loggingQualityFoV = false;
+  private boolean loggingReplacement = false;
 
   private String[] tiles;
   private int gridWidth = 1;
@@ -224,6 +226,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
     serverIPAddress = intent.getStringExtra("serverIPAddress");
     loggingQualityFoV = intent.getBooleanExtra("loggingQualityFoV", false);
+    loggingReplacement = intent.getBooleanExtra("loggingReplacement", false);
     gridWidth = intent.getIntExtra("W", 3);
     gridHeight = intent.getIntExtra("H", 3);
     tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -604,6 +607,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         /* eventListener */ null, noReplacement);
         mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
         mediaSource.setTileQualityTracker(new TileQualityTracker(logPrefix));
+        if (loggingReplacement) {
+          mediaSource.setReplacementTracker(new ReplacementTracker(logPrefix));
+        } else {
+          mediaSource.setReplacementTracker(null);
+        }
         mediaSource.setBuffers(minBufferMs, maxBufferMs);
         return mediaSource;
       case C.TYPE_HLS:

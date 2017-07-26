@@ -80,7 +80,7 @@ public class ReplacementTracker {
     fileAppender.start();
 
     // getting the instanceof the logger
-    logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.BandwidthConsumedTracker"
+    logger = LoggerFactory.getLogger("fr.unice.i3s.uca4svr.tracking.ReplacementTracker"
             + loggerNextID++);
     // I know the logger is from logback, this is the implementation i'm using below slf4j API.
     ((ch.qos.logback.classic.Logger) logger).addAppender(fileAppender);

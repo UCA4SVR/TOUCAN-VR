@@ -41,6 +41,7 @@ import java.util.List;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.extractor.ReplacementTrackOutput;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 /**
@@ -93,7 +94,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
                               int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder,
-                              TileQualityTracker tileQualityTracker, boolean noReplacement) {
+                              TileQualityTracker tileQualityTracker, ReplacementTracker replacementTracker,
+                              boolean noReplacement) {
     this.adaptationSetIndex = adaptationSetIndex;
     this.dynamicEditingHolder = dynamicEditingHolder;
     this.tileQualityTracker = tileQualityTracker;
@@ -117,12 +119,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     int[] trackTypes = new int[1 + embeddedTrackCount];
     ReplacementTrackOutput[] sampleQueues = new ReplacementTrackOutput[1 + embeddedTrackCount];
 
-    primarySampleQueue = new ReplacementTrackOutput(allocator);
+    primarySampleQueue = new ReplacementTrackOutput(allocator, replacementTracker);
     trackTypes[0] = primaryTrackType;
     sampleQueues[0] = primarySampleQueue;
 
     for (int i = 0; i < embeddedTrackCount; i++) {
-      ReplacementTrackOutput trackOutput = new ReplacementTrackOutput(allocator);
+      ReplacementTrackOutput trackOutput = new ReplacementTrackOutput(allocator, replacementTracker);
       embeddedSampleQueues[i] = trackOutput;
       sampleQueues[i + 1] = trackOutput;
       trackTypes[i + 1] = embeddedTrackTypes[i];

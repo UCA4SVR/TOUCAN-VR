@@ -44,6 +44,7 @@ import java.util.List;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 
@@ -62,6 +63,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
   private final Allocator allocator;
   private final TrackGroupArray trackGroups;
   private final TileQualityTracker tileQualityTracker;
+  private final ReplacementTracker replacementTracker;
   private final boolean noReplacement;
 
   private Callback callback;
@@ -82,7 +84,8 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
                             LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
                             int replacementBufferLowWatermark, int replacementBufferHighWatermark,
                             DynamicEditingHolder dynamicEditingHolder,
-                            TileQualityTracker tileQualityTracker, boolean noReplacement) {
+                            TileQualityTracker tileQualityTracker, ReplacementTracker replacementTracker,
+                            boolean noReplacement) {
     this.id = id;
     this.manifest = manifest;
     this.periodIndex = periodIndex;
@@ -94,6 +97,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
     this.allocator = allocator;
     this.dynamicEditingHolder = dynamicEditingHolder;
     this.tileQualityTracker = tileQualityTracker;
+    this.replacementTracker = replacementTracker;
     this.noReplacement = noReplacement;
     this.replacementBufferLowWatermark = replacementBufferLowWatermark * 1000;
     this.replacementBufferHighWatermark = replacementBufferHighWatermark * 1000;
@@ -190,12 +194,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
     if ((bufferedPosition - positionUs) < replacementBufferLowWatermark) {
       isReplacing = false;
     }
-        /*
-         * If the buffer is full and the playback has started, start replacing chunks.
-         * It doesn't make sense to replace if the playback hasn't started: we have no information
-         * from the picker.
-         * If we are still replacing (the buffer has not depleted that much), continue replacing.
-         */
+    /*
+     * If the buffer is full and the playback has started, start replacing chunks.
+     * It doesn't make sense to replace if the playback hasn't started: we have no information
+     * from the picker.
+     * If we are still replacing (the buffer has not depleted that much), continue replacing.
+     */
     if ((bufferedPosition - positionUs) > replacementBufferHighWatermark || isReplacing) {
       isReplacing = true;
       if (positionUs > 0) {
@@ -278,7 +282,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
             elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
     OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
             /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-            eventDispatcher, dynamicEditingHolder, tileQualityTracker, noReplacement);
+            eventDispatcher, dynamicEditingHolder, tileQualityTracker, replacementTracker, noReplacement);
     return stream;
   }
 
