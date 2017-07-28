@@ -71,6 +71,8 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   private TileQualityTracker tileQualityTracker;
   private BaseMediaChunk lastLoggedChunk;
+  private BaseMediaChunk chunkToBeReplaced;
+  private BaseMediaChunk replacingChunk;
   private int qualityLogged;
   private DynamicEditingHolder dynamicEditingHolder;
 
@@ -464,9 +466,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
           //TODO HANDLE THE CALLBACK WITH ROMARIC's CODE TO UPDATE THE MEDIA CHUNK LINKED LIST
           if (isMediaChunk(loadable)) {
             BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
-            mediaChunk.init(mediaChunkOutput);
-            mediaChunks.remove(maybeReplaceIndex);
-            mediaChunks.add(maybeReplaceIndex, mediaChunk);
+            mediaChunk.initForReplacement(mediaChunkOutput, ((BaseMediaChunk)maybeReplace).getFirstSampleIndices());
+            chunkToBeReplaced = mediaChunks.get(maybeReplaceIndex);
+            replacingChunk = mediaChunk;
             mediaChunkOutput.startReplacement(loadable.startTimeUs, loadable.endTimeUs);
           }
 
@@ -526,11 +528,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   }
 
   private void discardDownstreamMediaChunks(int primaryStreamReadIndex) {
-    while (mediaChunks.size() > 1
-            && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
+    while (mediaChunks.size() > 1 && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
       mediaChunks.removeFirst();
     }
+
     BaseMediaChunk currentChunk = mediaChunks.getFirst();
+      Log.e("SRD"+adaptationSetIndex,currentChunk.chunkIndex+"");
     //Logging of the quality
     if(tileQualityTracker !=null && currentChunk.trackFormat.width > 0) {
       if(!currentChunk.equals(this.lastLoggedChunk)) {
@@ -628,7 +631,16 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    * point I need to rebuffer again. In this case I've to stop the download.
    */
   public void stopReplacing() {
-    mediaChunkOutput.commitReplacement();
+    if(mediaChunkOutput.commitReplacement()) {
+      for(int j = 0; j<mediaChunks.size(); j++) {
+        if(mediaChunks.get(j).equals(chunkToBeReplaced)) {
+          mediaChunks.set(j, replacingChunk);
+          break;
+        }
+      }
+      replacingChunk = null;
+      chunkToBeReplaced = null;
+    }
   }
 
   public void cancelReplacement() {

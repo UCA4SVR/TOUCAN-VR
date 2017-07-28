@@ -663,11 +663,11 @@ public final class ReplacementTrackOutput implements TrackOutput {
     }
   }
 
-  public void commitReplacement() {
+  public boolean commitReplacement() {
     lock.lock();
     try {
       if (!isReplaceing) {
-        return;
+        return false;
       }
 
       // Compute the lowest and the highest timestamps contained in the replacement data
@@ -695,7 +695,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
         // it's too late,
         // we have already dequeued samples further than the starting point of the replacement
         cancelReplacement();
-        return;
+        return false;
       }
       // perform the replacement
       // Identify where the replacement must happen
@@ -725,7 +725,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
       if (infoQueue.queueSize + replacementAbsoluteWriteIndex > infoQueue.capacity ||
               totalBytesWritten + replacementTotalBytesWritten - totalBytesDropped > dataQueue.length) {
         cancelReplacement();
-        return;
+        return false;
       }
 
       // Copy data forward or backward if needed and update totalByteWritten
@@ -890,6 +890,7 @@ public final class ReplacementTrackOutput implements TrackOutput {
 
       // end the replacement
       cancelReplacement();
+      return true;
     } finally {
       lock.unlock();
     }

@@ -56,6 +56,15 @@ public abstract class BaseMediaChunk extends MediaChunk {
     firstSampleIndices = output.getWriteIndices();
   }
 
+  public void initForReplacement(BaseMediaChunkOutput output, int[] firstSampleIndices) {
+    this.output = output;
+    this.firstSampleIndices = firstSampleIndices;
+  }
+
+  public int[] getFirstSampleIndices() {
+    return this.firstSampleIndices;
+  }
+
   /**
    * Returns the index of the first sample in the specified track of the output that will originate
    * from this chunk.
