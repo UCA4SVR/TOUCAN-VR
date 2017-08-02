@@ -42,7 +42,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
     public static final int DEFAULT_MAX_INITIAL_BITRATE = 800000;
     public static final int DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS = 10000;
     public static final int DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS = 25000;
-    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 2000;
+    public static final int DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 1000;
     public static final int DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS = 6000;
     public static final float DEFAULT_BANDWIDTH_FRACTION = 0.75f;
 
@@ -257,6 +257,8 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         double bufferedPercentage = (double)bufferedDurationUs/bufferSize;
         double adjustedThreshold = bufferedPercentage*(maxDurationToRetainAfterDiscardUs - minDurationToRetainAfterDiscardUs);
         long safeMargin = maxDurationToRetainAfterDiscardUs - (long)adjustedThreshold;
+        if (safeMargin < minDurationToRetainAfterDiscardUs)
+            safeMargin = minDurationToRetainAfterDiscardUs;
         if (bufferedDurationUs < safeMargin) {
             // Not enough buffered data. Never discard in this case.
             return queueSize;
