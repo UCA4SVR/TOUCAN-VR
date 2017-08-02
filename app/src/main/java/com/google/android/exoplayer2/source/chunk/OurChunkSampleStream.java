@@ -34,7 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
-import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 /**
@@ -60,17 +60,20 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private final BaseMediaChunkOutput mediaChunkOutput;
   private final String highestFormatId;
   private TileQualityTracker tileQualityTracker;
+  private ReplacementTracker replacementTracker;
   private BaseMediaChunk lastLoggedChunk;
   private int qualityLogged;
   private DynamicEditingHolder dynamicEditingHolder;
-  public final int adaptationSetIndex;
+  private final int adaptationSetIndex;
 
   private Format primaryDownstreamTrackFormat;
   private long pendingResetPositionUs;
-  /* package */ long lastSeekPositionUs;
-  /* package */ boolean loadingFinished;
+  private long lastSeekPositionUs;
+  private boolean loadingFinished;
+  private boolean wasDiscarding = false;
 
   /**
+   * @param adaptationSetIndex The index of the associated adaptation set.
    * @param primaryTrackType The type of the primary track. One of the {@link C}
    *     {@code TRACK_TYPE_*} constants.
    * @param embeddedTrackTypes The types of any embedded tracks, or null.
@@ -84,10 +87,12 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    */
   public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
-                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder, TileQualityTracker tileQualityTracker) {
+                              int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder,
+                              TileQualityTracker tileQualityTracker, ReplacementTracker replacementTracker) {
     this.adaptationSetIndex = adaptationSetIndex;
     this.dynamicEditingHolder = dynamicEditingHolder;
     this.tileQualityTracker = tileQualityTracker;
+    this.replacementTracker = replacementTracker;
     //Getting the highest format for this tile
     this.highestFormatId = ((DefaultDashSRDChunkSource)chunkSource).getHighestFormatId();
     this.primaryTrackType = primaryTrackType;
@@ -336,13 +341,14 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   // SequenceableLoader implementation
 
   @Override
-  public boolean continueLoading(long positionUs) {
+  public boolean continueLoading(long playbackPositionUs) {
     if (loadingFinished || loader.isLoading()) {
       return false;
     }
 
+    // Populate the chunk holder with the next chunk to download
     chunkSource.getNextChunk(mediaChunks.isEmpty() ? null : mediaChunks.getLast(),
-        pendingResetPositionUs != C.TIME_UNSET ? pendingResetPositionUs : positionUs,
+        pendingResetPositionUs != C.TIME_UNSET ? pendingResetPositionUs : playbackPositionUs,
         nextChunkHolder);
     boolean endOfStream = nextChunkHolder.endOfStream;
     Chunk loadable = nextChunkHolder.chunk;
@@ -357,9 +363,22 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       return false;
     }
 
+    // Make sure the chunk is not an initialization chunk
     if (isMediaChunk(loadable)) {
       pendingResetPositionUs = C.TIME_UNSET;
       BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
+      if (mediaChunks.size() > 0) {
+        // Check whether some discarding is needed (i.e. a better quality in the FoV is desired)
+        if (!wasDiscarding && maybeDiscardUpstream(playbackPositionUs)) {
+          wasDiscarding = true;
+          // If discarding actually happens we shouldn't download the next chunk because it's the wrong one
+          callback.onContinueLoadingRequested(this);
+          return false;
+        } else {
+          wasDiscarding = false;
+        }
+      }
+
       mediaChunk.init(mediaChunkOutput);
       mediaChunks.add(mediaChunk);
     }
@@ -369,92 +388,6 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
         loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
     return true;
   }
-
-    public boolean replace(long playbackPositionUs) {
-		//Still buffering?
-		if(loader.isLoading())
-			return false;
-
-        /*        Targeting the chunk to be replaced: mediachunks holds in a linked list all
-        the chunks already downloaded. The chunk whose startTimeUS and endTimeUs satisfy
-        startTimeUS < playbackPosition < endTimeUs is identified and then the replacement
-        starts two segments after */
-		MediaChunk maybeReplace = null;
-		int maybeReplaceIndex = 0;
-        for(MediaChunk mediaChunk : mediaChunks) {
-			if((mediaChunk.startTimeUs<playbackPositionUs)&&(mediaChunk.endTimeUs>playbackPositionUs)) {
-				maybeReplace = mediaChunk;
-				break;
-			}
-			maybeReplaceIndex++;
-		}
-
-		if(maybeReplace!=null) {
-			/*
-			I've found the chunk that is currently playing in the buffer.
-			Checking if I can replace chunk starting two segments ahead of it.
-			 */
-			maybeReplaceIndex+=2;
-			if(maybeReplaceIndex < mediaChunks.size()) {
-				maybeReplace = mediaChunks.get(maybeReplaceIndex);
-                /*if the video is dynamically edited I need to know if a snapchange occurs before the start of the chunk.
-                If yes, the tile will be analyzed iff it is in the field of view after the snapchange.
-                The replacement will take place if the quality is not the highest.
-                 */
-                boolean replaceFlag = false;
-                if(dynamicEditingHolder.isDynamicEdited() && dynamicEditingHolder.nextSCMicroseconds<maybeReplace.startTimeUs) {
-                        /*
-                        The snapchange occurs before the beginning of the chunk.
-                        In this case I'm sure that it has the highest quality because the same consideration
-                        is adopted when choosing the quality for downloading the chunks.
-                        Do nothing!
-                         */
-                } else {
-                    //The video is not dynamically edited or a snapchange occurs AFTER the beginning of the chunk: i'll base my analysis on the picker
-                    TilesPicker tilesPicker = TilesPicker.getPicker();
-                    if(tilesPicker.isPicked(adaptationSetIndex) && !maybeReplace.trackFormat.id.equals(highestFormatId)) {
-                        //The tile is picked and it hasn't the highest quality -> replace
-                        replaceFlag = true;
-                    }
-                }
-                //Should I replace?
-				if(replaceFlag) {
-					//Fire the download
-					//First put into nextChunkHolder the correct Chunk
-					((DefaultDashSRDChunkSource)chunkSource).getChunkToBeReplaced(maybeReplace.chunkIndex,nextChunkHolder);
-					//Then fire the download
-					Chunk loadable = nextChunkHolder.chunk;
-					nextChunkHolder.clear();
-
-					//TODO HANDLE THE CALLBACK WITH ROMARIC's CODE TO UPDATE THE MEDIA CHUNK LINKED LIST
-                    if (isMediaChunk(loadable)) {
-                        BaseMediaChunk mediaChunk = (BaseMediaChunk) loadable;
-                        mediaChunk.init(mediaChunkOutput);
-                        mediaChunks.remove(maybeReplaceIndex);
-                        mediaChunks.add(maybeReplaceIndex,mediaChunk);
-                    }
-
-                    long elapsedRealtimeMs = loader.startLoading(loadable, this, minLoadableRetryCount);
-					eventDispatcher.loadStarted(loadable.dataSpec, loadable.type, primaryTrackType,
-							loadable.trackFormat, loadable.trackSelectionReason, loadable.trackSelectionData,
-							loadable.startTimeUs, loadable.endTimeUs, elapsedRealtimeMs);
-					return true;
-				} else {
-					//For some reasons the tile should not be replaced: do nothing
-					return false;
-				}
-			} else {
-				//No time to replace: do nothing
-				return false;
-			}
-		} else {
-			/*
-			I've not found the chunk that is now playing in the buffer
-			Should I do the replacement anyway?
-			*/
-			return false;
-		}
-    }
 
   @Override
   public long getNextLoadPositionUs() {
@@ -467,18 +400,6 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
 
   // Internal methods
 
-  // TODO[REFACTOR]: Call maybeDiscardUpstream for DASH and SmoothStreaming.
-  /**
-   * Discards media chunks from the back of the buffer if conditions have changed such that it's
-   * preferable to re-buffer the media at a different quality.
-   *
-   * @param positionUs The current playback position in microseconds.
-   */
-  private void maybeDiscardUpstream(long positionUs) {
-    int queueSize = chunkSource.getPreferredQueueSize(positionUs, readOnlyMediaChunks);
-    discardUpstreamMediaChunks(Math.max(1, queueSize));
-  }
-
   private boolean isMediaChunk(Chunk chunk) {
     return chunk instanceof BaseMediaChunk;
   }
@@ -487,31 +408,20 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     return pendingResetPositionUs != C.TIME_UNSET;
   }
 
-  private void discardDownstreamMediaChunks(int primaryStreamReadIndex) {
-    while (mediaChunks.size() > 1
-        && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
-      mediaChunks.removeFirst();
-    }
-    BaseMediaChunk currentChunk = mediaChunks.getFirst();
-    //Logging of the quality
-    if(tileQualityTracker !=null && currentChunk.trackFormat.width > 0) {
-      if(!currentChunk.equals(this.lastLoggedChunk)) {
-        qualityLogged = currentChunk.trackFormat.id.equals(this.highestFormatId) ? 1 : 0;
-        tileQualityTracker.track(adaptationSetIndex, currentChunk.chunkIndex, currentChunk.startTimeUs, currentChunk.endTimeUs, qualityLogged);
-        this.lastLoggedChunk = currentChunk;
-      }
-    }
-    Format trackFormat = currentChunk.trackFormat;
-    if (!trackFormat.equals(primaryDownstreamTrackFormat)) {
-      eventDispatcher.downstreamFormatChanged(primaryTrackType, trackFormat,
-          currentChunk.trackSelectionReason, currentChunk.trackSelectionData,
-          currentChunk.startTimeUs);
-    }
-    primaryDownstreamTrackFormat = trackFormat;
+  /**
+   * Discards media chunks from the back of the buffer if conditions have changed such that it's
+   * preferable to re-buffer the media at a different quality.
+   *
+   * @param positionUs The current playback position in microseconds.
+   * @return Whether some discarding has actually taken place.
+   */
+  private boolean maybeDiscardUpstream(long positionUs) {
+    int queueSize = chunkSource.getPreferredQueueSize(positionUs, readOnlyMediaChunks);
+    return discardUpstreamMediaChunks(Math.max(1, queueSize));
   }
 
   /**
-   * Discard upstream media chunks until the queue length is equal to the length specified.
+   * Discards upstream media chunks until the queue length is equal to the length specified.
    *
    * @param queueLength The desired length of the queue.
    * @return Whether chunks were discarded.
@@ -527,6 +437,9 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       removed = mediaChunks.removeLast();
       startTimeUs = removed.startTimeUs;
       loadingFinished = false;
+      // Logging of the chunks being discarded
+      if (replacementTracker != null)
+        replacementTracker.track(startTimeUs, adaptationSetIndex, (int)removed.trackSelectionData == 1 ? 0 : 1);
     }
     primarySampleQueue.discardUpstreamSamples(removed.getFirstSampleIndex(0));
     for (int i = 0; i < embeddedSampleQueues.length; i++) {
@@ -534,6 +447,29 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     }
     eventDispatcher.upstreamDiscarded(primaryTrackType, startTimeUs, endTimeUs);
     return true;
+  }
+
+  private void discardDownstreamMediaChunks(int primaryStreamReadIndex) {
+    while (mediaChunks.size() > 1
+            && mediaChunks.get(1).getFirstSampleIndex(0) <= primaryStreamReadIndex) {
+      mediaChunks.removeFirst();
+    }
+    BaseMediaChunk currentChunk = mediaChunks.getFirst();
+    //Logging of the quality
+    if(tileQualityTracker !=null && currentChunk.trackFormat.width > 0) {
+      if(!currentChunk.equals(this.lastLoggedChunk)) {
+        qualityLogged = currentChunk.trackFormat.id.equals(this.highestFormatId) ? 1 : 0;
+        tileQualityTracker.track(adaptationSetIndex, currentChunk.chunkIndex, currentChunk.startTimeUs, currentChunk.endTimeUs, qualityLogged);
+        this.lastLoggedChunk = currentChunk;
+      }
+    }
+    Format trackFormat = currentChunk.trackFormat;
+    if (!trackFormat.equals(primaryDownstreamTrackFormat)) {
+      eventDispatcher.downstreamFormatChanged(primaryTrackType, trackFormat,
+              currentChunk.trackSelectionReason, currentChunk.trackSelectionData,
+              currentChunk.startTimeUs);
+    }
+    primaryDownstreamTrackFormat = trackFormat;
   }
 
   /**
@@ -584,13 +520,4 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     }
 
   }
-
-    /**
-     * The method is called when I'm downloading chunks for the replacement strategy but at some
-     * point I need to rebuffer again. In this case I've to stop the download.
-     */
-    public void stopReplacing() {
-        if(loader.isLoading()) loader.cancelLoading();
-    }
-
 }
