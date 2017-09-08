@@ -294,11 +294,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 CheckConnection checkConnection = new CheckConnection(this);
                 checkConnection.response = this;
                 if(isRemoteFile && loggingRealTimeUserPosition)
-                    checkConnection.execute(mediaUri,serverIPAddress+"/cleanTables.php");
+                    checkConnection.execute(mediaUri,serverIPAddress);
                 else if(isRemoteFile && !loggingRealTimeUserPosition)
                     checkConnection.execute(mediaUri);
                 else if(!isRemoteFile && loggingRealTimeUserPosition)
-                    checkConnection.execute(serverIPAddress+"/cleanTables.php");
+                    checkConnection.execute(serverIPAddress);
             } else {
                 if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
                     changeStatus(Status.CHECKING_PERMISSION);
