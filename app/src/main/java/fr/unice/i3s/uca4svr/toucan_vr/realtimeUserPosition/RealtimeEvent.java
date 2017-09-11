@@ -24,6 +24,7 @@ public class RealtimeEvent {
     */
 
     public boolean eventType;
+    public boolean playing;
     public long timestamp;
 
 }

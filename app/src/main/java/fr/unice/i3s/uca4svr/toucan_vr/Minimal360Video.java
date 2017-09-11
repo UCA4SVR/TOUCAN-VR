@@ -360,18 +360,29 @@ public class Minimal360Video extends GVRMain implements PushResponse {
             realtimeEvent = new RealtimeEvent();
     }
 
-    public void pushTapEvent(Long timestamp) {
+    private long lastTimestampPush = Long.MIN_VALUE;
+
+    public void pushTapEvent(Long timestamp, boolean playing) {
         if (realtimeEventPusher != null) {
+            realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP(), this);
+            realtimeEvent = new RealtimeEvent();
             realtimeEvent.eventType = false;
             realtimeEvent.timestamp = timestamp;
+            realtimeEvent.playing = playing;
             realtimeEventPusher.execute(realtimeEvent);
         }
+    }
+
+    private boolean inSession() {
+        return statusCode == PlayerActivity.Status.PLAYING ||
+                statusCode == PlayerActivity.Status.PAUSED;
+
     }
 
     @Override
     public void onStep() {
         // We only perform the tracking and the snapchanges if the video is playing
-        if (statusCode == PlayerActivity.Status.PLAYING && videoSceneObjectPlayer != null) {
+        if (inSession() && videoSceneObjectPlayer != null) {
             final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
             if (headMotionTracker != null)
                 headMotionTracker.track(gvrContext, player.getCurrentPosition(), getCurrentXAngle(), getCurrentYAngle());
@@ -383,6 +394,10 @@ public class Minimal360Video extends GVRMain implements PushResponse {
                 realtimeEvent.eventType = true;//TODO realtimeEvent was null here
                 realtimeEvent.timestamp = player.getCurrentPosition();
                 realtimeEventPusher.execute(realtimeEvent);
+                if (realtimeEvent.timestamp - lastTimestampPush > 300 || lastTimestampPush == Long.MIN_VALUE) {
+                    lastTimestampPush = realtimeEvent.timestamp;
+                    pushTapEvent(player.getCurrentPosition(), player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY);
+                }
             }
             //Dynamic Editing block
             if(dynamicEditingHolder.isDynamicEdited()) {

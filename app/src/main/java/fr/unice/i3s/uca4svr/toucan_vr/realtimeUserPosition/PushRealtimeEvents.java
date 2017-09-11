@@ -35,7 +35,7 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
     private PushResponse callback;
     private String serverIP;
     private final static String pushForHeadMotion = "";
-    private final static String pushForTapEvent = "/tapEvent";
+    private final static String pushForPlaybackState = "/playback";
 
 
     public PushRealtimeEvents(GVRContext context, String serverIP, PushResponse callback) {
@@ -62,16 +62,18 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
         String urlParameters = "";
         if (event.eventType) {
             GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-            urlParameters = "x=" + headTransform.getRotationPitch() +
-                    "&y=" + headTransform.getRotationYaw() +
-                    "&z=" + headTransform.getRotationRoll();
+            urlParameters = "x=" + headTransform.getRotationX() +
+                    "&y=" + headTransform.getRotationY() +
+                    "&z=" + headTransform.getRotationZ() +
+                    "&w=" + headTransform.getRotationW();
             fullURI = serverIP + pushForHeadMotion;
 
         } else {
-            return true;
+            //return true;
             //TODO re-enable when the server will be able to handle it
-//            urlParameters = "?timestamp=" + event.timestamp;
-//            fullURI = serverIP + pushForTapEvent;
+            urlParameters = "playing=" + event.playing +
+                    "&currentTime=" + event.timestamp;
+            fullURI = serverIP + pushForPlaybackState;
 
         }
         if (fullURI.length() > 0) {

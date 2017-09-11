@@ -293,12 +293,13 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             if (isRemoteFile || loggingRealTimeUserPosition) {
                 CheckConnection checkConnection = new CheckConnection(this);
                 checkConnection.response = this;
-                if(isRemoteFile && loggingRealTimeUserPosition)
-                    checkConnection.execute(mediaUri,serverIPAddress);
-                else if(isRemoteFile && !loggingRealTimeUserPosition)
+                if(isRemoteFile && loggingRealTimeUserPosition) {
+                    checkConnection.execute(mediaUri/*,serverIPAddress*/);
+                } else if(isRemoteFile && !loggingRealTimeUserPosition) {
                     checkConnection.execute(mediaUri);
-                else if(!isRemoteFile && loggingRealTimeUserPosition)
-                    checkConnection.execute(serverIPAddress);
+                } else if(!isRemoteFile && loggingRealTimeUserPosition) {
+                    //checkConnection.execute(serverIPAddress);
+                }
             } else {
                 if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
                     changeStatus(Status.CHECKING_PERMISSION);
@@ -378,13 +379,15 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     videoSceneObjectPlayer.pause();
                     //Pushing the tap event
                     if(loggingRealTimeUserPosition) {
-                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
+                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition(),
+                                player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY);
                     }
                 } else {
                     videoSceneObjectPlayer.start();
                     //Pushing the tap event
                     if(loggingRealTimeUserPosition) {
-                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
+                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition(),
+                                player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY);
                     }
                 }
             }
