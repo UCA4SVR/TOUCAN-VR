@@ -20,6 +20,7 @@
 package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.graphics.Color;
+import android.os.AsyncTask;
 import android.view.Gravity;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -27,6 +28,8 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
+import com.google.android.exoplayer2.util.Clock;
+import com.google.android.exoplayer2.util.SystemClock;
 
 import org.gearvrf.GVRAndroidResource;
 import org.gearvrf.GVRContext;
@@ -360,8 +363,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
             realtimeEvent = new RealtimeEvent();
     }
 
-    private long lastTimestampPush = Long.MIN_VALUE;
-
     public void pushTapEvent(Long timestamp, boolean playing) {
         if (realtimeEventPusher != null) {
             realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP(), this);
@@ -369,7 +370,7 @@ public class Minimal360Video extends GVRMain implements PushResponse {
             realtimeEvent.eventType = false;
             realtimeEvent.timestamp = timestamp;
             realtimeEvent.playing = playing;
-            realtimeEventPusher.execute(realtimeEvent);
+            realtimeEventPusher.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, realtimeEvent);
         }
     }
 
@@ -378,6 +379,10 @@ public class Minimal360Video extends GVRMain implements PushResponse {
                 statusCode == PlayerActivity.Status.PAUSED;
 
     }
+
+    private long lastPlaybackTransmissionTime = Long.MIN_VALUE;
+    private long lastPositionTransmissionTime = Long.MIN_VALUE;
+    private Clock clock = new SystemClock();
 
     @Override
     public void onStep() {
@@ -389,13 +394,17 @@ public class Minimal360Video extends GVRMain implements PushResponse {
             if (freezingEventsTracker != null)
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
             if (realtimeEventPusher != null) {
-                realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP(), this);
-                realtimeEvent = new RealtimeEvent();
-                realtimeEvent.eventType = true;//TODO realtimeEvent was null here
-                realtimeEvent.timestamp = player.getCurrentPosition();
-                realtimeEventPusher.execute(realtimeEvent);
-                if (realtimeEvent.timestamp - lastTimestampPush > 300 || lastTimestampPush == Long.MIN_VALUE) {
-                    lastTimestampPush = realtimeEvent.timestamp;
+                long currentTime = clock.elapsedRealtime();
+                if (currentTime - lastPositionTransmissionTime >= 20 || lastPositionTransmissionTime == Long.MIN_VALUE) {
+                    lastPositionTransmissionTime = currentTime;
+                    realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP(), this);
+                    realtimeEvent = new RealtimeEvent();
+                    realtimeEvent.eventType = true;//TODO realtimeEvent was null here
+                    realtimeEvent.timestamp = player.getCurrentPosition();
+                    realtimeEventPusher.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,realtimeEvent);
+                }
+                if (currentTime - lastPlaybackTransmissionTime >= 1000 || lastPlaybackTransmissionTime == Long.MIN_VALUE) {
+                    lastPlaybackTransmissionTime = currentTime;
                     pushTapEvent(player.getCurrentPosition(), player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY);
                 }
             }

@@ -26,6 +26,7 @@ import org.gearvrf.GVRTransform;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
@@ -77,8 +78,13 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
 
         }
         if (fullURI.length() > 0) {
+            HttpURLConnection urlc = null;
             try {
-                HttpURLConnection urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
+                urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
+            } catch (IOException e) {
+                return false;
+            }
+            try {
                 byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
                 urlc.setDoOutput(true);
                 urlc.setInstanceFollowRedirects(false);
@@ -94,6 +100,8 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
                 return (urlc.getResponseCode() == 200);
             } catch (IOException e) {
                 return false;
+            } finally {
+                urlc.disconnect();
             }
         } else {
             return false;
