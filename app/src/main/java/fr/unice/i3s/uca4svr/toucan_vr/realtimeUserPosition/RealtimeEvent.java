@@ -23,7 +23,6 @@ public class RealtimeEvent {
     eventType == false ----> Tap Event
     */
 
-    public boolean eventType;
     public boolean playing;
     public long timestamp;
 

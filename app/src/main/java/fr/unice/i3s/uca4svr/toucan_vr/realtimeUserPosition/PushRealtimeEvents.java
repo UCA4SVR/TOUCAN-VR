@@ -18,7 +18,6 @@ package fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition;
 
 
 import android.os.AsyncTask;
-import android.util.Log;
 
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRTransform;
@@ -26,7 +25,6 @@ import org.gearvrf.GVRTransform;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
@@ -35,8 +33,7 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
     private GVRContext context;
     private PushResponse callback;
     private String serverIP;
-    private final static String pushForHeadMotion = "";
-    private final static String pushForPlaybackState = "/playback";
+    private final static String pushInfoPath = "/infos";
 
 
     public PushRealtimeEvents(GVRContext context, String serverIP, PushResponse callback) {
@@ -59,26 +56,17 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
     }
 
     private Boolean push(RealtimeEvent event) {
-        String fullURI = "";
-        String urlParameters = "";
-        if (event.eventType) {
-            GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-            urlParameters = "x=" + headTransform.getRotationX() +
-                    "&y=" + headTransform.getRotationY() +
-                    "&z=" + headTransform.getRotationZ() +
-                    "&w=" + headTransform.getRotationW();
-            fullURI = serverIP + pushForHeadMotion;
+        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
+        String urlParameters = "x=" + headTransform.getRotationX() +
+                "&y=" + headTransform.getRotationY() +
+                "&z=" + headTransform.getRotationZ() +
+                "&w=" + headTransform.getRotationW() +
+                "&currentTime=" + event.timestamp +
+                "&playing=" + event.playing;
+        String fullURI = serverIP + pushInfoPath;
 
-        } else {
-            //return true;
-            //TODO re-enable when the server will be able to handle it
-            urlParameters = "playing=" + event.playing +
-                    "&currentTime=" + event.timestamp;
-            fullURI = serverIP + pushForPlaybackState;
-
-        }
         if (fullURI.length() > 0) {
-            HttpURLConnection urlc = null;
+            HttpURLConnection urlc;
             try {
                 urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
             } catch (IOException e) {

@@ -377,18 +377,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     preparePlayer();
                 else if (!play) {
                     videoSceneObjectPlayer.pause();
-                    //Pushing the tap event
-                    if(loggingRealTimeUserPosition) {
-                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition(),
-                                player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY);
-                    }
                 } else {
                     videoSceneObjectPlayer.start();
-                    //Pushing the tap event
-                    if(loggingRealTimeUserPosition) {
-                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition(),
-                                player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY);
-                    }
                 }
             }
         }
