@@ -40,6 +40,7 @@ import org.gearvrf.GVRRenderData;
 import org.gearvrf.GVRScene;
 import org.gearvrf.GVRSceneObject;
 import org.gearvrf.GVRTexture;
+import org.gearvrf.GVRTransform;
 import org.gearvrf.scene_objects.GVRSphereSceneObject;
 import org.gearvrf.scene_objects.GVRTextViewSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject;
@@ -79,6 +80,9 @@ public class Minimal360Video extends GVRMain implements PushResponse {
     // Objects used to push the tap events and the user's realtime position
     private PushRealtimeEvents realtimeEventPusher = null;
     private RealtimeEvent realtimeEvent = null;
+
+    private long lastTransmissionTime = Long.MIN_VALUE;
+    private Clock clock = new SystemClock();
 
     // The status code needed to always know which virtual scene to create
     private PlayerActivity.Status statusCode = PlayerActivity.Status.NULL;
@@ -369,9 +373,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
 
     }
 
-    private long lastPositionTransmissionTime = Long.MIN_VALUE;
-    private Clock clock = new SystemClock();
-
     @Override
     public void onStep() {
         // We only perform the tracking and the snapchanges if the video is playing
@@ -383,13 +384,20 @@ public class Minimal360Video extends GVRMain implements PushResponse {
                 freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
             if (realtimeEventPusher != null) {
                 long currentTime = clock.elapsedRealtime();
-                if (currentTime - lastPositionTransmissionTime >= 20 || lastPositionTransmissionTime == Long.MIN_VALUE) {
-                    lastPositionTransmissionTime = currentTime;
+                if (currentTime - lastTransmissionTime >= 80 || lastTransmissionTime == Long.MIN_VALUE) {
                     realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP(), this);
                     realtimeEvent = new RealtimeEvent();
-                    realtimeEvent.timestamp = player.getCurrentPosition();
+                    realtimeEvent.timestamp = clock.elapsedRealtime();
+                    realtimeEvent.videoTime = player.getCurrentPosition();
                     realtimeEvent.playing = player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY;
+                    GVRTransform headTransform = gvrContext.getMainScene().getMainCameraRig().getHeadTransform();
+                    realtimeEvent.x = headTransform.getRotationX();
+                    realtimeEvent.y = headTransform.getRotationY();
+                    realtimeEvent.z = headTransform.getRotationZ();
+                    realtimeEvent.w = headTransform.getRotationW();
+                    realtimeEvent.start = lastTransmissionTime == Long.MIN_VALUE;
                     realtimeEventPusher.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR,realtimeEvent);
+                    lastTransmissionTime = currentTime;
                 }
             }
             //Dynamic Editing block

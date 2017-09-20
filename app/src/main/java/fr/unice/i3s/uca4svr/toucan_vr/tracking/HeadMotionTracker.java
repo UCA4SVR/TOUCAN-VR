@@ -106,6 +106,8 @@ public class HeadMotionTracker {
         return String.format("%s_headMotion_%s.csv", logFilePrefix, dateFormat.format(date));
     }
 
+    private long lastPlaybackPosition = -1;
+
     /**
      * Outputs a track record to the log file.
      * The same clock reference is used as for every tracker. Also the playback position is recorded.
@@ -115,9 +117,16 @@ public class HeadMotionTracker {
      */
     public void track(GVRContext context, long playbackPosition, float x, float y) {
         GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
+        /*
         String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.0f,%4$.0f,%5$.0f,%6$.0f,%7$.0f",
                 clock.elapsedRealtime(), playbackPosition, headTransform.getRotationPitch(),
                 headTransform.getRotationYaw(), headTransform.getRotationRoll(),x,y);
+        //*/
+        String rotationsString = String.format(Locale.ENGLISH, "%1$d,%2$d,%3$.5f,%4$.5f,%5$.5f,%6$.5f,%7$b",
+                clock.elapsedRealtime(), playbackPosition, headTransform.getRotationX(),
+                headTransform.getRotationY(), headTransform.getRotationZ(),headTransform.getRotationW(),
+                this.lastPlaybackPosition == playbackPosition);
+        this.lastPlaybackPosition = playbackPosition;
         logger.error(rotationsString);
     }
 }

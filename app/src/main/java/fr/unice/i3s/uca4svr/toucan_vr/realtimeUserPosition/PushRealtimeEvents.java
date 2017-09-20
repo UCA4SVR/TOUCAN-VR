@@ -57,12 +57,14 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
 
     private Boolean push(RealtimeEvent event) {
         GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-        String urlParameters = "x=" + headTransform.getRotationX() +
-                "&y=" + headTransform.getRotationY() +
-                "&z=" + headTransform.getRotationZ() +
-                "&w=" + headTransform.getRotationW() +
-                "&currentTime=" + event.timestamp +
-                "&playing=" + event.playing;
+        String urlParameters = "x=" + event.x +
+                "&y=" + event.y +
+                "&z=" + event.z +
+                "&w=" + event.w +
+                "&time=" + event.timestamp +
+                "&currentTime=" + event.videoTime +
+                "&playing=" + event.playing +
+                "&start=" + event.start;
         String fullURI = serverIP + pushInfoPath;
 
         if (fullURI.length() > 0) {

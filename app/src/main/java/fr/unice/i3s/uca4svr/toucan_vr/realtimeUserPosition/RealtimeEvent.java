@@ -17,13 +17,12 @@
 package fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition;
 
 public class RealtimeEvent {
-
-    /* Three types of events:
-    eventType == true ----> Track Event
-    eventType == false ----> Tap Event
-    */
-
-    public boolean playing;
     public long timestamp;
-
+    public boolean playing;
+    public long videoTime;
+    public float x;
+    public float y;
+    public float z;
+    public float w;
+    public boolean start = false;
 }
