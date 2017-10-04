@@ -24,5 +24,7 @@ public class RealtimeEvent {
     public float y;
     public float z;
     public float w;
+    public float snapAngle;
+    public boolean dynamic;
     public boolean start = false;
 }

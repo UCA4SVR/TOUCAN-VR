@@ -64,7 +64,9 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
                 "&time=" + event.timestamp +
                 "&currentTime=" + event.videoTime +
                 "&playing=" + event.playing +
-                "&start=" + event.start;
+                "&start=" + event.start +
+                "&snapAngle=" + event.snapAngle +
+                "&dynamic=" + event.dynamic;
         String fullURI = serverIP + pushInfoPath;
 
         if (fullURI.length() > 0) {
