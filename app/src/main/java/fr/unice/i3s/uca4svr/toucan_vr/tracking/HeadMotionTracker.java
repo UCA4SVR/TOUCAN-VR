@@ -118,11 +118,10 @@ public class HeadMotionTracker {
   public void track(GVRContext context, long playbackPosition, float x, float y) {
     GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
     //*
-    String rotationsString = String.format(Locale.ENGLISH, "%1d,%2$.4f,%3$.4f,%4$.4f,%5$.4f,%6$.4f,%7$.4f,%8$.4f,%9$.4f,%10$.4f",
-            clock.elapsedRealtime(),
+    String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.4f,%4$.4f,%5$.4f,%6$.4f,%7$.4f",
+            clock.elapsedRealtime(), playbackPosition,
             headTransform.getRotationPitch(), headTransform.getRotationYaw(), headTransform.getRotationRoll(),
-            x,y,
-            headTransform.getRotationX(), headTransform.getRotationY(), headTransform.getRotationZ(), headTransform.getRotationW());
+            x,y);
     //*/
     /*
     String rotationsString = String.format(Locale.ENGLISH, "%1$d,%2$d,%3$.5f,%4$.5f,%5$.5f,%6$.5f,%7$b",
