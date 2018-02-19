@@ -1,15 +1,27 @@
-# toucan
+# TOUCAN_VR
 
-V 0.1.0
+Description
 
-+ Plays a 360 video in the GearVR headset using exoplayer 2 and the GearVR framework
-+ Has a welcome screen asking to tap the trackpad on the side of the headset to start the playback
-+ Has an end screen asking to remove the headset
-+ Records the head motion of the user during the playback to a file (if storage permission is granted)
-+ Display a "tap to grant permission" screen if permissions are lacking to play the video. If
-permissions are not granted after a few calls, you need to restart the app and accept the permissions.
-+ Storage permissions are required to display videos stored on the phone, activating them will
-automatically turn the logging of the headmotion (and other logging in the future) on for now.
+## Build and install
 
-This application can be launched through the Toucan_parametrizer app using an intent.
-For now, the intent is not read and the path to the video displayed is hard coded.
+The repository provides an Android Studio project. Clone or download it, import the project in Android Studio, let Gradle check for dependencies and install the application in your favourite device.
+
+## Mandatory requirement
+
+TOUCAN_VR retrieves all network configuration parameters, video to be played and logs to be recorded from the TOUCAN_VR Application (https://github.com/UCA4SVR/TOUCAN_VR_parametrizer). TOUCAN_VR must be started from TOUCAN_VR_Parametrizer. Launching TOUCAN_VR from the launcher will result in an error. 
+You may want to test the application with a fix input and a set of predifined parameters: please tune the file PlayerActivity.java and its functions isIntentValid(intent) and parseIntent().
+
+## Permissions
+
+Toucan_VR requires the following permissions:
+
+1. READ_EXTERNAL_STORAGE
+2. WRITE_EXTERNAL_STORAGE
+3. ACCESS_NETWORK_STATE
+4. INTERNET
+
+## Playback
+
+TOUCAN_VR requires a Samsung Gear VR to run. 
+For testing purposes, it is possible to run the application outside the headset enabling the developer mode of the Samsung GVR framweork.
+When TOUCAN_VR is correctly started, the streaming source is reachable, and the device is inserted into a Samsung Gear VR, a tap on the headset is required to start the playback of the content. The following tap events will pause and resume the playback.
