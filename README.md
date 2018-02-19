@@ -6,9 +6,17 @@ Description
 
 The repository provides an Android Studio project. Clone or download it, import the project in Android Studio, let Gradle check for dependencies and install the application in your favourite device.
 
+## External Dependencies
+
+The following applications are needed in order TOUCAN_VR to properly run:
+
+1. Samsung Gear VR Framework
+
 ## Mandatory requirement
 
-TOUCAN_VR retrieves all network configuration parameters, video to be played and logs to be recorded from the TOUCAN_VR Application (https://github.com/UCA4SVR/TOUCAN_VR_parametrizer). TOUCAN_VR must be started from TOUCAN_VR_Parametrizer. Launching TOUCAN_VR from the launcher will result in an error. 
+TOUCAN_VR retrieves all network configuration parameters, video to be played and logs to be recorded from the TOUCAN_VR Parametrizer Application (https://github.com/UCA4SVR/TOUCAN_VR_parametrizer). 
+TOUCAN_VR must be started from TOUCAN_VR_Parametrizer. 
+Launching TOUCAN_VR from the launcher will result in an error. 
 You may want to test the application with a fix input and a set of predifined parameters: please tune the file PlayerActivity.java and its functions isIntentValid(intent) and parseIntent().
 
 ## Permissions
