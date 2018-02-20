@@ -68,6 +68,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListene
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
@@ -96,9 +97,10 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private int bufferForPlaybackAfterRebufferMs;
     //Second section
     private int maxInitialBitrate = PyramidalTrackSelection.DEFAULT_MAX_INITIAL_BITRATE;
-    private int minDurationForQualityIncreaseUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
-    private int maxDurationForQualityDecreaseUs = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
-    private int minDurationToRetainAfterDiscardUs = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
+    private int minDurationForQualityIncrease = PyramidalTrackSelection.DEFAULT_MIN_DURATION_FOR_QUALITY_INCREASE_MS;
+    private int maxDurationForQualityDecrease = PyramidalTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS;
+    private int minDurationToRetainAfterDiscard = PyramidalTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
+    private int maxDurationToRetainAfterDiscard = PyramidalTrackSelection.DEFAULT_MAX_DURATION_TO_RETAIN_AFTER_DISCARD_MS;
     private float bandwidthFraction = PyramidalTrackSelection.DEFAULT_BANDWIDTH_FRACTION;
 
     private String mediaUri = "https://bitmovin-a.akamaihd.net/content/playhouse-vr/mpds/105560.mpd";
@@ -110,6 +112,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingRealTimeUserPosition = false;
     private String serverIPAddress;
     private boolean loggingQualityFoV = false;
+    private boolean loggingReplacement = false;
 
     private String[] tiles;
     private int gridWidth = 1;
@@ -223,6 +226,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
         serverIPAddress = intent.getStringExtra("serverIPAddress");
         loggingQualityFoV = intent.getBooleanExtra("loggingQualityFoV", false);
+        loggingReplacement = intent.getBooleanExtra("loggingReplacement", false);
         gridWidth = intent.getIntExtra("W", 3);
         gridHeight = intent.getIntExtra("H", 3);
         tiles = intent.getStringExtra("tilesCSV").split(",");
@@ -276,8 +280,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
             if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
-                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges || loggingQualityFoV
-                    || dynamicEditingHolder.isDynamicEdited()) {
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges
+                    || loggingQualityFoV || loggingReplacement || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
                 permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -289,12 +293,13 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             if (isRemoteFile || loggingRealTimeUserPosition) {
                 CheckConnection checkConnection = new CheckConnection(this);
                 checkConnection.response = this;
-                if(isRemoteFile && loggingRealTimeUserPosition)
-                    checkConnection.execute(mediaUri,serverIPAddress+"/cleanTables.php");
-                else if(isRemoteFile && !loggingRealTimeUserPosition)
+                if(isRemoteFile && loggingRealTimeUserPosition) {
+                    checkConnection.execute(mediaUri/*,serverIPAddress*/);
+                } else if(isRemoteFile && !loggingRealTimeUserPosition) {
                     checkConnection.execute(mediaUri);
-                else if(!isRemoteFile && loggingRealTimeUserPosition)
-                    checkConnection.execute(serverIPAddress+"/cleanTables.php");
+                } else if(!isRemoteFile && loggingRealTimeUserPosition) {
+                    //checkConnection.execute(serverIPAddress);
+                }
             } else {
                 if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
                     changeStatus(Status.CHECKING_PERMISSION);
@@ -372,16 +377,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     preparePlayer();
                 else if (!play) {
                     videoSceneObjectPlayer.pause();
-                    //Pushing the tap event
-                    if(loggingRealTimeUserPosition) {
-                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
-                    }
                 } else {
                     videoSceneObjectPlayer.start();
-                    //Pushing the tap event
-                    if(loggingRealTimeUserPosition) {
-                        ((Minimal360Video) getMain()).pushTapEvent(player.getCurrentPosition());
-                    }
                 }
             }
         }
@@ -410,8 +407,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             // May be extended or replaced by custom implementations to try different adaptive strategies.
             TrackSelection.Factory videoTrackSelectionFactory =
                     new PyramidalTrackSelection.Factory(
-                            bandwidthMeter, maxInitialBitrate, minDurationForQualityIncreaseUs,
-                            maxDurationForQualityDecreaseUs, minDurationToRetainAfterDiscardUs,
+                            bandwidthMeter, maxInitialBitrate, maxBufferMs,
+                            minDurationForQualityIncrease, maxDurationForQualityDecrease,
+                            minDurationToRetainAfterDiscard, maxDurationToRetainAfterDiscard,
                             bandwidthFraction, dynamicEditingHolder);
             TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
@@ -476,8 +474,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                     } else {
                         TilesPicker.getPicker().disableLogger();
                     }
-
-
                     if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
                     }
@@ -600,7 +596,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);
-                mediaSource.setTileQualityTracker(new TileQualityTracker(logPrefix));
+                mediaSource.setTileQualityTracker(loggingQualityFoV ? new TileQualityTracker(logPrefix) : null);
+                mediaSource.setReplacementTracker(loggingReplacement ? new ReplacementTracker(logPrefix) : null);
                 return mediaSource;
             case C.TYPE_HLS:
                 return new HlsMediaSource(uri, mediaDataSourceFactory, mainHandler,

@@ -22,17 +22,18 @@ import android.os.AsyncTask;
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRTransform;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
-public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean> {
+public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolean> {
 
     private GVRContext context;
     private PushResponse callback;
     private String serverIP;
-    private final static String pushForHeadMotion = "/logHeadMotion.php";
-    private final static String pushForTapEvent = "/logTapEvent.php";
+    private final static String pushInfoPath = "/infos";
 
 
     public PushRealtimeEvents(GVRContext context, String serverIP, PushResponse callback) {
@@ -43,8 +44,8 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
 
     @Override
     protected Boolean doInBackground(RealtimeEvent... events) {
-        for(RealtimeEvent event : events) {
-            if(!push(event)) return false;
+        for (RealtimeEvent event : events) {
+            if (!push(event)) return false;
         }
         return true;
     }
@@ -55,31 +56,51 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent,Integer,Boolean>
     }
 
     private Boolean push(RealtimeEvent event) {
-        String fullURI = "";
-        if (event.eventType) {
-            GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-            fullURI = serverIP + pushForHeadMotion +
-                    "?timestamp=" + event.timestamp +
-                    "&x=" + headTransform.getRotationPitch() +
-                    "&y=" + headTransform.getRotationYaw() +
-                    "&z=" + headTransform.getRotationRoll();
-        } else {
-            fullURI = serverIP + pushForTapEvent +
-                    "?timestamp=" + event.timestamp;
-        }
-        if(fullURI.length()>0) {
+        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
+        String urlParameters = "x=" + event.x +
+                "&y=" + event.y +
+                "&z=" + event.z +
+                "&w=" + event.w +
+                "&time=" + event.timestamp +
+                "&currentTime=" + event.videoTime +
+                "&playing=" + event.playing +
+                "&start=" + event.start +
+                "&snapAngle=" + event.snapAngle +
+                "&dynamic=" + event.dynamic;
+        String fullURI = serverIP + pushInfoPath;
+
+        if (fullURI.length() > 0) {
+            HttpURLConnection urlc;
             try {
-                HttpURLConnection urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
-                urlc.setRequestProperty("User-Agent", "Test");
-                urlc.setRequestProperty("Connection", "close");
-                urlc.setConnectTimeout(1500);
+                urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
+            } catch (IOException e) {
+                return false;
+            }
+            try {
+                byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
+                urlc.setDoOutput(true);
+                urlc.setInstanceFollowRedirects(false);
+                urlc.setRequestMethod("POST");
+                urlc.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                urlc.setRequestProperty("charset", "utf-8");
+                urlc.setRequestProperty("Content-Length", Integer.toString(postData.length));
+                urlc.setUseCaches(false);
+                try (DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
+                    wr.write(postData);
+                }
                 urlc.connect();
                 return (urlc.getResponseCode() == 200);
             } catch (IOException e) {
                 return false;
+            } finally {
+                urlc.disconnect();
             }
         } else {
             return false;
         }
+    }
+
+    public String getServerIP() {
+        return serverIP;
     }
 }

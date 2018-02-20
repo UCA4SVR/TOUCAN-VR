@@ -26,7 +26,7 @@ public class DynamicEditingHolder {
 	public final long timeThreshold;
 	public final double angleThreshold;
 	public int nextSCMilliseconds;
-    public int nextSCMicroseconds;
+	public int nextSCMicroseconds;
 	public int nextSCroiDegrees;
 	public int[] nextSCfoVTiles;
 	public float lastRotation;
