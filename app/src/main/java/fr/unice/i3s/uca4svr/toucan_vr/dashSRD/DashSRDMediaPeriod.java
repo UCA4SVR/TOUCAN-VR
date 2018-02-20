@@ -20,17 +20,15 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
-import android.util.Log;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
-import com.google.android.exoplayer2.source.CompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.MediaPeriod;
+import com.google.android.exoplayer2.source.SRDCompositeSequenceableLoader;
 import com.google.android.exoplayer2.source.SampleStream;
 import com.google.android.exoplayer2.source.SequenceableLoader;
 import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.TrackGroupArray;
-import com.google.android.exoplayer2.source.chunk.ChunkSampleStream;
 import com.google.android.exoplayer2.source.dash.DashChunkSource;
 import com.google.android.exoplayer2.source.dash.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.dash.manifest.DashManifest;
@@ -38,212 +36,258 @@ import com.google.android.exoplayer2.source.dash.manifest.Representation;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.Allocator;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.AdaptationSetSRD;
-import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.manifest.SupplementalProperty;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.source.chunk.OurChunkSampleStream;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
+
 
 /**
  * A DASH {@link MediaPeriod}.
  */
 /* package */ final class DashSRDMediaPeriod implements MediaPeriod,
-        SequenceableLoader.Callback<ChunkSampleStream<DashChunkSource>> {
+        SequenceableLoader.Callback<OurChunkSampleStream<DashChunkSource>> {
 
-    /* package */ final int id;
-    private final DashChunkSource.Factory chunkSourceFactory;
-    private final int minLoadableRetryCount;
-    private final EventDispatcher eventDispatcher;
-    private final long elapsedRealtimeOffset;
-    private final LoaderErrorThrower manifestLoaderErrorThrower;
-    private final Allocator allocator;
-    private final TrackGroupArray trackGroups;
+  /* package */ final int id;
+  private final DashChunkSource.Factory chunkSourceFactory;
+  private final int minLoadableRetryCount;
+  private final EventDispatcher eventDispatcher;
+  private final long elapsedRealtimeOffset;
+  private final LoaderErrorThrower manifestLoaderErrorThrower;
+  private final Allocator allocator;
+  private final TrackGroupArray trackGroups;
+  private final TileQualityTracker tileQualityTracker;
+  private final ReplacementTracker replacementTracker;
+  private final boolean noReplacement;
 
-    private Callback callback;
-    private ChunkSampleStream<DashChunkSource>[] sampleStreams;
-    private CompositeSequenceableLoader sequenceableLoader;
-    private DashManifest manifest;
-    private int periodIndex;
-    private List<AdaptationSet> adaptationSets;
+  private Callback callback;
+  private SRDCompositeSequenceableLoader sequenceableLoader;
+  private OurChunkSampleStream<DashChunkSource>[] sampleStreams;
+  private DashManifest manifest;
+  private int periodIndex;
+  private List<AdaptationSet> adaptationSets;
+  private DynamicEditingHolder dynamicEditingHolder;
 
-    public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
-                           DashChunkSource.Factory chunkSourceFactory,  int minLoadableRetryCount,
-                           EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
-                           LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator) {
-        this.id = id;
-        this.manifest = manifest;
-        this.periodIndex = periodIndex;
-        this.chunkSourceFactory = chunkSourceFactory;
-        this.minLoadableRetryCount = minLoadableRetryCount;
-        this.eventDispatcher = eventDispatcher;
-        this.elapsedRealtimeOffset = elapsedRealtimeOffset;
-        this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
-        this.allocator = allocator;
-        sampleStreams = newSampleStreamArray(0);
-        sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
-        adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
-        trackGroups = buildTrackGroups(adaptationSets);
+  private int replacementBufferHighWatermark;
+  private int replacementBufferLowWatermark;
+  private boolean isReplacing;
+
+  public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
+                            DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
+                            EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
+                            LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
+                            int replacementBufferLowWatermark, int replacementBufferHighWatermark,
+                            DynamicEditingHolder dynamicEditingHolder,
+                            TileQualityTracker tileQualityTracker, ReplacementTracker replacementTracker,
+                            boolean noReplacement) {
+    this.id = id;
+    this.manifest = manifest;
+    this.periodIndex = periodIndex;
+    this.chunkSourceFactory = chunkSourceFactory;
+    this.minLoadableRetryCount = minLoadableRetryCount;
+    this.eventDispatcher = eventDispatcher;
+    this.elapsedRealtimeOffset = elapsedRealtimeOffset;
+    this.manifestLoaderErrorThrower = manifestLoaderErrorThrower;
+    this.allocator = allocator;
+    this.dynamicEditingHolder = dynamicEditingHolder;
+    this.tileQualityTracker = tileQualityTracker;
+    this.replacementTracker = replacementTracker;
+    this.noReplacement = noReplacement;
+    this.replacementBufferLowWatermark = replacementBufferLowWatermark * 1000;
+    this.replacementBufferHighWatermark = replacementBufferHighWatermark * 1000;
+    this.isReplacing = false;
+    sampleStreams = newSampleStreamArray(0);
+    sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
+    adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
+    trackGroups = buildTrackGroups(adaptationSets);
+  }
+
+  public void updateManifest(DashManifest manifest, int periodIndex) {
+    this.manifest = manifest;
+    this.periodIndex = periodIndex;
+    adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
+    if (sampleStreams != null) {
+      for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+        sampleStream.getChunkSource().updateManifest(manifest, periodIndex);
+      }
+      callback.onContinueLoadingRequested(this);
     }
+  }
 
-    public void updateManifest(DashManifest manifest, int periodIndex) {
-        this.manifest = manifest;
-        this.periodIndex = periodIndex;
-        adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
-        if (sampleStreams != null) {
-            for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
-                sampleStream.getChunkSource().updateManifest(manifest, periodIndex);
-            }
-            callback.onContinueLoadingRequested(this);
+  public void release() {
+    for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+      sampleStream.release();
+    }
+  }
+
+  @Override
+  public void prepare(Callback callback) {
+    this.callback = callback;
+    callback.onPrepared(this);
+  }
+
+  @Override
+  public void maybeThrowPrepareError() throws IOException {
+    manifestLoaderErrorThrower.maybeThrowError();
+  }
+
+  @Override
+  public TrackGroupArray getTrackGroups() {
+    return trackGroups;
+  }
+
+  @Override
+  public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
+                           SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
+    int adaptationSetCount = adaptationSets.size();
+    HashMap<Integer, OurChunkSampleStream<DashChunkSource>> primarySampleStreams = new HashMap<>();
+
+    for (int i = 0; i < selections.length; i++) {
+      if (streams[i] instanceof OurChunkSampleStream) {
+        @SuppressWarnings("unchecked")
+        OurChunkSampleStream<DashChunkSource> stream = (OurChunkSampleStream<DashChunkSource>) streams[i];
+        if (selections[i] == null || !mayRetainStreamFlags[i]) {
+          stream.release();
+          streams[i] = null;
+        } else {
+          int adaptationSetIndex = trackGroups.indexOf(selections[i].getTrackGroup());
+          primarySampleStreams.put(adaptationSetIndex, stream);
         }
-    }
-
-    public void release() {
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
-            sampleStream.release();
+      }
+      if (streams[i] == null && selections[i] != null) {
+        int trackGroupIndex = trackGroups.indexOf(selections[i].getTrackGroup());
+        if (trackGroupIndex < adaptationSetCount) {
+          OurChunkSampleStream<DashChunkSource> stream = buildSampleStream(trackGroupIndex,
+                  selections[i], positionUs);
+          primarySampleStreams.put(trackGroupIndex, stream);
+          streams[i] = stream;
+          streamResetFlags[i] = true;
         }
+      }
     }
+    sampleStreams = newSampleStreamArray(primarySampleStreams.size());
+    primarySampleStreams.values().toArray(sampleStreams);
+    sequenceableLoader = new SRDCompositeSequenceableLoader(sampleStreams);
+    return positionUs;
+  }
 
-    @Override
-    public void prepare(Callback callback) {
-        this.callback = callback;
-        callback.onPrepared(this);
+  @Override
+  public void discardBuffer(long positionUs) {
+    for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+      sampleStream.discardUnselectedEmbeddedTracksTo(positionUs);
     }
+  }
 
-    @Override
-    public void maybeThrowPrepareError() throws IOException {
-        manifestLoaderErrorThrower.maybeThrowError();
+  @Override
+  public boolean continueLoading(long positionUs) {
+    long bufferedPosition = getBufferedPositionUs();
+
+    /*
+     * If the buffer falls bellow the low watermark, stop replacement and buffer content again.
+     */
+    if ((bufferedPosition - positionUs) < replacementBufferLowWatermark) {
+      isReplacing = false;
     }
-
-    @Override
-    public TrackGroupArray getTrackGroups() {
-        return trackGroups;
-    }
-
-    @Override
-    public long selectTracks(TrackSelection[] selections, boolean[] mayRetainStreamFlags,
-                             SampleStream[] streams, boolean[] streamResetFlags, long positionUs) {
-        int adaptationSetCount = adaptationSets.size();
-        HashMap<Integer, ChunkSampleStream<DashChunkSource>> primarySampleStreams = new HashMap<>();
-
-        for (int i = 0; i < selections.length; i++) {
-            if (streams[i] instanceof ChunkSampleStream) {
-                @SuppressWarnings("unchecked")
-                ChunkSampleStream<DashChunkSource> stream = (ChunkSampleStream<DashChunkSource>) streams[i];
-                if (selections[i] == null || !mayRetainStreamFlags[i]) {
-                    stream.release();
-                    streams[i] = null;
-                } else {
-                    int adaptationSetIndex = trackGroups.indexOf(selections[i].getTrackGroup());
-                    primarySampleStreams.put(adaptationSetIndex, stream);
-                }
-            }
-            if (streams[i] == null && selections[i] != null) {
-                int trackGroupIndex = trackGroups.indexOf(selections[i].getTrackGroup());
-                if (trackGroupIndex < adaptationSetCount) {
-                    ChunkSampleStream<DashChunkSource> stream = buildSampleStream(trackGroupIndex,
-                            selections[i], positionUs);
-                    primarySampleStreams.put(trackGroupIndex, stream);
-                    streams[i] = stream;
-                    streamResetFlags[i] = true;
-                }
-            }
-        }
-        sampleStreams = newSampleStreamArray(primarySampleStreams.size());
-        primarySampleStreams.values().toArray(sampleStreams);
-        sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
-        return positionUs;
-    }
-
-    @Override
-    public void discardBuffer(long positionUs) {
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
-            sampleStream.discardUnselectedEmbeddedTracksTo(positionUs);
-        }
-    }
-
-    @Override
-    public boolean continueLoading(long positionUs) {
-        return sequenceableLoader.continueLoading(positionUs);
-    }
-
-    @Override
-    public long getNextLoadPositionUs() {
-        return sequenceableLoader.getNextLoadPositionUs();
-    }
-
-    @Override
-    public long readDiscontinuity() {
-        return C.TIME_UNSET;
-    }
-
-    @Override
-    public long getBufferedPositionUs() {
-        long bufferedPositionUs = Long.MAX_VALUE;
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
-            long rendererBufferedPositionUs = sampleStream.getBufferedPositionUs();
-            if (rendererBufferedPositionUs != C.TIME_END_OF_SOURCE) {
-                bufferedPositionUs = Math.min(bufferedPositionUs, rendererBufferedPositionUs);
-            }
-        }
-        return bufferedPositionUs == Long.MAX_VALUE ? C.TIME_END_OF_SOURCE : bufferedPositionUs;
-    }
-
-    @Override
-    public long seekToUs(long positionUs) {
-        for (ChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
-            sampleStream.seekToUs(positionUs);
-        }
-        return positionUs;
-    }
-
-    // SequenceableLoader.Callback implementation.
-
-    @Override
-    public void onContinueLoadingRequested(ChunkSampleStream<DashChunkSource> sampleStream) {
+    /*
+     * If the buffer is full and the playback has started, start replacing chunks.
+     * It doesn't make sense to replace if the playback hasn't started: we have no information
+     * from the picker.
+     * If we are still replacing (the buffer has not depleted that much), continue replacing.
+     */
+    if ((bufferedPosition - positionUs) > replacementBufferHighWatermark || isReplacing) {
+      isReplacing = true;
+      if (positionUs > 0) {
+        if (!sequenceableLoader.replaceChunks(positionUs))
+          callback.onContinueLoadingRequested(this);
+      } else {
+        //Nothing to do
         callback.onContinueLoadingRequested(this);
+      }
+    } else {
+      sequenceableLoader.continueLoading(positionUs);
     }
+    return true;
+  }
 
-    // Internal methods.
+  @Override
+  public long getNextLoadPositionUs() {
+    return sequenceableLoader.getNextLoadPositionUs();
+  }
 
-    // N.B. this method creates a group of tracks from each of the adaptation sets
-    private static TrackGroupArray buildTrackGroups(List<AdaptationSet> adaptationSets) {
-        int adaptationSetCount = adaptationSets.size();
-        TrackGroup[] trackGroupArray = new TrackGroup[adaptationSetCount];
+  @Override
+  public long readDiscontinuity() {
+    return C.TIME_UNSET;
+  }
 
-        for (int i = 0; i < adaptationSetCount; i++) {
-            // casting to AdaptationSetSRD
-            AdaptationSetSRD adaptationSet = (AdaptationSetSRD)adaptationSets.get(i);
-
-            // TODO: parse SupplementalProperty to build a proper object to attach to the TrackGroup (?)
-
-            List<Representation> representations = adaptationSet.representations;
-            Format[] formats = new Format[representations.size()];
-            for (int j = 0; j < formats.length; j++) {
-                formats[j] = representations.get(j).format;
-            }
-            trackGroupArray[i] = new TrackGroup(formats);
-        }
-
-        return new TrackGroupArray(trackGroupArray);
+  @Override
+  public long getBufferedPositionUs() {
+    long bufferedPositionUs = Long.MAX_VALUE;
+    for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+      long rendererBufferedPositionUs = sampleStream.getBufferedPositionUs();
+      if (rendererBufferedPositionUs != C.TIME_END_OF_SOURCE) {
+        bufferedPositionUs = Math.min(bufferedPositionUs, rendererBufferedPositionUs);
+      }
     }
+    return bufferedPositionUs == Long.MAX_VALUE ? C.TIME_END_OF_SOURCE : bufferedPositionUs;
+  }
 
-    // N.B. this method creates a stream of chunks for each of the renderer
-    //      (provided that each renderer has a group of exposed tracks and is enabled)
-    private ChunkSampleStream<DashChunkSource> buildSampleStream(int adaptationSetIndex,
-                                                                 TrackSelection selection, long positionUs) {
-        AdaptationSet adaptationSet = adaptationSets.get(adaptationSetIndex);
-        DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
-                manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
-                elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
-        ChunkSampleStream<DashChunkSource> stream = new ChunkSampleStream<>(adaptationSet.type,
-                /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
-                eventDispatcher);
-        return stream;
+  @Override
+  public long seekToUs(long positionUs) {
+    for (OurChunkSampleStream<DashChunkSource> sampleStream : sampleStreams) {
+      sampleStream.seekToUs(positionUs);
     }
+    return positionUs;
+  }
 
-    @SuppressWarnings("unchecked")
-    private static ChunkSampleStream<DashChunkSource>[] newSampleStreamArray(int length) {
-        return new ChunkSampleStream[length];
+  // SequenceableLoader.Callback implementation.
+
+  @Override
+  public void onContinueLoadingRequested(OurChunkSampleStream<DashChunkSource> sampleStream) {
+    callback.onContinueLoadingRequested(this);
+  }
+
+  // Internal methods.
+
+  // N.B. this method creates a group of tracks from each of the adaptation sets
+  private static TrackGroupArray buildTrackGroups(List<AdaptationSet> adaptationSets) {
+    int adaptationSetCount = adaptationSets.size();
+    TrackGroup[] trackGroupArray = new TrackGroup[adaptationSetCount];
+
+    for (int i = 0; i < adaptationSetCount; i++) {
+      // casting to AdaptationSetSRD
+      AdaptationSetSRD adaptationSet = (AdaptationSetSRD) adaptationSets.get(i);
+      List<Representation> representations = adaptationSet.representations;
+      Format[] formats = new Format[representations.size()];
+      for (int j = 0; j < formats.length; j++) {
+        formats[j] = representations.get(j).format;
+      }
+      trackGroupArray[i] = new TrackGroup(formats);
     }
+    return new TrackGroupArray(trackGroupArray);
+  }
+
+  // N.B. this method creates a stream of chunks for each of the renderer
+  //      (provided that each renderer has a group of exposed tracks and is enabled)
+  private OurChunkSampleStream<DashChunkSource> buildSampleStream(int adaptationSetIndex,
+                                                                  TrackSelection selection, long positionUs) {
+    AdaptationSet adaptationSet = adaptationSets.get(adaptationSetIndex);
+    DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
+            manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
+            elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
+    OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
+            /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
+            eventDispatcher, dynamicEditingHolder, tileQualityTracker, replacementTracker, noReplacement);
+    return stream;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static OurChunkSampleStream<DashChunkSource>[] newSampleStreamArray(int length) {
+    return new OurChunkSampleStream[length];
+  }
 }

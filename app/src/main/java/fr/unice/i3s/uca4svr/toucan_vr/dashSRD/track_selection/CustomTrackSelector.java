@@ -23,6 +23,7 @@ package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 import android.content.Context;
 import android.graphics.Point;
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
