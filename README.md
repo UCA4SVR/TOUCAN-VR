@@ -5,7 +5,7 @@ The application implements the buffering strategy, replacement or descarding tec
 TOUCAN_VR has been developed and tested on Samsung Galaxy S7 edge running Android 7, together with the Samsung Gear VR headset.
 The application has been built on top of Exoplayer 2 which in turn leverages the Samsung Gear VR Framework to display VR scenes.
 
-[1] TOUCAN-Preprocessing https://github.com/UCA4SVR/TOUCAN-preprocessing
+[1] TOUCAN-Preprocessing https://github.com/UCA4SVR/TOUCAN-preprocessing     
 [2] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming"
 
 ## Build and install
