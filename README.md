@@ -32,16 +32,16 @@ The following permissions are required:
 3. ACCESS_NETWORK_STATE
 4. INTERNET
 
-**If permissions are not granted, an error screen will appear together with the request for the missing permission.
+**If permissions are not granted, an error screen will appear together with the request for the missing permission.**
 
-**If TOUCAN_VR is not started from TOUCAN_VR-Parametrizer an error screen will be shown.
+**If TOUCAN_VR is not started from TOUCAN_VR-Parametrizer an error screen will be shown.**
 
 When TOUCAN_VR is correctly invoked from TOUCAN_VR-Parametrizer, the following checks are carried out:
 
 1. Internet connection (if the video is remote)
 2. Existence of the MPD file
 
-**An error screen will appear if checks fail.
+**An error screen will appear if checks fail.**
 
 When TOUCAN_VR is correctly started and the streaming source is reachable, a screen suggests to tap the touchpad of the Samsung Gear VR headset to start the playback of the content. The following tap events will pause and resume the playback. At the end of the content, a screen suggest the user to remove the headset.
 
