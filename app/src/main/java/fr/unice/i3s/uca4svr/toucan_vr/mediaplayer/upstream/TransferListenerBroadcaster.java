@@ -41,14 +41,14 @@ public class TransferListenerBroadcaster implements TransferListener<Object> {
     }
 
     synchronized public void removeAllListeners() {
-        for (TransferListener listener : listeners) {
-            listeners.remove(listener);
-        }
+        listeners.removeAll(listeners);
     }
 
     @Override
     synchronized public void onTransferStart(Object source, DataSpec dataSpec) {
-        listeners.removeAll(listeners);
+        for (TransferListener<Object> listener : listeners) {
+            listener.onTransferStart(source, dataSpec);
+        }
     }
 
     @Override
