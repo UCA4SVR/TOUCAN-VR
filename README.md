@@ -7,22 +7,22 @@ The application has been built on top of Exoplayer 2 which in turn leverages the
 
 Created by:
 
-Universite Nice Sophia Antipolis and CNRS
+Universite Nice Sophia Antipolis (Universite Cote d'Azur) and CNRS  
 Laboratoire d'Informatique, Signaux et Systèmes de Sophia Antipolis (I3S)
 
 Contributors:
 
-Savino DAMBRA
-Giuseppe SAMELA
-Lucile SASSATELLI
-Romaric PIGHETTI
-Ramon APARICIO-PARDO
+Savino DAMBRA  
+Giuseppe SAMELA  
+Lucile SASSATELLI  
+Romaric PIGHETTI  
+Ramon APARICIO-PARDO  
 Anne-Marie PINNA-DERY
 
 References:
 
 [1] TOUCAN-Preprocessing https://github.com/UCA4SVR/TOUCAN-preprocessing     
-[2] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Aparicio-Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming"
+[2] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Aparicio-Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming", submitted
 
 ## Build and install
 
