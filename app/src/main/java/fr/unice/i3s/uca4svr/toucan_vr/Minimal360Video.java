@@ -13,8 +13,8 @@
  * limitations under the License.
  *
  * Modifications:
- * Several adaptations to use Exoplayer2 to display tiles videos.
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Several adaptations to use Exoplayer2 to display tiled videos.
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 
 package fr.unice.i3s.uca4svr.toucan_vr;
