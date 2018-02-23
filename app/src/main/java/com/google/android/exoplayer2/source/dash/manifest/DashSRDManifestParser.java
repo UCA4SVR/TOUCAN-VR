@@ -16,7 +16,7 @@
  * Modifications:
  * Package name
  * Added SRD support to the parser
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 
 package com.google.android.exoplayer2.source.dash.manifest;
