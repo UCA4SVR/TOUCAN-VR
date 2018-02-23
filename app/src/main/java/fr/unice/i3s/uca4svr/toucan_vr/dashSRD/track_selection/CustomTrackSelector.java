@@ -16,7 +16,7 @@
  * Modifications:
  * Package name
  * Added SRD support (selecting one track per adaptation set dedicated to video)
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection;
 
