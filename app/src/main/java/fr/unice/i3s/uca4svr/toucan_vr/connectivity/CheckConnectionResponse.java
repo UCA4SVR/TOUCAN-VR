@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  
- * Modifications:
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 package fr.unice.i3s.uca4svr.toucan_vr.connectivity;
 
