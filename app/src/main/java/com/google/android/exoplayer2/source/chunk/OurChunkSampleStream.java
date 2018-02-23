@@ -14,7 +14,6 @@
  * limitations under the License.
  
  * Modifications:
- * Activity name
  * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 package com.google.android.exoplayer2.source.chunk;
