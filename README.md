@@ -24,6 +24,19 @@ References:
 [1] TOUCAN-Preprocessing https://github.com/UCA4SVR/TOUCAN-preprocessing     
 [2] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Aparicio-Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming", submitted
 
+## Contributing
+If you want to contribute to the project, your help is very welcome. 
+We suggest the following contribution instructions:
+
+1. Create a personal fork of the project on Github
+2. Clone the fork on your local machine, it will be the point where your contribution starts from.
+3. Create a new branch to work on. Our working branch is either develop or feature/discarding_bynary_strategy (it depends whether you want to work on the discarding or replacement strategy), so branch from those.
+4. Implement/fix your feature, comment your code.
+5. Follow the code style of the project, including indentation.
+6. Push your commits with a message explaining the work you've done.
+7. From your fork, open a pull request in the correct branch. You can find useful instruction about opening pull requests from forked projects here https://help.github.com/articles/creating-a-pull-request-from-a-fork/. Target develop or feature/discarding_bynary_strategy branch depending on what branch you forked from.
+8. Once your pull request is accepted, you can pull the changes from the original repository.
+
 ## Build and install
 
 The repository provides an Android Studio project. Clone or download it, import the project in Android Studio, let Gradle check for dependencies and install the application in your favourite device.
