@@ -37,6 +37,9 @@ We suggest the following contribution instructions:
 7. From your fork, open a pull request in the correct branch. You can find useful instruction about opening pull requests from forked projects here https://help.github.com/articles/creating-a-pull-request-from-a-fork/. Target develop or feature/discarding_bynary_strategy branch depending on what branch you forked from.
 8. Once your pull request is accepted, you can pull the changes from the original repository.
 
+## Contact
+For any question, please send an email to githubprojecttoucanvr@gmail.com
+
 ## Build and install
 
 The repository provides an Android Studio project. Clone or download it, import the project in Android Studio, let Gradle check for dependencies and install the application in your favourite device.
