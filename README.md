@@ -1,4 +1,5 @@
 # TOUCAN_VR
+[![DOI](https://zenodo.org/badge/82916354.svg)](https://zenodo.org/badge/latestdoi/82916354)
 
 TOUCAN_VR allows to stream and play a DASH-SRD described content created with [1]. It can be parametrized with [2].
 The application implements the buffering strategy, replacement or descarding techniques and dynamic editing described in [3].
