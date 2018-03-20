@@ -23,7 +23,7 @@ Anne-Marie PINNA-DERY
 References:
 
 [1] TOUCAN-Preprocessing https://github.com/UCA4SVR/TOUCAN-preprocessing     
-[2] TOUCAN-VR parametrizer https://github.com/UCA4SVR/TOUCAN_VR_parametrizer
+[2] TOUCAN-VR parametrizer https://github.com/UCA4SVR/TOUCAN_VR_parametrizer  
 [3] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Aparicio-Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming", ACM Multimedia Systems Conference (MMSys), Amsterdam, The Netherlands, June 2018.
 
 ## Contributing
