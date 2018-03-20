@@ -1,7 +1,7 @@
 # TOUCAN_VR
 
-TOUCAN_VR allows to stream and play a DASH-SRD described content created with [1].
-The application implements the buffering strategy, replacement or descarding techniques and dynamic editing described in [2].
+TOUCAN_VR allows to stream and play a DASH-SRD described content created with [1]. It can be parametrized with [2].
+The application implements the buffering strategy, replacement or descarding techniques and dynamic editing described in [3].
 TOUCAN_VR has been developed and tested on Samsung Galaxy S7 edge running Android 7, together with the Samsung Gear VR headset.
 The application has been built on top of Exoplayer 2 which in turn leverages the Samsung Gear VR Framework to display VR scenes.
 
@@ -22,7 +22,8 @@ Anne-Marie PINNA-DERY
 References:
 
 [1] TOUCAN-Preprocessing https://github.com/UCA4SVR/TOUCAN-preprocessing     
-[2] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Aparicio-Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming", ACM Multimedia Systems Conference (MMSys), Amsterdam, The Netherlands, June 2018.
+[2] TOUCAN-VR parametrizer https://github.com/UCA4SVR/TOUCAN_VR_parametrizer
+[3] S. Dambra, G. Samela, L. Sassatelli, R. Pighetti, R. Aparicio-Pardo, A. Pinna-Déry "Film Editing: New Levers to Improve VR Streaming", ACM Multimedia Systems Conference (MMSys), Amsterdam, The Netherlands, June 2018.
 
 ## Contributing
 If you want to contribute to the project, your help is very welcome. 
