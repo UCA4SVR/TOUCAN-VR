@@ -14,24 +14,17 @@
  * limitations under the License.
  */
 
-package fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing;
+package fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations;
 
-public class SnapChange {
+public class SnapChange extends DynamicOperation {
 
-	private int milliseconds;
 	private int roiDegrees;
 	private int[] foVTiles;
-	private boolean millisecondsFlag;
 	private boolean roiDegreesFlag;
 	private boolean foVTilesFlag;
 
 	public SnapChange() {
-		this.millisecondsFlag = this.roiDegreesFlag = this.foVTilesFlag = false;
-	}
-
-	public void setMilliseconds(int milliseconds) {
-		this.milliseconds = milliseconds;
-		this.millisecondsFlag = true;
+		this.roiDegreesFlag = this.foVTilesFlag = false;
 	}
 
 	public void setRoiDegrees(int roiDegrees) {
@@ -44,17 +37,10 @@ public class SnapChange {
 		this.foVTilesFlag = true;
 	}
 
+	@Override
 	public boolean isOK() {
-		return this.millisecondsFlag && this.roiDegreesFlag && this.foVTilesFlag;
+		return super.isOK() && this.roiDegreesFlag && this.foVTilesFlag;
 	}
-
-	public int getSCMilliseconds() {
-		return this.milliseconds;
-	}
-
-    public long getSCMicroseconds() {
-        return this.milliseconds*1000;
-    }
 
 	public int getSCroiDegrees() {
 		return this.roiDegrees;

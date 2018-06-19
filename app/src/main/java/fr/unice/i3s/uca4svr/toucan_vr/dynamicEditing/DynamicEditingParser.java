@@ -21,9 +21,9 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.ArrayList;
+
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 
 public class DynamicEditingParser {
 

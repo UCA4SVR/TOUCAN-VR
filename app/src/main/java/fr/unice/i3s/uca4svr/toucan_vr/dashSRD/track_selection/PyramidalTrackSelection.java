@@ -33,7 +33,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
-import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.SnapChange;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
@@ -193,15 +194,15 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         int currentSelectedIndex = selectedIndex;
 
         if(dynamicEditingHolder.isDynamicEdited()) {
-            List<SnapChange> snapChanges = dynamicEditingHolder.getSnapChanges();
+            List<DynamicOperation> operations = dynamicEditingHolder.getOperations();
             SnapChange closestSnapChange = null;
             // In case of multiple snap changes in the buffer, consider the last one when making decisions
-            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() < nextChunkEndTimeUs; i++) {
-                closestSnapChange = snapChanges.get(i);
+            for (int i = 0; i < operations.size() && operations.get(i).getMicroseconds() < nextChunkEndTimeUs; i++) {
+                closestSnapChange = (SnapChange)operations.get(i);
             }
             if (closestSnapChange != null) {
                 int desiredIndex = Arrays.binarySearch(closestSnapChange.getSCfoVTiles(), adaptationSetIndex) >= 0 ? 0 : 1;
-                if (closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
+                if (closestSnapChange.getMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
                     // The snap change involves the current chunk. Provide a smooth transition when the snap change
                     // is forcing the quality to be low while the tile is still displayed to the user.
                     desiredIndex = selectedIndex;
