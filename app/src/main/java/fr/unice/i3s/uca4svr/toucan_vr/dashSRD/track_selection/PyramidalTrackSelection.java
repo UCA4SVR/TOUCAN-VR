@@ -266,15 +266,16 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
 
         MediaChunk previousChunk = queue.get(0);
+        DynamicOperation op = dynamicEditingHolder.getCurrentOperation();
         if(dynamicEditingHolder.isDynamicEdited() &&
-                dynamicEditingHolder.nextSCMicroseconds <= nextChunkEndTimeUs) {
-            long timeBeforeSnapChangeUs = dynamicEditingHolder.nextSCMicroseconds - playbackPositionUs;
+                op.getMicroseconds() <= nextChunkEndTimeUs) {
+            long timeBeforeSnapChangeUs = op.getMicroseconds() - playbackPositionUs;
             if (timeBeforeSnapChangeUs < maxDurationToRetainAfterDiscardUs) {
                 // The snap change is close to the playback position. It's not worth discarding.
                 return queueSize;
             }
             // Check for the last chunk before the snap change position
-            for (int i = 1; i < queueSize && queue.get(i).endTimeUs < dynamicEditingHolder.nextSCMicroseconds; i++) {
+            for (int i = 1; i < queueSize && queue.get(i).endTimeUs < op.getMicroseconds(); i++) {
                 previousChunk = queue.get(i);
             }
 

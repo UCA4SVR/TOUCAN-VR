@@ -54,7 +54,7 @@ public class DynamicEditingParser {
 			switch (eventType) {
 				case XmlPullParser.START_TAG:
 					if (tagname.equalsIgnoreCase("snapchange")) {
-						snapchange = new SnapChange();
+						snapchange = new SnapChange(dynamicEditingHolder);
 					}
 					break;
 
@@ -65,7 +65,7 @@ public class DynamicEditingParser {
 				case XmlPullParser.END_TAG:
 					if (tagname.equalsIgnoreCase("snapchange")) {
 						// add video object to list and check if all the parameters are set
-						if(snapchange!=null && snapchange.isOK()) {
+						if(snapchange!=null && snapchange.isWellDefined()) {
 							dynamicEditingHolder.add(snapchange);
 						} else {
 							throw new XmlPullParserException("Not well formed snapchange tag!");
@@ -91,9 +91,6 @@ public class DynamicEditingParser {
 			//check if the file is empty
 			if(dynamicEditingHolder.empty()) {
 				throw new XmlPullParserException("File is empty!");
-			} else {
-				//Snapchanges have been stored into the holder object. Preparing the first snapchange.
-				dynamicEditingHolder.getNextSnapChange();
 			}
 	}
 

@@ -15,21 +15,19 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing;
 
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 
 public class DynamicEditingHolder {
 
-	private List<DynamicOperation> operations;
+	private Queue<DynamicOperation> operations;
 	private boolean isDynamicEdited;
 	public final long timeThreshold;
 	public final double angleThreshold;
-	public int nextSCMilliseconds;
-	public int nextSCMicroseconds;
-	public int nextSCroiDegrees;
 	public float lastRotation;
 
 	public DynamicEditingHolder(boolean isDynamicEdited) {
@@ -37,7 +35,7 @@ public class DynamicEditingHolder {
 		this.timeThreshold = 100;
 		this.angleThreshold = 30;
 		if(this.isDynamicEdited) {
-			this.operations = new ArrayList<>();
+			this.operations = new LinkedList<>();
 		}
 	}
 
@@ -46,7 +44,7 @@ public class DynamicEditingHolder {
 		this.timeThreshold = timeThreshold;
 		this.angleThreshold = angleThreshold;
 		if(this.isDynamicEdited) {
-			this.operations = new ArrayList<>();
+			this.operations = new LinkedList<>();
 		}
 	}
 
@@ -61,23 +59,20 @@ public class DynamicEditingHolder {
 		return isDynamicEdited;
 	}
 
-	public void getNextSnapChange() {
-		this.nextSCMilliseconds = operations.get(0).getMilliseconds();
-		this.nextSCMicroseconds = this.nextSCMilliseconds*1000;
-		this.nextSCroiDegrees = ((SnapChange)operations.get(0)).getSCroiDegrees();
+	public List<DynamicOperation> getOperations() {
+		return (LinkedList<DynamicOperation>)operations;
 	}
 
-	public List<DynamicOperation> getOperations() {
-		return operations;
-	}
+	public DynamicOperation getCurrentOperation() {
+	  return operations.peek();
+  }
 
 	public void advance(float lastRotation) {
 		if(this.operations.size()==1)
 			this.isDynamicEdited = false;
 		else {
 			this.lastRotation = lastRotation;
-			this.operations.remove(0);
-			getNextSnapChange();
+			this.operations.poll();
 		}
 	}
 }
