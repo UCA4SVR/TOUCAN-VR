@@ -16,10 +16,13 @@
 
 package fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations;
 
+import com.google.android.exoplayer2.ExoPlayer;
+
 import org.gearvrf.GVRContext;
 import org.gearvrf.GVRSceneObject;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.DynamicOperationsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.utils.Angles;
 
 import static java.lang.Math.abs;
@@ -28,8 +31,10 @@ public class SnapChange extends DynamicOperation {
 
 	private int roiDegrees;
 	private int[] foVTiles;
+	private float angleBeforeSC;
 	private boolean roiDegreesFlag;
 	private boolean foVTilesFlag;
+	private boolean triggered;
 
 	public SnapChange(DynamicEditingHolder dynamicEditingHolder) {
 	  super(dynamicEditingHolder);
@@ -53,18 +58,24 @@ public class SnapChange extends DynamicOperation {
 
   @Override
   public void activate(GVRSceneObject videoHolder, GVRContext gvrContext) {
-    float currentAngle = getCurrentYAngle(gvrContext);
-    float difference = currentAngle - roiDegrees;
+    angleBeforeSC = Angles.getCurrentYAngle(gvrContext);
+    float difference = angleBeforeSC - roiDegrees;
     videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
     dynamicEditingHolder.advance(difference);
   }
 
   @Override
+  public void logIn(DynamicOperationsTracker tracker, long executionTime) {
+      tracker.trackSnapchange(getMilliseconds(), executionTime, roiDegrees, angleBeforeSC, triggered);
+  }
+
+  @Override
   public boolean hasToBeTriggeredInContext(GVRContext gvrContext) {
     //Check if a SnapChange is needed
-    float currentAngle = getCurrentYAngle(gvrContext);
+    float currentAngle = Angles.getCurrentYAngle(gvrContext);
     float trigger = computeTrigger(dynamicEditingHolder.lastRotation, currentAngle, roiDegrees);
-    return trigger > dynamicEditingHolder.angleThreshold;
+    triggered = trigger > dynamicEditingHolder.angleThreshold;
+    return triggered;
   }
 
   public int getSCroiDegrees() {
@@ -74,22 +85,6 @@ public class SnapChange extends DynamicOperation {
 	public int[] getSCfoVTiles() {
 		return this.foVTiles;
 	}
-
-  private float getCurrentYAngle(GVRContext gvrContext) {
-    double angle = 0;
-    float[] lookAt = gvrContext.getMainScene().getMainCameraRig().getLookAt();
-    // cos = [0], sin = [2]
-    double norm = Math.sqrt(lookAt[0] * lookAt[0] + lookAt[2] * lookAt[2]);
-    double cos = lookAt[0] / norm;
-    cos = abs(cos) > 1 ? Math.signum(cos) : cos;
-    if (lookAt[2] == 0) {
-      angle = Math.acos(cos);
-    } else {
-      angle = Math.signum(lookAt[2]) * Math.acos(cos);
-    }
-    //From radiant to degree + orientation
-    return (float)(angle * 180 / Math.PI * -1);
-  }
 
   private float computeTrigger(float lastRotation, float currentUserPosition, float nextSCroiDegrees) {
     float normalizedLastRotation = Angles.normalizeAngle(lastRotation);
