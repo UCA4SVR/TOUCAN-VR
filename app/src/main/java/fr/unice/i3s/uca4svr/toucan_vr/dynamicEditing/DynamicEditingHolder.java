@@ -21,6 +21,7 @@ import java.util.Queue;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.Stop;
 
 public class DynamicEditingHolder {
 
@@ -36,6 +37,10 @@ public class DynamicEditingHolder {
 		this.angleThreshold = 30;
 		if(this.isDynamicEdited) {
 			this.operations = new LinkedList<>();
+			//TODO: DELETE THIS
+      DynamicOperation stop = new Stop(this, 4000);
+      stop.setMilliseconds(1000);
+      this.operations.add(stop);
 		}
 	}
 
@@ -45,6 +50,10 @@ public class DynamicEditingHolder {
 		this.angleThreshold = angleThreshold;
 		if(this.isDynamicEdited) {
 			this.operations = new LinkedList<>();
+      //TODO: DELETE THIS
+      DynamicOperation stop = new Stop(this, 4000);
+      stop.setMilliseconds(1000);
+      this.operations.add(stop);
 		}
 	}
 
