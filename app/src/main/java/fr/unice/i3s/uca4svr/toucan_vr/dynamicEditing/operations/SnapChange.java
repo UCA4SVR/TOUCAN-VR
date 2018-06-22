@@ -22,6 +22,8 @@ import org.gearvrf.GVRContext;
 import org.gearvrf.GVRSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+import java.util.Arrays;
+
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.DynamicOperationsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.utils.Angles;
@@ -68,6 +70,18 @@ public class SnapChange extends DynamicOperation {
   @Override
   public void logIn(DynamicOperationsTracker tracker, long executionTime) {
       tracker.trackSnapchange(getMilliseconds(), executionTime, roiDegrees, angleBeforeSC, triggered);
+  }
+
+  @Override
+  public int computeIdealIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs) {
+    int desiredIndex = Arrays.binarySearch(foVTiles, adaptationSetIndex) >= 0 ? 0 : 1;
+    if (this.getMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
+      // The snap change involves the current chunk. Provide a smooth transition when the snap change
+      // is forcing the quality to be low while the tile is still displayed to the user.
+      return selectedIndex;
+    } else {
+      return desiredIndex;
+    }
   }
 
   @Override

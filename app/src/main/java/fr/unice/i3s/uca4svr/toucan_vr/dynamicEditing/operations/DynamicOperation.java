@@ -47,4 +47,6 @@ public abstract class DynamicOperation {
   public abstract boolean hasToBeTriggeredInContext(GVRContext gvrContext);
 
   public abstract void logIn(DynamicOperationsTracker tracker, long executionTime);
+
+  public abstract int computeIdealIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs);
 }

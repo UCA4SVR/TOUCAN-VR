@@ -195,21 +195,15 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
 
         if(dynamicEditingHolder.isDynamicEdited()) {
             List<DynamicOperation> operations = dynamicEditingHolder.getOperations();
-            SnapChange closestSnapChange = null;
-            // In case of multiple snap changes in the buffer, consider the last one when making decisions
+            DynamicOperation dynamicOperation = null;
+            // In case of multiple operations in the buffer, consider the last one when making decisions
             for (int i = 0; i < operations.size() && operations.get(i).getMicroseconds() < nextChunkEndTimeUs; i++) {
-                closestSnapChange = (SnapChange)operations.get(i);
+                dynamicOperation = operations.get(i);
             }
-            if (closestSnapChange != null) {
-                int desiredIndex = Arrays.binarySearch(closestSnapChange.getSCfoVTiles(), adaptationSetIndex) >= 0 ? 0 : 1;
-                if (closestSnapChange.getMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
-                    // The snap change involves the current chunk. Provide a smooth transition when the snap change
-                    // is forcing the quality to be low while the tile is still displayed to the user.
-                    desiredIndex = selectedIndex;
-                }
-                selectedIndex = desiredIndex;
+            if (dynamicOperation != null) {
+                selectedIndex = dynamicOperation.computeIdealIndex(selectedIndex, adaptationSetIndex, nextChunkStartTimeUs);
             } else {
-                // No snap changes in the buffer
+                // No operations in the buffer
                 selectedIndex = determineIdealSelectedIndex(isPicked);
             }
         } else {
