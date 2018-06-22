@@ -217,7 +217,7 @@ public class Minimal360Video extends GVRMain implements PushResponse {
 
       //Initial Rotation
       if(dynamicEditingHolder.isDynamicEdited()) {
-        dynamicEditingHolder.getCurrentOperation().activate(videoHolder, gvrContext);
+        dynamicEditingHolder.getCurrentOperation().activate(videoHolder);
       }
 
       // need a final handle on the object for the thread
@@ -389,7 +389,7 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       if(dynamicEditingHolder.isDynamicEdited()) {
         DynamicOperation op = dynamicEditingHolder.getCurrentOperation();
         if (op.isReady(player.getCurrentPosition()) && op.hasToBeTriggeredInContext(gvrContext)) {
-          op.activate(videoHolder, gvrContext);
+          op.activate(videoHolder);
           if (dynamicOperationsTracker != null) {
             op.logIn(dynamicOperationsTracker, player.getCurrentPosition());
           }

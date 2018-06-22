@@ -57,8 +57,8 @@ public class SnapChange extends DynamicOperation {
 	}
 
   @Override
-  public void activate(GVRSceneObject videoHolder, GVRContext gvrContext) {
-    angleBeforeSC = Angles.getCurrentYAngle(gvrContext);
+  public void activate(GVRSceneObject videoHolder) {
+    angleBeforeSC = Angles.getCurrentYAngle(videoHolder.getGVRContext());
     float difference = angleBeforeSC - roiDegrees;
     videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
     dynamicEditingHolder.advance(difference);

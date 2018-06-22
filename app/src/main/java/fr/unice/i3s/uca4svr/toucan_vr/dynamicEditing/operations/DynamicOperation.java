@@ -41,7 +41,7 @@ public abstract class DynamicOperation {
     return abs(this.milliseconds - currentTime) < dynamicEditingHolder.timeThreshold;
   }
 
-  public abstract void activate(GVRSceneObject videoHolder, GVRContext gvrContext);
+  public abstract void activate(GVRSceneObject videoHolder);
 
   public abstract boolean hasToBeTriggeredInContext(GVRContext gvrContext);
 
