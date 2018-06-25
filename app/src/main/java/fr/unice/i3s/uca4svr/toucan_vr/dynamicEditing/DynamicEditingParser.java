@@ -23,20 +23,20 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.elementParsers.ElementParser;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.elementParsers.GlobalParser;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 
 public class DynamicEditingParser {
 
 	//private attributes
-	private DynamicEditingHolder dynamicEditingHolder;
-	private SnapChange snapchange;
-	private String text;
-	private String[] strTiles;
-	private int[] intTiles;
 	private String dynamicEditingFN;
+	private ElementParser elementParser;
 
 	public DynamicEditingParser(String dynamicEditingFN) {
 		this.dynamicEditingFN = dynamicEditingFN;
+		this.elementParser = new GlobalParser();
 	}
 
 	//Main parse method
@@ -50,48 +50,19 @@ public class DynamicEditingParser {
 		parser.setInput(new FileInputStream(file),"UTF-8");
 		int eventType = parser.getEventType();
 		while (eventType != XmlPullParser.END_DOCUMENT) {
-			String tagname = parser.getName();
-			switch (eventType) {
-				case XmlPullParser.START_TAG:
-					if (tagname.equalsIgnoreCase("snapchange")) {
-						snapchange = new SnapChange(dynamicEditingHolder);
-					}
-					break;
+		  elementParser.parse(this, dynamicEditingHolder, parser);
+		  eventType = parser.getEventType();
+    }
+    //check if the file is empty
+    if(dynamicEditingHolder.empty()) {
+      throw new XmlPullParserException("File is empty!");
+    }
 
-				case XmlPullParser.TEXT:
-					text = parser.getText();
-					break;
-
-				case XmlPullParser.END_TAG:
-					if (tagname.equalsIgnoreCase("snapchange")) {
-						// add video object to list and check if all the parameters are set
-						if(snapchange!=null && snapchange.isWellDefined()) {
-							dynamicEditingHolder.add(snapchange);
-						} else {
-							throw new XmlPullParserException("Not well formed snapchange tag!");
-						}
-					} else if (tagname.equalsIgnoreCase("milliseconds")) {
-						if (snapchange!=null) snapchange.setMilliseconds(Integer.parseInt(text));
-					} else if (tagname.equalsIgnoreCase("roiDegrees")) {
-						if (snapchange!=null) snapchange.setRoiDegrees(Integer.parseInt(text));
-					} else if (tagname.equalsIgnoreCase("foVTile")) {
-							strTiles = text.split(",");
-							intTiles = new int[strTiles.length];
-							for (int i = 0; i < strTiles.length; i++) {
-								intTiles[i] = Integer.parseInt(strTiles[i]);
-							}
-							if (snapchange != null) snapchange.setFoVTiles(intTiles);
-					}
-					break;
-				default:
-					break;
-			}
-			eventType = parser.next();
-			}
-			//check if the file is empty
-			if(dynamicEditingHolder.empty()) {
-				throw new XmlPullParserException("File is empty!");
-			}
+    System.out.println(dynamicEditingHolder.getOperations());
 	}
+
+	public void setElementParser(ElementParser elementParser) {
+	  this.elementParser = elementParser;
+  }
 
 }

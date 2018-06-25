@@ -654,6 +654,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         try {
             parser.parse(dynamicEditingHolder);
         } catch (Exception e) {
+            e.printStackTrace();
             changeStatus(Status.WRONGDYNED);
         }
     }

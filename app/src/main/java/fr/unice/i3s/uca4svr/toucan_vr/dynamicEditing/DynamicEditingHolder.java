@@ -49,8 +49,8 @@ public class DynamicEditingHolder {
 	}
 
 
-	public void add(SnapChange snapchange) {
-		this.operations.add(snapchange);
+	public void add(DynamicOperation dynamicOperation) {
+		this.operations.add(dynamicOperation);
 	}
 
 	public boolean empty() { return operations.size()==0; }
