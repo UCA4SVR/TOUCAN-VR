@@ -15,20 +15,19 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing;
 
-
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 
 public class DynamicEditingHolder {
 
-	private List<SnapChange> snapchanges;
+	private Queue<DynamicOperation> operations;
 	private boolean isDynamicEdited;
 	public final long timeThreshold;
 	public final double angleThreshold;
-	public int nextSCMilliseconds;
-	public int nextSCMicroseconds;
-	public int nextSCroiDegrees;
-	public int[] nextSCfoVTiles;
 	public float lastRotation;
 
 	public DynamicEditingHolder(boolean isDynamicEdited) {
@@ -36,7 +35,7 @@ public class DynamicEditingHolder {
 		this.timeThreshold = 100;
 		this.angleThreshold = 30;
 		if(this.isDynamicEdited) {
-			this.snapchanges = new ArrayList<>();
+			this.operations = new LinkedList<>();
 		}
 	}
 
@@ -45,39 +44,35 @@ public class DynamicEditingHolder {
 		this.timeThreshold = timeThreshold;
 		this.angleThreshold = angleThreshold;
 		if(this.isDynamicEdited) {
-			this.snapchanges = new ArrayList<>();
+			this.operations = new LinkedList<>();
 		}
 	}
 
 
-	public void add(SnapChange snapchange) {
-		this.snapchanges.add(snapchange);
+	public void add(DynamicOperation dynamicOperation) {
+		this.operations.add(dynamicOperation);
 	}
 
-    public boolean empty() { return snapchanges.size()==0; }
+	public boolean empty() { return operations.size()==0; }
 
 	public boolean isDynamicEdited() {
 		return isDynamicEdited;
 	}
 
-	public void getNextSnapChange() {
-		this.nextSCMilliseconds = snapchanges.get(0).getSCMilliseconds();
-        this.nextSCMicroseconds = this.nextSCMilliseconds*1000;
-		this.nextSCroiDegrees = snapchanges.get(0).getSCroiDegrees();
-		this.nextSCfoVTiles = snapchanges.get(0).getSCfoVTiles();
+	public List<DynamicOperation> getOperations() {
+		return (LinkedList<DynamicOperation>)operations;
 	}
 
-	public List<SnapChange> getSnapChanges() {
-		return snapchanges;
-	}
+	public DynamicOperation getCurrentOperation() {
+	  return operations.peek();
+  }
 
 	public void advance(float lastRotation) {
-		if(this.snapchanges.size()==1)
+		if(this.operations.size()==1)
 			this.isDynamicEdited = false;
 		else {
 			this.lastRotation = lastRotation;
-			this.snapchanges.remove(0);
-			getNextSnapChange();
+			this.operations.poll();
 		}
 	}
 }
