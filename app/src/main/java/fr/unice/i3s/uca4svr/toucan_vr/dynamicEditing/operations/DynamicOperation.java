@@ -11,6 +11,12 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.DynamicOperationsTracker;
 
 import static java.lang.Math.abs;
 
+/**
+ * General dynamic operation implementation.
+ * Stores the timing system and the abstract method that each concrete dynamic operation has to implement and specify.
+ *
+ * @author Julien Lemaire
+ */
 public abstract class DynamicOperation {
   private int milliseconds;
   private boolean millisecondsFlag;

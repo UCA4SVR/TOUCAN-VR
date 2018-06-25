@@ -16,6 +16,12 @@ import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
 
+/**
+ * Writes snapchange execution log into a specific logger (leading to a specific csv file).
+ *
+ * @author Romaric Pighetti
+ * @author Julien Lemaire
+ */
 public class SnapchangeLogWriter {
 
   // Each logger must have a different ID,

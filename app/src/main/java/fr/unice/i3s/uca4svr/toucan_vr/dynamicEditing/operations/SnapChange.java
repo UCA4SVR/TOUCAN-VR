@@ -30,6 +30,13 @@ import fr.unice.i3s.uca4svr.toucan_vr.utils.Angles;
 
 import static java.lang.Math.abs;
 
+/**
+ * SnapChange technique as described in further research documentation.
+ * Implements the operation's data and behavior.
+ *
+ * @author Romaric Pighetti
+ * @author Julien Lemaire
+ */
 public class SnapChange extends DynamicOperation {
 
 	private int roiDegrees;

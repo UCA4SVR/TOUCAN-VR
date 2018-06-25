@@ -20,13 +20,10 @@ import java.util.Locale;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.writers.SnapchangeLogWriter;
 
 /**
- * It tracks if the snapchange is executed or not (because the user was looking at the ROI when the snapchange occurred)
- * Each entry in the csv file will have:
- *  - the timestamp of the snapchange
- *  - the timestamp at which the snapchange is activated
- *  - the angle in degrees fixed after the snapchange
- *  - the current user's angle
- *  - boolean representing if the snapchange has been executed or not
+ * Tracks every kind of dynamic operations with its own method to be called.
+ *
+ * @author Romaric Pighetti
+ * @author Julien Lemaire
  */
 public class DynamicOperationsTracker {
 
