@@ -54,5 +54,5 @@ public abstract class DynamicOperation {
 
   public abstract void logIn(DynamicOperationsTracker tracker, long executionTime);
 
-  public abstract int computeIdealIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs);
+  public abstract int computeIdealTileIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs);
 }

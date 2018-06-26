@@ -57,12 +57,9 @@ public class DynamicEditingParser {
     if(dynamicEditingHolder.empty()) {
       throw new XmlPullParserException("File is empty!");
     }
-
-    System.out.println(dynamicEditingHolder.getOperations());
 	}
 
 	public void setElementParser(ElementParser elementParser) {
 	  this.elementParser = elementParser;
   }
-
 }

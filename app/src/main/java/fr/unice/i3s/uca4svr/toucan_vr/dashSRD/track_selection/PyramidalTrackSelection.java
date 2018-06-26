@@ -29,12 +29,10 @@ import com.google.android.exoplayer2.trackselection.BaseTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 
-import java.util.Arrays;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
-import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
@@ -201,7 +199,7 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
                 dynamicOperation = operations.get(i);
             }
             if (dynamicOperation != null) {
-                selectedIndex = dynamicOperation.computeIdealIndex(selectedIndex, adaptationSetIndex, nextChunkStartTimeUs);
+                selectedIndex = dynamicOperation.computeIdealTileIndex(selectedIndex, adaptationSetIndex, nextChunkStartTimeUs);
             } else {
                 // No operations in the buffer
                 selectedIndex = determineIdealSelectedIndex(isPicked);

@@ -18,6 +18,8 @@ public class GlobalParser extends ElementParser {
     String tagname = parser.getName();
     if (tagname.equalsIgnoreCase("snapchange")) {
       context.setElementParser(new SnapChangeParser(holder));
+    } else if (tagname.equalsIgnoreCase("stop")) {
+      context.setElementParser(new StopParser(holder));
     }
   }
 

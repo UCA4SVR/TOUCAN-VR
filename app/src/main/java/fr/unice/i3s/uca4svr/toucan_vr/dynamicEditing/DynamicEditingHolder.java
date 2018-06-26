@@ -37,10 +37,6 @@ public class DynamicEditingHolder {
 		this.angleThreshold = 30;
 		if(this.isDynamicEdited) {
 			this.operations = new LinkedList<>();
-			//TODO: DELETE THIS
-      DynamicOperation stop = new Stop(this, 4000);
-      stop.setMilliseconds(1000);
-      this.operations.add(stop);
 		}
 	}
 
@@ -50,10 +46,6 @@ public class DynamicEditingHolder {
 		this.angleThreshold = angleThreshold;
 		if(this.isDynamicEdited) {
 			this.operations = new LinkedList<>();
-      //TODO: DELETE THIS
-      DynamicOperation stop = new Stop(this, 4000);
-      stop.setMilliseconds(1000);
-      this.operations.add(stop);
 		}
 	}
 
@@ -84,4 +76,12 @@ public class DynamicEditingHolder {
 			this.operations.poll();
 		}
 	}
+
+	public void advance() {
+    if(this.operations.size()==1)
+			this.isDynamicEdited = false;
+		else {
+			this.operations.poll();
+		}
+  }
 }

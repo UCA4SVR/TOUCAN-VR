@@ -80,7 +80,7 @@ public class SnapChange extends DynamicOperation {
   }
 
   @Override
-  public int computeIdealIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs) {
+  public int computeIdealTileIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs) {
     int desiredIndex = Arrays.binarySearch(foVTiles, adaptationSetIndex) >= 0 ? 0 : 1;
     if (this.getMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
       // The snap change involves the current chunk. Provide a smooth transition when the snap change

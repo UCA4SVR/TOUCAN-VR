@@ -215,11 +215,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       this.videoHolder = new GVRSceneObject(this.gvrContext);
       scene.addSceneObject(videoHolder);
 
-      //Initial Rotation
-      if(dynamicEditingHolder.isDynamicEdited()) {
-        dynamicEditingHolder.getCurrentOperation().activate(videoSceneObjectPlayer, videoHolder);
-      }
-
       // need a final handle on the object for the thread
       final GVRSceneObject videoHolderFinal = videoHolder;
 

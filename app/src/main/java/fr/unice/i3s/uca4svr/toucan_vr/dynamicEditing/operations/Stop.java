@@ -18,9 +18,12 @@ public class Stop extends DynamicOperation {
     this.millisPauseTime = millisPauseTime;
   }
 
+  public Stop(DynamicEditingHolder dynamicEditingHolder) {
+    this(dynamicEditingHolder, 0);
+  }
+
   @Override
   public void activate(final GVRVideoSceneObjectPlayer<ExoPlayer> player, GVRSceneObject videoHolder) {
-    System.out.println("STOOOP");
     player.pause();
     new Thread(new Runnable() { //async so the user can explore the scene
       @Override
@@ -30,10 +33,10 @@ public class Stop extends DynamicOperation {
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
-        System.out.println("GO ON");
         player.start();
       }
     }).start();
+    dynamicEditingHolder.advance();
   }
 
   @Override
@@ -47,7 +50,11 @@ public class Stop extends DynamicOperation {
   }
 
   @Override
-  public int computeIdealIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs) {
+  public int computeIdealTileIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs) {
     return selectedIndex; // nothing to do
+  }
+
+  public void setDuration(int millisDuration) {
+    this.millisPauseTime = millisDuration;
   }
 }
