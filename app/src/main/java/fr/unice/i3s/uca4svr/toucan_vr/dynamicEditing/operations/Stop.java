@@ -34,9 +34,9 @@ public class Stop extends DynamicOperation {
           e.printStackTrace();
         }
         player.start();
+        dynamicEditingHolder.advance();
       }
     }).start();
-    dynamicEditingHolder.advance();
   }
 
   @Override
