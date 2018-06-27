@@ -48,19 +48,20 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import java.util.ArrayList;
-import java.util.Locale;
 import java.util.concurrent.Future;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition.PushRealtimeEvents;
 import fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition.PushResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition.RealtimeEvent;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
+import fr.unice.i3s.uca4svr.toucan_vr.tracking.DynamicOperationsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.FreezingEventsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.HeadMotionTracker;
-import fr.unice.i3s.uca4svr.toucan_vr.tracking.SnapchangeEventsTracker;
+import fr.unice.i3s.uca4svr.toucan_vr.utils.Angles;
 
 import static java.lang.Math.abs;
 
@@ -76,7 +77,7 @@ public class Minimal360Video extends GVRMain implements PushResponse {
   private FreezingEventsTracker freezingEventsTracker = null;
 
   // The tracker for the snapchange events
-  private SnapchangeEventsTracker snapchangeEventsTracker = null;
+  private DynamicOperationsTracker dynamicOperationsTracker = null;
 
   // Objects used to push the tap events and the user's realtime position
   private PushRealtimeEvents realtimeEventPusher = null;
@@ -214,14 +215,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       this.videoHolder = new GVRSceneObject(this.gvrContext);
       scene.addSceneObject(videoHolder);
 
-      //Initial Rotation
-      if(dynamicEditingHolder.isDynamicEdited()) {
-        float currentAngle = getCurrentYAngle();
-        float difference = currentAngle - dynamicEditingHolder.nextSCroiDegrees;
-        videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
-        dynamicEditingHolder.advance(difference);
-      }
-
       // need a final handle on the object for the thread
       final GVRSceneObject videoHolderFinal = videoHolder;
 
@@ -358,9 +351,9 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       freezingEventsTracker = new FreezingEventsTracker(logPrefix);
   }
 
-  public void initSnapchangeEventsTracker(String logPrefix) {
-    if (snapchangeEventsTracker == null)
-      snapchangeEventsTracker = new SnapchangeEventsTracker(logPrefix);
+  public void initDynamicOperationsTracker(String logPrefix) {
+    if (dynamicOperationsTracker == null)
+      dynamicOperationsTracker = new DynamicOperationsTracker(logPrefix);
   }
 
   public void initRealtimeEventPusher(GVRContext context, String serverIP) {
@@ -382,32 +375,19 @@ public class Minimal360Video extends GVRMain implements PushResponse {
     if (inSession() && videoSceneObjectPlayer != null) {
       final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
       if (headMotionTracker != null) {
-        headMotionTracker.track(gvrContext, player.getCurrentPosition(), getCurrentXAngle(), getCurrentYAngle());
+        headMotionTracker.track(gvrContext, player.getCurrentPosition(), Angles.getCurrentXAngle(gvrContext), Angles.getCurrentYAngle(gvrContext));
       }
       if (freezingEventsTracker != null) {
         freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
       }
       //Dynamic Editing block
       if(dynamicEditingHolder.isDynamicEdited()) {
-        if (abs(dynamicEditingHolder.nextSCMilliseconds - player.getCurrentPosition()) < dynamicEditingHolder.timeThreshold) {
-          boolean triggered = false;
-          //Check if a SnapChange is needed
-          float currentAngle = getCurrentYAngle();
-          float difference = currentAngle-dynamicEditingHolder.nextSCroiDegrees;
-          float trigger = computeTrigger(dynamicEditingHolder.lastRotation, currentAngle, dynamicEditingHolder.nextSCroiDegrees);
-          if(trigger > dynamicEditingHolder.angleThreshold) {
-            //Perform the SnapChange
-            videoHolder.getTransform().setRotationByAxis(difference,0,1,0);
-            triggered = true;
-            currentSnapAngle = difference;
+        DynamicOperation op = dynamicEditingHolder.getCurrentOperation();
+        if (op.isReady(player.getCurrentPosition()) && op.hasToBeTriggeredInContext(gvrContext)) {
+          op.activate(videoSceneObjectPlayer, videoHolder);
+          if (dynamicOperationsTracker != null) {
+            op.logIn(dynamicOperationsTracker, player.getCurrentPosition());
           }
-          //Tracking
-          if (snapchangeEventsTracker != null) {
-            snapchangeEventsTracker.track(dynamicEditingHolder.nextSCMilliseconds, player.getCurrentPosition(), dynamicEditingHolder.nextSCroiDegrees, currentAngle, triggered);
-          }
-          //Update for the next SnapChange
-          dynamicEditingHolder.advance(difference);
-
         }
       }
 
@@ -432,62 +412,6 @@ public class Minimal360Video extends GVRMain implements PushResponse {
         }
       }
     }
-  }
-
-  /**
-   * Gets the current user position Y angle (in degrees). It ranges between -180 and 180
-   * @return User position
-   */
-
-  private float getCurrentYAngle() {
-    double angle = 0;
-    float[] lookAt = gvrContext.getMainScene().getMainCameraRig().getLookAt();
-    // cos = [0], sin = [2]
-    double norm = Math.sqrt(lookAt[0] * lookAt[0] + lookAt[2] * lookAt[2]);
-    double cos = lookAt[0] / norm;
-    cos = abs(cos) > 1 ? Math.signum(cos) : cos;
-    if (lookAt[2] == 0) {
-      angle = Math.acos(cos);
-    } else {
-      angle = Math.signum(lookAt[2]) * Math.acos(cos);
-    }
-    //From radiant to degree + orientation
-    return (float)(angle * 180 / Math.PI * -1);
-  }
-
-  /**
-   * Gets the current user position X angle (in degrees). It ranges between -90 and 90
-   * @return User position
-   */
-
-  private float getCurrentXAngle() {
-    double angle = 0;
-    float[] lookAt = gvrContext.getMainScene().getMainCameraRig().getLookAt();
-    // cos = [0], sin = [2]
-    double norm = Math.sqrt(lookAt[0] * lookAt[0] + lookAt[2] * lookAt[2]);
-    angle = Math.atan2(lookAt[1],norm);
-
-    //From radiant to degree + orientation
-    return (float)(angle * 180 / Math.PI * -1);
-  }
-
-  /**
-   * Normalizes a given angle from a space between -360 and 360 to a space between -180 and 180
-   * @param angle Angle to be normalized
-   * @return Normalized angle
-   */
-  private float normalizeAngle(float angle) {
-    if((angle>=-180)&&(angle<=180))
-      return angle;
-    else
-      return -1*Math.signum(angle)*(360-abs(angle));
-  }
-
-  private float computeTrigger(float lastRotation, float currentUserPosition, float nextSCroiDegrees) {
-    float normalizedLastRotation = normalizeAngle(lastRotation);
-    float trigger = normalizeAngle(currentUserPosition-normalizedLastRotation);
-    trigger = normalizeAngle(trigger-nextSCroiDegrees);
-    return abs(trigger);
   }
 
   @Override

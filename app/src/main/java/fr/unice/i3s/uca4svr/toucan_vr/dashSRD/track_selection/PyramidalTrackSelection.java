@@ -29,11 +29,10 @@ import com.google.android.exoplayer2.trackselection.BaseTrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.upstream.BandwidthMeter;
 
-import java.util.Arrays;
 import java.util.List;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
-import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.SnapChange;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 
 public class PyramidalTrackSelection extends BaseTrackSelection {
@@ -193,22 +192,16 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         int currentSelectedIndex = selectedIndex;
 
         if(dynamicEditingHolder.isDynamicEdited()) {
-            List<SnapChange> snapChanges = dynamicEditingHolder.getSnapChanges();
-            SnapChange closestSnapChange = null;
-            // In case of multiple snap changes in the buffer, consider the last one when making decisions
-            for (int i = 0; i < snapChanges.size() && snapChanges.get(i).getSCMicroseconds() < nextChunkEndTimeUs; i++) {
-                closestSnapChange = snapChanges.get(i);
+            List<DynamicOperation> operations = dynamicEditingHolder.getOperations();
+            DynamicOperation dynamicOperation = null;
+            // In case of multiple operations in the buffer, consider the last one when making decisions
+            for (int i = 0; i < operations.size() && operations.get(i).getMicroseconds() < nextChunkEndTimeUs; i++) {
+                dynamicOperation = operations.get(i);
             }
-            if (closestSnapChange != null) {
-                int desiredIndex = Arrays.binarySearch(closestSnapChange.getSCfoVTiles(), adaptationSetIndex) >= 0 ? 0 : 1;
-                if (closestSnapChange.getSCMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
-                    // The snap change involves the current chunk. Provide a smooth transition when the snap change
-                    // is forcing the quality to be low while the tile is still displayed to the user.
-                    desiredIndex = selectedIndex;
-                }
-                selectedIndex = desiredIndex;
+            if (dynamicOperation != null) {
+                selectedIndex = dynamicOperation.computeIdealTileIndex(selectedIndex, adaptationSetIndex, nextChunkStartTimeUs);
             } else {
-                // No snap changes in the buffer
+                // No operations in the buffer
                 selectedIndex = determineIdealSelectedIndex(isPicked);
             }
         } else {
@@ -265,15 +258,16 @@ public class PyramidalTrackSelection extends BaseTrackSelection {
         }
 
         MediaChunk previousChunk = queue.get(0);
+        DynamicOperation op = dynamicEditingHolder.getCurrentOperation();
         if(dynamicEditingHolder.isDynamicEdited() &&
-                dynamicEditingHolder.nextSCMicroseconds <= nextChunkEndTimeUs) {
-            long timeBeforeSnapChangeUs = dynamicEditingHolder.nextSCMicroseconds - playbackPositionUs;
+                op.getMicroseconds() <= nextChunkEndTimeUs) {
+            long timeBeforeSnapChangeUs = op.getMicroseconds() - playbackPositionUs;
             if (timeBeforeSnapChangeUs < maxDurationToRetainAfterDiscardUs) {
                 // The snap change is close to the playback position. It's not worth discarding.
                 return queueSize;
             }
             // Check for the last chunk before the snap change position
-            for (int i = 1; i < queueSize && queue.get(i).endTimeUs < dynamicEditingHolder.nextSCMicroseconds; i++) {
+            for (int i = 1; i < queueSize && queue.get(i).endTimeUs < op.getMicroseconds(); i++) {
                 previousChunk = queue.get(i);
             }
 
