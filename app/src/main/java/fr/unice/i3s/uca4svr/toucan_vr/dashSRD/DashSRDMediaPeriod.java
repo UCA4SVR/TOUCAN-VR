@@ -16,7 +16,7 @@
  * Modifications:
  * Package name
  * Added SRD support to the parser
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
