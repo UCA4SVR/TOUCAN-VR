@@ -1,4 +1,4 @@
-# TOUCAN_VR generalized operations
+# TOUCAN-VR generalized operations
 
 
 This branch of TOUCAN-VR enables the effects of Virtual Walls and Slow Downs, additionally to snap-changes, as introduced in [1].
