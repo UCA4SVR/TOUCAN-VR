@@ -21,6 +21,7 @@ package fr.unice.i3s.uca4svr.toucan_vr;
 
 import android.graphics.Color;
 import android.os.AsyncTask;
+import android.util.Log;
 import android.view.Gravity;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
@@ -48,16 +49,33 @@ import org.gearvrf.scene_objects.GVRVideoSceneObject;
 import org.gearvrf.scene_objects.GVRVideoSceneObject.GVRVideoType;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
+//import org.tensorflow.TensorFlow;
+//import org.tensorflow.Graph;
+//import org.tensorflow.Session;
+//import org.tensorflow.Tensor;
+//import org.tensorflow.SavedModelBundle;
+
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Iterator;
+import java.util.Queue;
 import java.util.concurrent.Future;
 
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.SnapChange;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.meshes.PartitionedSphereMeshes;
 import fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition.PushRealtimeEvents;
 import fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition.PushResponse;
 import fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition.RealtimeEvent;
+import fr.unice.i3s.uca4svr.toucan_vr.tflite.Classifier;
+import fr.unice.i3s.uca4svr.toucan_vr.tflite.ClassifierFloatMobileNet;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.DynamicOperationsTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.FreezingEventsTracker;
@@ -95,6 +113,18 @@ public class Minimal360Video extends GVRMain implements PushResponse {
   //Info about the dynamic editing
   private DynamicEditingHolder dynamicEditingHolder;
 
+  private float lastDynamicOpTriggered;
+
+  private Classifier snap_trigger_classifier = null;
+
+  //---- To hhtp send quality in FoV
+  static private List<Integer> chunkIndexes_picked = new ArrayList<Integer>();
+  static private List<Integer> chunkIndexes_quals = new ArrayList<Integer>();
+  static private List<Boolean[]> pickedTiles = new ArrayList<Boolean[]>();
+  static private List<Integer[]> qualityTiles = new ArrayList<Integer[]>();
+  private int index_waitingtocomplete = 1;
+  private int chunkIndex;
+  //------------
 
   private GVRSceneObject videoHolder;
 
@@ -106,13 +136,23 @@ public class Minimal360Video extends GVRMain implements PushResponse {
 
   private float currentSnapAngle = Float.NaN;
 
-  Minimal360Video(PlayerActivity.Status statusCode, String [] tiles,
-                  int gridWidth, int gridHeight, DynamicEditingHolder dynamicEditingHolder) {
+  private int nb_snaps_triggered = 0;
+  private float last_possible_snap_time;
+  private float proba_trigger = 0.0f;
+
+  Minimal360Video(PlayerActivity activity, PlayerActivity.Status statusCode, String [] tiles,
+                  int gridWidth, int gridHeight, DynamicEditingHolder dynamicEditingHolder, int numThreads) {
     this.statusCode = statusCode;
     this.tiles = tiles;
     this.gridWidth = gridWidth;
     this.gridHeight = gridHeight;
     this.dynamicEditingHolder = dynamicEditingHolder;
+    this.lastDynamicOpTriggered = -0.01f;
+    try {
+      this.snap_trigger_classifier = Classifier.create(activity, Classifier.Model.FLOAT, Classifier.Device.CPU, numThreads);
+    } catch(Exception e){
+
+    }
   }
 
   public void setVideoSceneObjectPlayer(GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer) {
@@ -132,6 +172,8 @@ public class Minimal360Video extends GVRMain implements PushResponse {
   @Override
   public void onInit(GVRContext gvrContext) {
     this.gvrContext = gvrContext;
+//    System.out.print("x:"+videoHolder.getTransform().getRotationPitch()+" y:"+videoHolder.getTransform().getRotationYaw()+" z:"+videoHolder.getTransform().getRotationRoll()+"\n");
+//    System.exit(0);
     // We need to create the initial scene
     sceneDispatcher();
   }
@@ -154,7 +196,7 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       frustumPicker.setFrustum(40,1,49,50);
 
       // Attaching the picker
-      scene.getEventReceiver().addListener(TilesPicker.getPicker());
+      scene.getEventReceiver().addListener(TilesPicker.getPicker(dynamicEditingHolder));
 
       // Add a listener to the player to catch the end of the playback
       final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
@@ -181,6 +223,24 @@ public class Minimal360Video extends GVRMain implements PushResponse {
               // Display the end scene
               videoSceneObjectPlayer = null;
               setStatusCode(PlayerActivity.Status.PLAYBACK_ENDED);
+
+
+              realtimeEventPusher = new PushRealtimeEvents(gvrContext, realtimeEventPusher.getServerIP());
+              realtimeEvent = new RealtimeEvent();
+              realtimeEvent.timestamp = clock.elapsedRealtime();
+              realtimeEvent.videoTime = 0;
+              realtimeEvent.playing = false;
+              realtimeEvent.x = 0;
+              realtimeEvent.y = 0;
+              realtimeEvent.z = 0;
+              realtimeEvent.isPlaying = 0;
+              realtimeEvent.headX = 0;
+              realtimeEvent.headY = 0;
+              realtimeEvent.headZ = 0;
+              realtimeEvent.dynamic = dynamicEditingHolder.isDynamicEdited();
+              realtimeEvent.snapAngle = 0;
+              realtimeEvent.start = false;
+              realtimeEventPusher.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, realtimeEvent);
               break;
             default:
               break;
@@ -221,6 +281,7 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       // Create an holder objects for the video objects, attach it to the scene and rotate the object according the first snapchange
       this.videoHolder = new GVRSceneObject(this.gvrContext);
       scene.addSceneObject(videoHolder);
+//      videoHolder.getGVRContext().getMainScene().getMainCameraRig().getHeadTransform().reset();
 
       // need a final handle on the object for the thread
       final GVRSceneObject videoHolderFinal = videoHolder;
@@ -383,6 +444,23 @@ public class Minimal360Video extends GVRMain implements PushResponse {
 
   @Override
   public void onStep() {
+
+//    Graph graph = new Graph()
+//    Session session = new Session(graph);
+//    SavedModelBundle model = SavedModelBundle.load("./model");
+//    Tensor<Double> tensor = model.session().runner().fetch("actor0/out/BiasAdd:0")
+//      .feed("actor0/inputs1/X:0", Tensor.<Double>create(3, Double.class))
+//      .feed("actor0/inputs2/X:0", Tensor.<Double>create(3, Double.class))
+//      .feed("actor0/inputs3/X:0", Tensor.<Double>create(3, Double.class))
+//      .feed("actor0/inputs4/X:0", Tensor.<Double>create(3, Double.class))
+//      .feed("actor0/keep_per:0", Tensor.<Double>create(3, Double.class))
+//      .run().get(0).expect(Double.class);
+//
+//    System.out.println(tensor.doubleValue());
+
+
+//    this.snap_trigger_classifier.predict(null);
+
     // We only perform the tracking and the snapchanges if the video is playing
     if (inSession() && videoSceneObjectPlayer != null) {
       final ExoPlayer player = videoSceneObjectPlayer.getPlayer();
@@ -395,21 +473,48 @@ public class Minimal360Video extends GVRMain implements PushResponse {
       if (freezingEventsTracker != null) {
         freezingEventsTracker.track(player.getPlaybackState(), player.getCurrentPosition());
       }
+      boolean is_snapChange = false;
       //Dynamic Editing block
       if(dynamicEditingHolder.isDynamicEdited()) {
+        List<DynamicOperation> ops = (List)DynamicEditingHolder.operations;
         DynamicOperation op = dynamicEditingHolder.getCurrentOperation();
-        if (op.isReady(player.getCurrentPosition())) {
-          if (op.hasToBeTriggeredInContext(gvrContext)) {
-            op.activate(videoSceneObjectPlayer, videoHolder, headMotionTracker, dynamicOperationsTracker); // Execute the operation
-          } else { // If operation doesn't have to be triggered, go to next one anyway
-            dynamicEditingHolder.advance();
-          }
-
-          // Log
-          if (dynamicOperationsTracker != null) {
-            op.logIn(dynamicOperationsTracker, player.getCurrentPosition());
+        //----------Initialization to correct randomness of tilePicker------
+        if (op.getMicroseconds() < 20000){
+          for (int i=0;i<ops.size();i++){
+            SnapChange sc = (SnapChange)(ops.get(i));
+            int[] FoVtiles = new int[gridWidth*gridHeight];
+            for (int ind=0; ind<gridHeight*gridWidth; ind++){
+              FoVtiles[ind]=-1;
+              if (tilesPicker.isPicked(ind)) FoVtiles[ind]=ind;
+            }
+            sc.setFoVTiles(FoVtiles);
           }
         }
+        //------------------------------------------------------------------
+        if (op.isReady(player.getCurrentPosition())) {
+          if (op.getDecided() && op.getTriggered()) {
+            if (op.hasToBeTriggeredInContext(gvrContext)) {
+              op.activate(videoSceneObjectPlayer, videoHolder, headMotionTracker, dynamicOperationsTracker); // Execute the operation
+              currentSnapAngle = dynamicEditingHolder.lastRotation * 0.017453292F;//TO_RADIANS = 0.017453292F
+            } else {
+              dynamicEditingHolder.advance();
+            }
+            //nb_snaps_triggered += 1;
+            nb_snaps_triggered = 1;
+            lastDynamicOpTriggered = op.getMilliseconds();
+          } else { // If operation doesn't have to be triggered, go to next one anyway
+            dynamicEditingHolder.advance();
+            nb_snaps_triggered = 0;
+          }
+          last_possible_snap_time = op.getInput(); // not initially here
+          proba_trigger = op.getProba();
+        }
+
+        // Log
+        if (dynamicOperationsTracker != null) {
+          op.logIn(dynamicOperationsTracker, player.getCurrentPosition());
+        }
+        //last_possible_snap_time = op.getInput(); //player.getCurrentPosition();
       }
 
       if (realtimeEventPusher != null) {
@@ -421,15 +526,53 @@ public class Minimal360Video extends GVRMain implements PushResponse {
           realtimeEvent.videoTime = player.getCurrentPosition();
           realtimeEvent.playing = player.getPlayWhenReady() && player.getPlaybackState() == ExoPlayer.STATE_READY;
           GVRTransform headTransform = gvrContext.getMainScene().getMainCameraRig().getHeadTransform();
-          realtimeEvent.x = headTransform.getRotationX();
-          realtimeEvent.y = headTransform.getRotationY();
-          realtimeEvent.z = headTransform.getRotationZ();
-          realtimeEvent.w = headTransform.getRotationW();
+//          GVRTransform headTransform = videoHolder.getTransform();
+
+          GVRContext context = videoHolder.getGVRContext();
+          float normalizedLastRotation = Angles.normalizeAngle(dynamicEditingHolder.lastRotation);
+          float currentUserPosition = Angles.getCurrentYAngle(context);
+          float currentUserPosition_correctedwithSC = Angles.normalizeAngle(currentUserPosition-normalizedLastRotation); // [0;360]
+
+//          String msg = "Y : "+headTransform.getRotationY()+" / Y snaps : "+currentUserPosition_correctedwithSC;
+//          context.getMainScene().addStatMessage(msg);
+//          headTransform.setRotation(headTransform.getRotationW(), headTransform.getRotationX(), currentUserPosition_correctedwithSC, headTransform.getRotationZ());
+
+//          System.out.print("normalizedLastRotation:"+normalizedLastRotation+" / currentUserPosition:"+currentUserPosition+"\n");
+          realtimeEvent.x = gvrContext.getMainScene().getMainCameraRig().getLookAt()[1];//[-1;1]
+          // Lucile
+          //realtimeEvent.x = headTransform.getRotationPitch();
+          realtimeEvent.y = currentUserPosition_correctedwithSC;//[0;360]
+          realtimeEvent.z = headTransform.getRotationRoll(); //Angles.normalizeAngle(headTransform.getRotationRoll());//not correct
+          if(statusCode == PlayerActivity.Status.PLAYING) {
+            realtimeEvent.isPlaying = 1;
+          } else{
+            realtimeEvent.isPlaying = 0;
+          }
+
+          //TODO find a way to send bandwidth tracking
+
+          realtimeEvent.headW = headTransform.getRotationW();
+          realtimeEvent.headX = headTransform.getRotationX();
+          realtimeEvent.headY = headTransform.getRotationY();
+          realtimeEvent.headZ = headTransform.getRotationZ();
+          realtimeEvent.lastDynamicOpTriggered = lastDynamicOpTriggered;
           realtimeEvent.dynamic = dynamicEditingHolder.isDynamicEdited();
           realtimeEvent.snapAngle = currentSnapAngle;
+
+          realtimeEvent.nb_snaps_triggered = nb_snaps_triggered; // test: it is last trigger
+          realtimeEvent.last_possible_snap_time = last_possible_snap_time; // test: it is mean input
+          realtimeEvent.proba_trigger = proba_trigger;
+
           realtimeEvent.start = lastTransmissionTime == Long.MIN_VALUE;
+
+          setIndexAndQualFoV();
+//          realtimeEvent.chunkIndex = dynamicEditingHolder.getChunkIndex();
+//          realtimeEvent.qualityFoV = dynamicEditingHolder.getQualityFoV();
+
           realtimeEventPusher.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, realtimeEvent);
           lastTransmissionTime = currentTime;
+//          System.out.print("mean input speed: "+realtimeEvent.last_possible_snap_time+" , proba_trigger: "+realtimeEvent.proba_trigger+"\n");
+          System.out.print("chunk index: "+realtimeEvent.chunkIndex+" , quality in FoV: "+realtimeEvent.qualityFoV+"\n");
         }
       }
     }
@@ -443,5 +586,61 @@ public class Minimal360Video extends GVRMain implements PushResponse {
   @Override
   public void pushResponse(boolean exists) {
 
+  }
+
+  private void setIndexAndQualFoV() {
+
+    chunkIndexes_picked = dynamicEditingHolder.get_chunkIndexes_picked();
+    pickedTiles = dynamicEditingHolder.get_pickedTiles();
+    chunkIndexes_quals = dynamicEditingHolder.get_chunkIndexes_quals();
+    qualityTiles = dynamicEditingHolder.get_qualityTiles();
+
+    int current_played_index = 0;
+    if (chunkIndexes_picked.size()>0 && chunkIndexes_quals.size()>0){
+      current_played_index = Math.min(chunkIndexes_picked.get(chunkIndexes_picked.size()-1), chunkIndexes_quals.get(chunkIndexes_quals.size()-1));
+    }
+
+    if (current_played_index > index_waitingtocomplete) {
+      System.out.print("current_played_index, index_waitingtocomplete: "+current_played_index+", "+index_waitingtocomplete+ "\n");
+
+      int ind_in_qualityTiles_list = chunkIndexes_quals.indexOf(index_waitingtocomplete);
+      if (ind_in_qualityTiles_list>=0) {
+        Integer[] quals = qualityTiles.get(ind_in_qualityTiles_list);
+//        System.out.print("chunk index: "+index_waitingtocomplete+", ind in list: "+ ind_in_qualityTiles_list + ", quals: " + quals[0] + quals[1] + quals[2] + quals[3] + quals[4] + quals[5] + quals[6] + quals[7] + quals[8] + "\n");
+        int indStart_in_pickedTiles_list = chunkIndexes_picked.indexOf(index_waitingtocomplete);
+        int indEnd_in_pickedTiles_list = chunkIndexes_picked.lastIndexOf(index_waitingtocomplete);
+        int nb_timestamps = 0;
+        int nb_tilesInFoV = 0;
+        float acc_tot = 0.0f;
+        float acc_chunk = 0.0f;
+        for (int ind = indStart_in_pickedTiles_list; ind < indEnd_in_pickedTiles_list + 1; ind = ind + 1) {
+          Boolean[] picked = pickedTiles.get(ind);
+          if (picked.length == gridHeight * gridWidth) {
+            nb_tilesInFoV = 0;
+            acc_chunk = 0.0f;
+            for (int j = 0; j < picked.length; j = j + 1) {
+              if (picked[j]) {
+//                if (quals[j] < 0) {
+//                  System.out.print("in loop, chunk index: "+index_waitingtocomplete+", ind in list: "+ ind_in_qualityTiles_list + ", quals: " + quals[0] + quals[1] + quals[2] + quals[3] + quals[4] + quals[5] + quals[6] + quals[7] + quals[8] + "\n");
+//                }
+                acc_chunk = acc_chunk + quals[j];
+                nb_tilesInFoV = nb_tilesInFoV + 1;
+              }
+            }
+            acc_chunk = acc_chunk / nb_tilesInFoV;
+            acc_tot = acc_tot + acc_chunk;
+            nb_timestamps = nb_timestamps + 1;
+          }
+        }
+//        if (acc_tot <= 0.1 || nb_timestamps == 0) {
+//          acc_tot = acc_tot - 10;
+//        }
+        float qualInFoV = acc_tot;
+        if (nb_timestamps>0) qualInFoV = qualInFoV / nb_timestamps;
+        realtimeEvent.chunkIndex = index_waitingtocomplete;
+        realtimeEvent.qualityFoV = qualInFoV;
+      }
+      index_waitingtocomplete = index_waitingtocomplete + 1; //current_played_index;
+    }
   }
 }

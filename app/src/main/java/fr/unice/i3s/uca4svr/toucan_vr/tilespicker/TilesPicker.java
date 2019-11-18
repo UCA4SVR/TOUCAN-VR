@@ -7,6 +7,10 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.SystemClock;
 import java.util.Locale;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.lang.Exception;
 
 import org.gearvrf.GVRPicker;
 import org.gearvrf.GVRSceneObject;
@@ -14,6 +18,7 @@ import org.gearvrf.IPickEvents;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.PickedTilesTracker;
+import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 
 public class TilesPicker implements IPickEvents {
 
@@ -24,8 +29,10 @@ public class TilesPicker implements IPickEvents {
   public GVRPicker picker = null;
   public MyRunnableTilesLogging myRunnableTilesLogging;
   public GVRVideoSceneObjectPlayer<ExoPlayer> videoSceneObjectPlayer = null;
+  private DynamicEditingHolder dynamicEditingHolder;
 
-  private TilesPicker() {
+  private TilesPicker(DynamicEditingHolder dynamicEditingHolder) {
+    this.dynamicEditingHolder = dynamicEditingHolder;
     /// Start pickedTiles logging thread
     this.myRunnableTilesLogging = new MyRunnableTilesLogging(this);
     Thread thread = new Thread(this.myRunnableTilesLogging, "MyTilesLogging");
@@ -65,13 +72,20 @@ public class TilesPicker implements IPickEvents {
       }
       strpickedTiles = (TextUtils.join(",", pickedTiles)).replace("true","1").replace("false","0");
       tilesPicker.pickedTilesTracker.logger.error(String.format(Locale.ENGLISH, "%d,%d,%s", clock.elapsedRealtime(), curVideoTime, strpickedTiles));
+
+      //---- adding picked tiles in holder to be read from Minimal360 and sent back to server
+      dynamicEditingHolder.add_chunkIndexes_picked((int)(curVideoTime / 1000 +1));
+      dynamicEditingHolder.add_pickedTiles(pickedTiles.clone());
+      //------------------------
     }
 
     @Override
     public void run() {
       while(keepRunning()) {
         if (picker != null && tilesPicker.videoSceneObjectPlayer != null) {
-          do_logging();
+          if (picker.getPicked() != null ) {
+            do_logging();
+          }
         }
         try {
           Thread.sleep(100L);
@@ -83,14 +97,30 @@ public class TilesPicker implements IPickEvents {
   }
   /// End of changes for proper logging
 
-  public static TilesPicker getPicker() {
-    if (tilesPicker == null) tilesPicker = new TilesPicker();
+//  public static TilesPicker getPicker() {
+//    return tilesPicker;
+//  }
+
+  public static TilesPicker getPicker(DynamicEditingHolder dynamicEditingHolder) {
+    if (tilesPicker == null) {
+      tilesPicker = new TilesPicker(dynamicEditingHolder);
+    }
 
     return tilesPicker;
   }
 
+  /*public static TilesPicker getPicker()  throws Exception {
+    try {
+      return tilesPicker;
+    }
+    catch(Exception E) {
+        throw new Exception("TilesPicker does not exist when called from Pyramidal, and should", E);
+    }
+  }*/
+
   public synchronized boolean isPicked(int index) {
 
+    System.out.print("pickedTiles length: " + pickedTiles.length + "\n");
     if (pickedTiles != null && pickedTiles.length > index) {
       return pickedTiles[index];
     } else {

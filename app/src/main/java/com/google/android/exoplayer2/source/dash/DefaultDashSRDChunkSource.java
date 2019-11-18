@@ -14,9 +14,6 @@ package com.google.android.exoplayer2.source.dash;
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- 
- * Modifications:
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 
 import android.net.Uri;
@@ -130,11 +127,17 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
         this.manifest = manifest;
         this.adaptationSetIndex = adaptationSetIndex;
         this.highestFormatId = trackSelection.getFormat(0).id;
-        this.trackSelection = trackSelection;
+
         if (trackSelection instanceof PyramidalTrackSelection) {
-            PyramidalTrackSelection pyramidalTrackSelection = (PyramidalTrackSelection) trackSelection;
-            pyramidalTrackSelection.updateAdaptationSetIndex(adaptationSetIndex);
+          PyramidalTrackSelection pyramidalTrackSelection = (PyramidalTrackSelection) trackSelection;
+          pyramidalTrackSelection.updateAdaptationSetIndex(adaptationSetIndex);
         }
+
+
+      System.out.println("class of trackSel "+trackSelection.getClass());
+      System.out.println("trackSel "+trackSelection);
+
+        this.trackSelection = trackSelection;
         this.dataSource = dataSource;
         this.periodIndex = periodIndex;
         this.elapsedRealtimeOffsetMs = elapsedRealtimeOffsetMs;
@@ -149,6 +152,7 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
             representationHolders[i] = new RepresentationHolder(periodDurationUs, representation,
                     enableEventMessageTrack, enableCea608Track, adaptationSet.type);
         }
+
     }
 
     @Override
@@ -194,19 +198,20 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
      */
     @Override
     public final void getNextChunk(MediaChunk previous, long playbackPositionUs, ChunkHolder out) {
-
         if (fatalError != null) {
             return;
         }
 
         long bufferedDurationUs = previous != null ? (previous.endTimeUs - playbackPositionUs) : 0;
 
-        // Provide the info needed to perform the pyramidal strategy
-        if (trackSelection instanceof PyramidalTrackSelection) {
+        System.out.println("trackSelection is Pyramidal? "+ (trackSelection instanceof PyramidalTrackSelection));
+          // Provide the info needed to perform the pyramidal strategy
+          if (trackSelection instanceof PyramidalTrackSelection) {
             PyramidalTrackSelection pyramidalTrackSelection = (PyramidalTrackSelection)trackSelection;
             pyramidalTrackSelection.updatePlaybackPosition(playbackPositionUs);
             RepresentationHolder representationHolder =
                     representationHolders[trackSelection.getSelectedIndex()];
+                    //representationHolders[0];
             int segmentIndex;
             if (previous == null) {
                 int availableSegmentCount = representationHolder.getSegmentCount();
@@ -227,6 +232,7 @@ public class DefaultDashSRDChunkSource implements DashChunkSource {
 
         RepresentationHolder representationHolder =
                 representationHolders[trackSelection.getSelectedIndex()];
+                //representationHolders[0];
 
         if (representationHolder.extractorWrapper != null) {
             Representation selectedRepresentation = representationHolder.representation;

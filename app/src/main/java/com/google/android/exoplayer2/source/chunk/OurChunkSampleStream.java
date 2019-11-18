@@ -12,9 +12,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- 
- * Modifications:
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  */
 package com.google.android.exoplayer2.source.chunk;
 
@@ -32,13 +29,30 @@ import com.google.android.exoplayer2.upstream.Loader;
 import com.google.android.exoplayer2.util.Assertions;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
+import fr.unice.i3s.uca4svr.toucan_vr.PlayerActivity;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
+
+import android.app.Activity;
+import android.os.AsyncTask;
+import android.util.Log;
+
+import java.nio.charset.StandardCharsets;
+import java.io.DataOutputStream;
+import java.util.Random;
+
+import fr.unice.i3s.uca4svr.toucan_vr.tflite.Classifier;
+
+
 
 /**
  * A {@link SampleStream} that loads media in {@link Chunk}s, obtained from a {@link ChunkSource}.
@@ -74,6 +88,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   private long lastSeekPositionUs;
   private boolean loadingFinished;
   private boolean wasDiscarding = false;
+  private Classifier snap_trigger_classifier;
 
   /**
    * @param adaptationSetIndex The index of the associated adaptation set.
@@ -88,7 +103,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
    *     before propagating an error.
    * @param eventDispatcher A dispatcher to notify of events.
    */
-  public OurChunkSampleStream(int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
+  public OurChunkSampleStream(Activity activity, int adaptationSetIndex, int primaryTrackType, int[] embeddedTrackTypes, T chunkSource,
                               Callback<OurChunkSampleStream<T>> callback, Allocator allocator, long positionUs,
                               int minLoadableRetryCount, EventDispatcher eventDispatcher, DynamicEditingHolder dynamicEditingHolder,
                               TileQualityTracker tileQualityTracker, ReplacementTracker replacementTracker) {
@@ -104,6 +119,11 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     this.callback = callback;
     this.eventDispatcher = eventDispatcher;
     this.minLoadableRetryCount = minLoadableRetryCount;
+    try {
+      this.snap_trigger_classifier = Classifier.create(activity, Classifier.Model.FLOAT, Classifier.Device.CPU, 1);
+    } catch(Exception e){
+
+    }
     loader = new Loader("Loader:ChunkSampleStream");
     nextChunkHolder = new ChunkHolder();
     mediaChunks = new LinkedList<>();
@@ -218,7 +238,7 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       // TODO: For this to work correctly, the embedded streams must not discard anything from their
       // sample queues beyond the current read position of the primary stream.
       for (DefaultTrackOutput embeddedSampleQueue : embeddedSampleQueues) {
-        embeddedSampleQueue.skipToKeyframeBefore(positionUs);
+        embeddedSampleQueue.skipToKeyframeBefore(positionUs, true);
       }
     } else {
       // We failed, and need to restart.
@@ -276,11 +296,13 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
   }
 
   @Override
-  public void skipToKeyframeBefore(long timeUs) {
-    primarySampleQueue.skipToKeyframeBefore(timeUs);
+  public void skipData(long positionUs) {
+    if (loadingFinished && positionUs > primarySampleQueue.getLargestQueuedTimestampUs()) {
+      primarySampleQueue.skipAll();
+    } else {
+      primarySampleQueue.skipToKeyframeBefore(positionUs, true);
+    }
   }
-
-  // Loader.Callback implementation.
 
   @Override
   public void onLoadCompleted(Chunk loadable, long elapsedRealtimeMs, long loadDurationMs) {
@@ -382,6 +404,14 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
         }
       }
 
+
+//      ByteBuffer input1 = tileQualityTracker.;
+//      ByteBuffer input2 = tileInFov;
+//      ByteBuffer input3 = triggeredSnaps;
+//      ByteBuffer input4 = nbOfChunksLeftToDl;
+//
+//
+//      this.snap_trigger_classifier.predict(input1, input2, input3, input4);
       mediaChunk.init(mediaChunkOutput);
       mediaChunks.add(mediaChunk);
     }
@@ -458,11 +488,71 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       mediaChunks.removeFirst();
     }
     BaseMediaChunk currentChunk = mediaChunks.getFirst();
+    final String data = adaptationSetIndex + "," + qualityLogged;
+
+    //Works but conflicts with the one used for bandwidth consumption in BandwidthConsumedTracker, couldnt figure out how to run multiple AsyncTasks
+    class TilesQualityTask extends AsyncTask<String, Integer, Void> {
+      @Override
+      protected Void doInBackground(String... strings) {
+
+        String urlParameters = "data=" + strings[0];
+        String fullURI = PlayerActivity.serverIPAddress + "/quality";
+
+        //Random is used because there are multiple consecutive calls for each tile which causes a delay on the external display
+        //TODO Replace random with a way to track which tile index was used last
+        if (fullURI.length() > 0 && new Random().nextFloat() < 0.1) {
+          HttpURLConnection urlc;
+          try {
+            urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
+          } catch (IOException e) {
+            Log.e("push", "Error during push on .quality\n", e);
+            return null;
+          }
+          try {
+            byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
+            System.out.println("data sent to quality"+ urlParameters);
+            urlc.setDoOutput(true);
+            urlc.setInstanceFollowRedirects(false);
+            urlc.setRequestMethod("POST");
+            urlc.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+            urlc.setRequestProperty("charset", "utf-8");
+            urlc.setRequestProperty("Content-Length", Integer.toString(postData.length));
+            urlc.setUseCaches(false);
+            try (DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
+              wr.write(postData);
+//                    String post_data = URLEncoder.encode("infos","UTF-8");
+//                    wr.write( post_data.getBytes());
+            }
+
+            urlc.connect();
+            if (urlc.getResponseCode() != 200) return null;
+          } catch (IOException e) {
+            Log.e("push", "Error during push on .infos\n", e);
+            return null;
+          } finally {
+            urlc.disconnect();
+          }
+        } else {
+//            Log.e("push","Error during push on .infos\n",e);
+          return null;
+        }
+
+        return null;
+      }
+
+    }
+    new TilesQualityTask().execute(data);
+
     //Logging of the quality
     if(tileQualityTracker !=null && currentChunk.trackFormat.width > 0) {
       if(!currentChunk.equals(this.lastLoggedChunk)) {
         qualityLogged = currentChunk.trackFormat.id.equals(this.highestFormatId) ? 1 : 0;
         tileQualityTracker.track(adaptationSetIndex, currentChunk.chunkIndex, currentChunk.startTimeUs, currentChunk.endTimeUs, qualityLogged);
+
+        //---- adding quality in holder to be read from Minimal360 and sent back to server
+        dynamicEditingHolder.add_qualityTiles(currentChunk.chunkIndex, adaptationSetIndex, qualityLogged);
+        //------------------------
+
         this.lastLoggedChunk = currentChunk;
       }
     }
@@ -498,11 +588,6 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
     }
 
     @Override
-    public void skipToKeyframeBefore(long timeUs) {
-      sampleQueue.skipToKeyframeBefore(timeUs);
-    }
-
-    @Override
     public void maybeThrowError() throws IOException {
       // Do nothing. Errors will be thrown from the primary stream.
     }
@@ -515,6 +600,15 @@ public class OurChunkSampleStream<T extends ChunkSource> implements SampleStream
       }
       return sampleQueue.readData(formatHolder, buffer, formatRequired, loadingFinished,
           lastSeekPositionUs);
+    }
+
+    @Override
+    public void skipData(long positionUs) {
+      if (loadingFinished && positionUs > sampleQueue.getLargestQueuedTimestampUs()) {
+        sampleQueue.skipAll();
+      } else {
+        sampleQueue.skipToKeyframeBefore(positionUs, true);
+      }
     }
 
     public void release() {

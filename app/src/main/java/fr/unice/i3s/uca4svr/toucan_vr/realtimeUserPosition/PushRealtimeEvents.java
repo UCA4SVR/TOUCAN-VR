@@ -26,7 +26,11 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+
+import android.util.Log;
+
 
 public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolean> {
 
@@ -35,6 +39,11 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
     private String serverIP;
     private final static String pushInfoPath = "/infos";
 
+
+    public PushRealtimeEvents(GVRContext context, String serverIP) {
+      this.context = context;
+      this.serverIP = serverIP;
+    }
 
     public PushRealtimeEvents(GVRContext context, String serverIP, PushResponse callback) {
         this.context = context;
@@ -52,28 +61,37 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
 
     @Override
     protected void onPostExecute(Boolean result) {
-        callback.pushResponse(result);
+        //callback.pushResponse(result);
     }
 
     private Boolean push(RealtimeEvent event) {
-        GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
         String urlParameters = "x=" + event.x +
                 "&y=" + event.y +
                 "&z=" + event.z +
-                "&w=" + event.w +
+                "&isPlaying=" + event.isPlaying +
+                "&headW=" + event.headW +
+                "&headX=" + event.headX +
+                "&headY=" + event.headY +
+                "&headZ=" + event.headZ +
                 "&time=" + event.timestamp +
                 "&currentTime=" + event.videoTime +
-                "&playing=" + event.playing +
+                "&lastDynamicOpTriggered=" + event.lastDynamicOpTriggered +
                 "&start=" + event.start +
                 "&snapAngle=" + event.snapAngle +
-                "&dynamic=" + event.dynamic;
-        String fullURI = serverIP + pushInfoPath;
+                "&dynamic=" + event.dynamic +
+                "&nb_snaps_triggered=" + event.nb_snaps_triggered +
+                "&last_possible_snap_time=" + event.last_possible_snap_time +
+                "&proba_trigger=" + event.proba_trigger +
+                "&qualityFoV=" + event.qualityFoV +
+                "&chunkIndex=" + event.chunkIndex;
+        String fullURI = serverIP /*+ ":8080"*/ + pushInfoPath ;
 
-        if (fullURI.length() > 0) {
+        if (fullURI.length() > 0 ) {
             HttpURLConnection urlc;
             try {
                 urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
             } catch (IOException e) {
+                Log.e("push","Error during push on .infos\n",e);
                 return false;
             }
             try {
@@ -88,14 +106,17 @@ public class PushRealtimeEvents extends AsyncTask<RealtimeEvent, Integer, Boolea
                 try (DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
                     wr.write(postData);
                 }
+
                 urlc.connect();
                 return (urlc.getResponseCode() == 200);
             } catch (IOException e) {
+                Log.e("push","Error during push on .infos\n",e);
                 return false;
             } finally {
                 urlc.disconnect();
             }
         } else {
+//            Log.e("push","Error during push on .infos\n",e);
             return false;
         }
     }

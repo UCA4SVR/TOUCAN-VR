@@ -20,6 +20,8 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
+import android.app.Activity;
+
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.source.AdaptiveMediaSourceEventListener.EventDispatcher;
@@ -72,8 +74,9 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
     private DynamicEditingHolder dynamicEditingHolder;
     private final TileQualityTracker tileQualityTracker;
     private final ReplacementTracker replacementTracker;
+    private Activity activity;
 
-    public DashSRDMediaPeriod(int id, DashManifest manifest, int periodIndex,
+    public DashSRDMediaPeriod(Activity activity, int id, DashManifest manifest, int periodIndex,
                               DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                               EventDispatcher eventDispatcher, long elapsedRealtimeOffset,
                               LoaderErrorThrower manifestLoaderErrorThrower, Allocator allocator,
@@ -91,10 +94,13 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
         this.dynamicEditingHolder = dynamicEditingHolder;
         this.tileQualityTracker = tileQualityTracker;
         this.replacementTracker = replacementTracker;
+        this.activity = activity;
         sampleStreams = newSampleStreamArray(0);
         sequenceableLoader = new CompositeSequenceableLoader(sampleStreams);
         adaptationSets = manifest.getPeriod(periodIndex).adaptationSets;
         trackGroups = buildTrackGroups(adaptationSets);
+        System.out.println("trackGroups length "+trackGroups.length);
+        System.out.println("trackGroup1 length "+trackGroups.get(1).length);
     }
 
     public void updateManifest(DashManifest manifest, int periodIndex) {
@@ -244,7 +250,7 @@ import com.google.android.exoplayer2.source.chunk.OurChunkSampleStream;
         DashChunkSource chunkSource = chunkSourceFactory.createDashChunkSource(
                 manifestLoaderErrorThrower, manifest, periodIndex, adaptationSetIndex, selection,
                 elapsedRealtimeOffset, /*enableEventMessageTrack*/ false, /*enableCea608Track*/ false);
-        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(adaptationSetIndex, adaptationSet.type,
+        OurChunkSampleStream<DashChunkSource> stream = new OurChunkSampleStream<>(this.activity, adaptationSetIndex, adaptationSet.type,
                 /*embeddedTrackTypes*/ null, chunkSource, this, allocator, positionUs, minLoadableRetryCount,
                 eventDispatcher, dynamicEditingHolder, tileQualityTracker, replacementTracker);
         return stream;

@@ -21,12 +21,32 @@ import static java.lang.Math.abs;
 public abstract class DynamicOperation {
   private int milliseconds;
   private boolean millisecondsFlag;
+  protected boolean triggered;
+  protected boolean decided;
   protected DynamicEditingHolder dynamicEditingHolder;
+
+  protected float mean_input_trigger;
+  protected float proba_trigger;
+  protected int op_index;
 
   public DynamicOperation(DynamicEditingHolder dynamicEditingHolder) {
     this.millisecondsFlag = false;
     this.dynamicEditingHolder = dynamicEditingHolder;
+    this.decided = false;
+    this.triggered = false;
   }
+
+  public boolean getTriggered(){ return this.triggered;}
+  public void setTriggered( boolean trig){ this.triggered = trig;}
+  public boolean getDecided(){ return this.decided;}
+  public void setDecided( boolean decision){ this.decided = decision;}
+
+  public float getInput(){ return this.mean_input_trigger;}
+  public void setInput( float meanInput){ this.mean_input_trigger = meanInput;}
+  public float getProba(){ return this.proba_trigger;}
+  public void setProba( float proba){ this.proba_trigger = proba;}
+  public int getIndex(){ return this.op_index;}
+  public void setIndex( int index){ this.op_index = index;}
 
   public int getMilliseconds() {
     return this.milliseconds;

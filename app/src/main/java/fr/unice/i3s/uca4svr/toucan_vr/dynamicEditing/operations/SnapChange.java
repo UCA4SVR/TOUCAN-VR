@@ -45,12 +45,11 @@ public class SnapChange extends DynamicOperation {
 	private float angleBeforeSC;
 	private boolean roiDegreesFlag;
 	private boolean foVTilesFlag;
-	private boolean triggered;
 
 	public SnapChange(DynamicEditingHolder dynamicEditingHolder) {
 	  super(dynamicEditingHolder);
 		this.roiDegreesFlag = this.foVTilesFlag = false;
-	}
+  }
 
 	public void setRoiDegrees(int roiDegrees) {
 		this.roiDegrees = roiDegrees;
@@ -62,7 +61,8 @@ public class SnapChange extends DynamicOperation {
 		this.foVTilesFlag = true;
 	}
 
-	@Override
+
+  @Override
 	public boolean isWellDefined() {
 		return super.isWellDefined() && this.roiDegreesFlag && this.foVTilesFlag;
 	}
@@ -73,6 +73,7 @@ public class SnapChange extends DynamicOperation {
     float difference = angleBeforeSC - roiDegrees;
     videoHolder.getTransform().setRotationByAxis(difference, 0, 1, 0);
     dynamicEditingHolder.advance(difference);
+    //System.out.println("snapChange activated from angle "+angleBeforeSC+" to "+roiDegrees);
   }
 
   @Override
@@ -83,13 +84,13 @@ public class SnapChange extends DynamicOperation {
   @Override
   public int computeIdealTileIndex(int selectedIndex, int adaptationSetIndex, long nextChunkStartTimeUs) {
     int desiredIndex = Arrays.binarySearch(foVTiles, adaptationSetIndex) >= 0 ? 0 : 1;
-    if (this.getMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
-      // The snap change involves the current chunk. Provide a smooth transition when the snap change
-      // is forcing the quality to be low while the tile is still displayed to the user.
-      return selectedIndex;
-    } else {
+//    if (this.getMicroseconds() >= nextChunkStartTimeUs && desiredIndex == 1) {
+//      // The snap change involves the current chunk. Provide a smooth transition when the snap change
+//      // is forcing the quality to be low while the tile is still displayed to the user.
+//      return selectedIndex;
+//    } else {
       return desiredIndex;
-    }
+//    }
   }
 
   @Override
@@ -97,8 +98,8 @@ public class SnapChange extends DynamicOperation {
     //Check if a SnapChange is needed
     float currentAngle = Angles.getCurrentYAngle(gvrContext);
     float trigger = computeTrigger(dynamicEditingHolder.lastRotation, currentAngle, roiDegrees);
-    triggered = trigger > dynamicEditingHolder.angleThreshold;
-    return triggered;
+    boolean triggered = trigger > dynamicEditingHolder.angleThreshold;
+    return triggered; // && this.triggered;
   }
 
   public int getSCroiDegrees() {

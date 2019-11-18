@@ -29,51 +29,85 @@ allprojects {
 }
 
 android {
+  signingConfigs {
+    customDebugType {
+      storeFile file('mykey.jks')
+      storePassword 'mykeypass'
+      keyAlias 'key0'
+      keyPassword 'mykeypass'
+    }
+  }
 
-    lintOptions {
-        // Set invalid package to warning to compile with logback.
-        // It includes javax.mail which we don't use.
-        warning 'InvalidPackage'
+  lintOptions {
+    // Set invalid package to warning to compile with logback.
+    // It includes javax.mail which we don't use.
+    warning 'InvalidPackage'
+  }
+  compileSdkVersion 28
+//  buildToolsVersion "28.0.2"
+  defaultConfig {
+    applicationId "fr.unice.i3s.uca4svr.toucan_vr"
+    minSdkVersion 24
+    targetSdkVersion 28
+    // version code = major * 10 000 + minor * 100 + patch
+    versionCode 400
+    versionName "1.0"
+    testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+//    multiDexEnabled true
+    ndk {
+      abiFilters 'armeabi-v7a'
     }
-
-    compileSdkVersion 25
-    buildToolsVersion "25.0.2"
-    defaultConfig {
-        applicationId "fr.unice.i3s.uca4svr.toucan_vr"
-        minSdkVersion 23
-        targetSdkVersion 25
-        // version code = major * 10 000 + minor * 100 + patch
-        versionCode 400
-        versionName "0.4.0"
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+//    signingConfig signingConfigs.customDebugType
+//    signingConfig signingConfigs.customDebugType
+  }
+  buildTypes {
+    release {
+      minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-
-        debug {
-            applicationIdSuffix ".debug"
-        }
+    debug {
+      applicationIdSuffix ".debug"
     }
-
-    productFlavors {
-        full {
-            applicationIdSuffix ".full"
-            versionNameSuffix "-full"
-        }
+    customDebugType {
+      debuggable true
+      applicationIdSuffix ".debug"
+      signingConfig signingConfigs.customDebugType
+      // Enables code shrinking, obfuscation, and optimization for only
+      // your project's release build type.
+//      minifyEnabled true
+//
+//      // Enables resource shrinking, which is performed by the
+//      // Android Gradle plugin.
+//      shrinkResources true
+//
+//      // Includes the default ProGuard rules files that are packaged with
+//      // the Android Gradle plugin. To learn more, go to the section about
+//      // R8 configuration files.
+//      proguardFiles getDefaultProguardFile(
+//        'proguard-android-optimize.txt'),
+//        'proguard-rules.pro'
     }
-
-    // ignore the x86 and arm-v8 files from the google vr libraries
-    packagingOptions {
-        exclude 'lib/x86/libgvr.so'
-        exclude 'lib/arm64-v8a/libgvr.so'
+  }
+  aaptOptions {
+    noCompress "tflite"
+  }
+  flavorDimensions "version"
+  productFlavors {
+    full {
+      dimension "version"
+      applicationIdSuffix ".full"
+      versionNameSuffix "-full"
     }
-    compileOptions {
-        targetCompatibility 1.7
-        sourceCompatibility 1.7
-    }
+  }
+  // ignore the x86 and arm-v8 files from the google vr libraries
+  packagingOptions {
+    exclude 'lib/x86/libgvr.so'
+    exclude 'lib/arm64-v8a/libgvr.so'
+  }
+  compileOptions {
+    targetCompatibility JavaVersion.VERSION_1_8
+    sourceCompatibility JavaVersion.VERSION_1_8
+  }
 }
 
 // Versions vars
@@ -81,31 +115,34 @@ ext.gearvrfVersion = '3.1.1'
 //project.ext.jomlVersion = "1.9.1-SNAPSHOT"
 
 dependencies {
-    // App Compat
-    compile 'com.android.support:appcompat-v7:25.2.0'
-
-    // VR dependencies
-    // compile "org.joml:joml-android:${jomlVersion}"
-    compile "org.gearvrf:framework:$gearvrfVersion"
-    compile "org.gearvrf:backend_daydream:$gearvrfVersion"
-    compile "org.gearvrf:backend_oculus:$gearvrfVersion"
-    compile 'com.google.vr:sdk-base:1.10.0'
-    compile 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'
-
-    // App dependencies
-    compile 'com.google.android.exoplayer:exoplayer:r2.3.0'
-    compile 'com.android.support.constraint:constraint-layout:1.0.0-beta5'
-
-    // Log dependencies
-    compile group: 'com.github.tony19', name: 'logback-android-core', version: '1.1.1-6'
-    compile group: 'com.github.tony19', name: 'logback-android-classic', version: '1.1.1-6'
-    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
-
-    //compile fileTree(dir: 'libs', include: ['*.jar'])
-
-    // Tests dependencies
-    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
-        exclude group: 'com.android.support', module: 'support-annotations'
-    })
-    testCompile 'junit:junit:4.12'
+  // App Compat
+  implementation 'com.android.support:appcompat-v7:28.0.0'
+  // VR dependencies
+  // compile "org.joml:joml-android:${jomlVersion}"
+  implementation "org.gearvrf:framework:$gearvrfVersion"
+  implementation "org.gearvrf:backend_daydream:$gearvrfVersion"
+  implementation "org.gearvrf:backend_oculus:$gearvrfVersion"
+  implementation 'com.google.vr:sdk-base:1.10.0'
+  implementation 'com.google.protobuf.nano:protobuf-javanano:3.0.0-alpha-7'
+  // App dependencies
+  implementation 'com.google.android.exoplayer:exoplayer:r2.4.0'
+  implementation 'com.android.support.constraint:constraint-layout:1.0.0-beta5'
+  // Log dependencies
+  implementation 'com.github.tony19:logback-android-core:1.1.1-6'
+  implementation 'com.github.tony19:logback-android-classic:1.1.1-6'
+  implementation 'org.slf4j:slf4j-api:1.7.21'
+  //  compile 'org.tensorflow:tensorflow-android:+'
+  implementation 'org.tensorflow:tensorflow-lite:0.0.0-nightly'
+  //implementation 'org.tensorflow:tensorflow-lite:1.14.0'
+  implementation 'com.android.support:multidex:1.0.0'
+  //  compile 'org.tensorflow:tensorflow:1.13.1'
+  //  compile 'org.tensorflow:libtensorflow_jni:1.13.1'
+  //compile fileTree(dir: 'libs', include: ['*.jar'])
+  // Tests dependencies
+  androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
+    exclude group: 'com.android.support', module: 'support-annotations'
+  })
+  testImplementation 'junit:junit:4.12'
+  //  compile files('lib/libtensorflow-1.13.1.jar')
 }
+
