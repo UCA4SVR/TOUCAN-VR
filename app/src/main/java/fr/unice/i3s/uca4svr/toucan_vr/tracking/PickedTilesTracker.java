@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ public class PickedTilesTracker {
     // so that creating a new logger won't override the previous one
     private static int loggerNextID = 0;
 
-    public final Logger logger;
+    private final Logger logger;
 
     private final Clock clock;
 
@@ -104,7 +104,7 @@ public class PickedTilesTracker {
      * Outputs a track record to the log file.
      * The same clock reference is used as for every tracker.
      */
-//    public void track(String pickedTiles) {
-//        logger.error(String.format(Locale.ENGLISH, "%d,%s", clock.elapsedRealtime(), pickedTiles));
-//    }
+    public void track(String pickedTiles) {
+        logger.error(String.format(Locale.ENGLISH, "%d,%s", clock.elapsedRealtime(), pickedTiles));
+    }
 }

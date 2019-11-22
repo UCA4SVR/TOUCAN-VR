@@ -1,5 +1,5 @@
-/*
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+/* 
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  *
  * Author: Romaric Pighetti
  *

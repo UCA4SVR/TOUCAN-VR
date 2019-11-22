@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
+ * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import com.google.android.exoplayer2.util.Clock;
 import com.google.android.exoplayer2.util.SystemClock;
 
 import org.gearvrf.GVRContext;
-import org.gearvrf.GVRSceneObject;
 import org.gearvrf.GVRTransform;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +35,6 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
-import fr.unice.i3s.uca4svr.toucan_vr.utils.Angles;
-import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 
 /**
  * Logs the pitch, yaw, roll angles from the HeadTransform of the main camera rig
@@ -118,38 +115,21 @@ public class HeadMotionTracker {
    * @param context The GearVR framework context from which we're logging the head motion
    * @param playbackPosition The current position in the video playback
    */
-  // LEGACY before LUCILE'S CHANGE BELOW**********************
-  //  public void track(GVRContext context, long playbackPosition, float x, float y) {
-//    GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-//    //*
-//    String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.4f,%4$.4f,%5$.4f,%6$.4f,%7$.4f",
-//            clock.elapsedRealtime(), playbackPosition,
-//            headTransform.getRotationPitch(), headTransform.getRotationYaw(), headTransform.getRotationRoll(),
-//            x,y);
-//    //*/
-//    /*
-//    String rotationsString = String.format(Locale.ENGLISH, "%1$d,%2$d,%3$.5f,%4$.5f,%5$.5f,%6$.5f,%7$b",
-//            clock.elapsedRealtime(), playbackPosition, headTransform.getRotationX(),
-//            headTransform.getRotationY(), headTransform.getRotationZ(),headTransform.getRotationW(),
-//            this.lastPlaybackPosition == playbackPosition);
-//    this.lastPlaybackPosition = playbackPosition;
-//    //*/
-//    logger.error(rotationsString);
-//  }
-  // TEST LUCILE
-  public void track(long playbackPosition, GVRSceneObject videoHolder, DynamicEditingHolder dynamicEditingHolder) {
-
-    GVRContext context = videoHolder.getGVRContext();
+  public void track(GVRContext context, long playbackPosition, float x, float y) {
     GVRTransform headTransform = context.getMainScene().getMainCameraRig().getHeadTransform();
-
-    float normalizedLastRotation = Angles.normalizeAngle(dynamicEditingHolder.lastRotation);
-    float currentUserPosition = Angles.getCurrentYAngle(context);
-    float currentUserPosition_correctedwithSC = Angles.normalizeAngle(currentUserPosition-normalizedLastRotation);
-
-    String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.4f,%4$.4f,%5$.4f,%6$.4f",
-      clock.elapsedRealtime(), playbackPosition,
-      currentUserPosition_correctedwithSC, currentUserPosition, dynamicEditingHolder.lastRotation, headTransform.getRotationPitch());
-
+    //*
+    String rotationsString = String.format(Locale.ENGLISH, "%1d,%2d,%3$.4f,%4$.4f,%5$.4f,%6$.4f,%7$.4f",
+            clock.elapsedRealtime(), playbackPosition,
+            headTransform.getRotationPitch(), headTransform.getRotationYaw(), headTransform.getRotationRoll(),
+            x,y);
+    //*/
+    /*
+    String rotationsString = String.format(Locale.ENGLISH, "%1$d,%2$d,%3$.5f,%4$.5f,%5$.5f,%6$.5f,%7$b",
+            clock.elapsedRealtime(), playbackPosition, headTransform.getRotationX(),
+            headTransform.getRotationY(), headTransform.getRotationZ(),headTransform.getRotationW(),
+            this.lastPlaybackPosition == playbackPosition);
+    this.lastPlaybackPosition = playbackPosition;
+    //*/
     logger.error(rotationsString);
   }
 }
