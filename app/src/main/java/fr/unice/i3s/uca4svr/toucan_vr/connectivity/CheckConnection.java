@@ -77,7 +77,6 @@ public class CheckConnection extends AsyncTask<String,Integer,Boolean> {
                 return false;
             }
         } else {
-          System.err.print("HttpURLConnection failed !!!");
             return false;
         }
     }

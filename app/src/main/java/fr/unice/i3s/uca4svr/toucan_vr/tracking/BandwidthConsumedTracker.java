@@ -17,9 +17,7 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.tracking;
 
-import android.os.AsyncTask;
 import android.os.Environment;
-import android.util.Log;
 
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.TransferListener;
@@ -29,12 +27,7 @@ import com.google.android.exoplayer2.util.SystemClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -44,7 +37,6 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.FileAppender;
-import fr.unice.i3s.uca4svr.toucan_vr.PlayerActivity;
 
 /**
  * Tracks the bandwidth consumed during the video playback.
@@ -135,54 +127,6 @@ public class BandwidthConsumedTracker implements TransferListener<Object> {
       logger.error(String.format(Locale.ENGLISH, "%d, %d, %d",
               transferIndex, currentTime, totalBytesConsumed));
     }
-
-    //Works but conflicts with the one used for tiles qualities in OurChunkSampleStream, couldnt figure out how to run multiple AsyncTasks
-    class BandwidthTask extends AsyncTask<String, Integer, Void> {
-      @Override
-      protected Void doInBackground(String... strings) {
-        String urlParameters = "bwConsumed=" + strings[0].split(",")[0]+
-          "&filesTransferred=" + strings[0].split(",")[1]+
-          "&currentTime="+strings[0].split(",")[2];
-
-        String fullURI = PlayerActivity.serverIPAddress /*+ ":8080"*/ + "/bandwidth" ;
-
-        if (fullURI.length() > 0 ) {
-          HttpURLConnection urlc;
-          try {
-            urlc = (HttpURLConnection) (new URL(fullURI).openConnection());
-          } catch (IOException e) {
-            Log.e("push","Error during push on .bandwidth\n",e);
-            return null;
-          }
-          try {
-            byte[] postData = urlParameters.getBytes(StandardCharsets.UTF_8);
-            urlc.setDoOutput(true);
-            urlc.setInstanceFollowRedirects(false);
-            urlc.setRequestMethod("POST");
-            urlc.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            urlc.setRequestProperty("charset", "utf-8");
-            urlc.setRequestProperty("Content-Length", Integer.toString(postData.length));
-            urlc.setUseCaches(false);
-            try (DataOutputStream wr = new DataOutputStream(urlc.getOutputStream())) {
-              wr.write(postData);
-            }
-
-            urlc.connect();
-            if (urlc.getResponseCode() != 200) return null;
-          } catch (IOException e) {
-            Log.e("push","Error during push on .bandwidth\n",e);
-            return null;
-          } finally {
-            urlc.disconnect();
-          }
-        } else {
-//            Log.e("push","Error during push on .infos\n",e);
-          return null;
-        }
-        return null;
-      }
-    }
-    //new BandwidthTask().execute(""+totalBytesConsumed+","+transferIndex+","+currentTime);
   }
 
   @Override

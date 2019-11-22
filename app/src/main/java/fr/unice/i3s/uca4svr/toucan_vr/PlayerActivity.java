@@ -29,21 +29,16 @@ import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.DefaultLoadControl;
 import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.LoadControl;
-import com.google.android.exoplayer2.drm.DrmInitData;
-import com.google.android.exoplayer2.drm.DrmInitData.SchemeData;
 import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory;
 import com.google.android.exoplayer2.source.ConcatenatingMediaSource;
 import com.google.android.exoplayer2.source.ExtractorMediaSource;
 import com.google.android.exoplayer2.source.MediaSource;
-import com.google.android.exoplayer2.source.TrackGroup;
 import com.google.android.exoplayer2.source.dash.DefaultDashSRDChunkSource;
 import com.google.android.exoplayer2.source.hls.HlsMediaSource;
 import com.google.android.exoplayer2.source.smoothstreaming.DefaultSsChunkSource;
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource;
-//import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelection;
 import com.google.android.exoplayer2.trackselection.TrackSelector;
-import com.google.android.exoplayer2.Format;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultAllocator;
 import com.google.android.exoplayer2.upstream.DefaultBandwidthMeter;
@@ -52,19 +47,12 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.upstream.HttpDataSource;
 import com.google.android.exoplayer2.upstream.TransferListener;
 import com.google.android.exoplayer2.util.Util;
-import com.google.android.exoplayer2.video.ColorInfo;
 
 import org.gearvrf.GVRActivity;
 import org.gearvrf.scene_objects.GVRVideoSceneObjectPlayer;
 
-import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
-import java.util.UUID;
-import java.util.Arrays;
 
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnection;
 import fr.unice.i3s.uca4svr.toucan_vr.connectivity.CheckConnectionResponse;
@@ -72,13 +60,11 @@ import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.CustomTrackSelecto
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.track_selection.PyramidalTrackSelection;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingHolder;
 import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.DynamicEditingParser;
-import fr.unice.i3s.uca4svr.toucan_vr.dynamicEditing.operations.DynamicOperation;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.TiledExoPlayer;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.scene_objects.ExoplayerSceneObject;
 import fr.unice.i3s.uca4svr.toucan_vr.mediaplayer.upstream.TransferListenerBroadcaster;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.PermissionManager;
 import fr.unice.i3s.uca4svr.toucan_vr.permissions.RequestPermissionResultListener;
-import fr.unice.i3s.uca4svr.toucan_vr.tflite.Classifier;
 import fr.unice.i3s.uca4svr.toucan_vr.tilespicker.TilesPicker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.BandwidthConsumedTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.dashSRD.DashSRDMediaSource;
@@ -86,7 +72,7 @@ import fr.unice.i3s.uca4svr.toucan_vr.tracking.ReplacementTracker;
 import fr.unice.i3s.uca4svr.toucan_vr.tracking.TileQualityTracker;
 
 public class PlayerActivity extends GVRActivity implements RequestPermissionResultListener, CheckConnectionResponse {
-//    MultiDex.install(this);
+
     enum Status {
         NO_INTENT, NO_INTERNET, NO_PERMISSION, CHECKING_INTERNET, CHECKING_PERMISSION,
         CHECKING_INTERNET_AND_PERMISSION, READY_TO_PLAY, PLAYING, PAUSED, PLAYBACK_ENDED,
@@ -102,7 +88,6 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private ExoPlayer player;
     private boolean needPreparePlayer = true;
     private DefaultBandwidthMeter bandwidthMeter;
-    Classifier snap_trigger_classifier;
 
     // Player's parameters to fine tune as we need
     //First section
@@ -125,7 +110,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingFreezes = false;
     private boolean loggingOperations = false;
     private boolean loggingRealTimeUserPosition = false;
-    public static String serverIPAddress;
+    private String serverIPAddress;
     private boolean loggingQualityFoV = false;
     private boolean loggingReplacement = false;
 
@@ -169,7 +154,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
         // We can avoid providing the videoSceneObject at first. We will create it only if the
         // intent exists and every parameter specified in it can be activated.
-        final Minimal360Video main = new Minimal360Video(this, statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder, 1);
+        final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
         setMain(main, "gvr.xml");
 
         // The intent is required to run the app, if it has not been provided we can stop there.
@@ -195,7 +180,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 }
             }
 
-            final Minimal360Video main = new Minimal360Video(this, statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder, 1);
+            final Minimal360Video main = new Minimal360Video(statusCode, tiles, gridWidth, gridHeight, dynamicEditingHolder);
             setMain(main, "gvr.xml");
 
             if (statusCode != Status.NO_INTENT) {
@@ -251,9 +236,9 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         //Dynamic editing check
         dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
         if(dynamicEditingFN != null && dynamicEditingFN.length() > 0) {
-          dynamicEditingHolder = new DynamicEditingHolder(true, numberOfTiles);
+          dynamicEditingHolder = new DynamicEditingHolder(true);
         } else {
-          dynamicEditingHolder = new DynamicEditingHolder(false, numberOfTiles);
+          dynamicEditingHolder = new DynamicEditingHolder(false);
         }
     }
 
@@ -316,7 +301,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                 } else if(isRemoteFile && !loggingRealTimeUserPosition) {
                     checkConnection.execute(mediaUri);
                 } else if(!isRemoteFile && loggingRealTimeUserPosition) {
-                    checkConnection.execute(serverIPAddress);
+                    //checkConnection.execute(serverIPAddress);
                 }
             } else {
                 if (statusCode == Status.CHECKING_INTERNET_AND_PERMISSION) {
@@ -421,56 +406,28 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private GVRVideoSceneObjectPlayer<ExoPlayer> makeVideoSceneObject() {
         boolean needNewPlayer = player == null;
         if (needNewPlayer) {
-            if(snap_trigger_classifier == null) {
-                try {
-                    snap_trigger_classifier = Classifier.create(this, Classifier.Model.FLOAT, Classifier.Device.CPU, 1);
-                } catch (Exception e) {
-                    System.err.println("TensorFlow Lite model error");
-                }
-            }
-                // The video track selection factory and the track selector.
-                // May be extended or replaced by custom implementations to try different adaptive strategies.
-                TrackSelection.Factory videoTrackSelectionFactory =
-                        new PyramidalTrackSelection.Factory(
-                                bandwidthMeter, maxInitialBitrate, maxBufferMs,
-                                minDurationForQualityIncrease, maxDurationForQualityDecrease,
-                                minDurationToRetainAfterDiscard, maxDurationToRetainAfterDiscard,
-                                bandwidthFraction, dynamicEditingHolder, snap_trigger_classifier, getGVRContext());
+            // The video track selection factory and the track selector.
+            // May be extended or replaced by custom implementations to try different adaptive strategies.
+            TrackSelection.Factory videoTrackSelectionFactory =
+                    new PyramidalTrackSelection.Factory(
+                            bandwidthMeter, maxInitialBitrate, maxBufferMs,
+                            minDurationForQualityIncrease, maxDurationForQualityDecrease,
+                            minDurationToRetainAfterDiscard, maxDurationToRetainAfterDiscard,
+                            bandwidthFraction, dynamicEditingHolder);
+            TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
 
-                TrackSelector trackSelector = new CustomTrackSelector(videoTrackSelectionFactory);
+            // The LoadControl, responsible for the buffering strategy
+            LoadControl loadControl = new DefaultLoadControl(
+                    new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
+                    minBufferMs,
+                    maxBufferMs,
+                    bufferForPlaybackMs,
+                    bufferForPlaybackAfterRebufferMs
+            );
 
-                // The LoadControl, responsible for the buffering strategy
-                LoadControl loadControl = new DefaultLoadControl(
-                        new DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE),
-                        minBufferMs,
-                        maxBufferMs,
-                        bufferForPlaybackMs,
-                        bufferForPlaybackAfterRebufferMs
-                );
-
-                // Instantiation of the ExoPlayer using our custom implementation.
-                // The number of tiles and the other components created above are given as parameters.
-                player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
-
-//                byte[] data = {0,0,0};
-//                SchemeData schemeData = new SchemeData(UUID.randomUUID(), "mimeType", data);
-//                DrmInitData drmInitData = new DrmInitData(schemeData);
-//                List<byte[]> initializationData = Arrays.asList(new byte[][]{data});
-//                Format formats = Format.createVideoSampleFormat("0", "sampleMimeType", "mp4", maxInitialBitrate, 10, 300, 300,
-//                (float)10.0, initializationData, drmInitData);
-//                TrackGroup group = new TrackGroup(formats);
-//                PyramidalTrackSelection pyr = (PyramidalTrackSelection)videoTrackSelectionFactory.createTrackSelection(group, 0);
-//                pyr.updateSelectedTrack(100);
-//                pyr.updateNextChunkEndTime(1000000);
-//                pyr.updateSelectedTrack(100);
-//                pyr.updateNextChunkEndTime(2100000);
-//                pyr.updateSelectedTrack(100);
-//
-//                List<DynamicOperation> operations = dynamicEditingHolder.getOperations();
-//                for (int i = 0; i < operations.size(); i++) {
-//                  System.out.println("operations.get("+i+").trigg : "+operations.get(i).getTriggered());
-//                }
-//                int j;
+            // Instantiation of the ExoPlayer using our custom implementation.
+            // The number of tiles and the other components created above are given as parameters.
+            player = new TiledExoPlayer(this, numberOfTiles, trackSelector, loadControl);
         }
 
         return new ExoplayerSceneObject(player);
@@ -516,11 +473,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         ((Minimal360Video) getMain()).initDynamicOperationsTracker(logPrefix);
                     if (loggingQualityFoV) {
                         //The TilesPicker is a singleton class so perhaps an object already exists but we want to refresh the logger inside with the proper prefix
-                      tilesPicker = TilesPicker.getPicker(dynamicEditingHolder);
+                      tilesPicker = TilesPicker.getPicker();
                       tilesPicker.refreshLogger(logPrefix);
                       ((Minimal360Video) getMain()).tilesPicker = tilesPicker;
                     } else {
-                        TilesPicker.getPicker(dynamicEditingHolder).disableLogger();
+                        TilesPicker.getPicker().disableLogger();
                     }
                     if (dynamicEditingHolder.isDynamicEdited()) {
                         parseDynamicEditing();
@@ -640,7 +597,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         new DefaultSsChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
             case C.TYPE_DASH:
-                DashSRDMediaSource mediaSource = new DashSRDMediaSource(this, uri, buildDataSourceFactory(false),
+                DashSRDMediaSource mediaSource = new DashSRDMediaSource(uri, buildDataSourceFactory(false),
                         new DefaultDashSRDChunkSource.Factory(mediaDataSourceFactory), mainHandler,
                         /* eventListener */ null);
                 mediaSource.setDynamicEditingHolder(dynamicEditingHolder);

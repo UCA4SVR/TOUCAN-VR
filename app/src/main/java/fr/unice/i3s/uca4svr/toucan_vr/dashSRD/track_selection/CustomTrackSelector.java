@@ -438,9 +438,7 @@ public class CustomTrackSelector extends TiledVideoMappingTrackSelector {
     TrackSelection[] rendererTrackSelections = new TrackSelection[rendererCount];
     Parameters params = paramsReference.get();
 
-    System.out.println("rendererTrackGroupArrays " +rendererTrackGroupArrays.length);
     for (int i = 0; i < rendererCount; i++) {
-    System.out.println("rendererTrackGroupArrays " +rendererTrackGroupArrays[i].length);
       if (C.TRACK_TYPE_VIDEO == rendererCapabilities[i].getTrackType()) {
         rendererTrackSelections[i] = selectVideoTrack(rendererCapabilities[i],
             rendererTrackGroupArrays[i], rendererFormatSupports[i], params.maxVideoWidth,
@@ -486,16 +484,13 @@ public class CustomTrackSelector extends TiledVideoMappingTrackSelector {
                                             boolean exceedConstraintsIfNecessary, boolean exceedRendererCapabilitiesIfNecessary)
       throws ExoPlaybackException {
     TrackSelection selection = null;
-    System.out.println("adaptiveVideoTrackSelection Factory type "+adaptiveVideoTrackSelectionFactory.getClass());
     if (adaptiveVideoTrackSelectionFactory != null) {
-      System.out.println("selectAdaptiveVideoTrack called");
       selection = selectAdaptiveVideoTrack(rendererCapabilities, groups, formatSupport,
           maxVideoWidth, maxVideoHeight, maxVideoBitrate, allowNonSeamlessAdaptiveness,
           allowMixedMimeAdaptiveness, viewportWidth, viewportHeight,
           orientationMayChange, adaptiveVideoTrackSelectionFactory);
     }
     if (selection == null) {
-      System.out.println("selectFixedVideoTrack called");
       selection = selectFixedVideoTrack(groups, formatSupport, maxVideoWidth, maxVideoHeight,
           maxVideoBitrate, viewportWidth, viewportHeight, orientationMayChange,
           exceedConstraintsIfNecessary, exceedRendererCapabilitiesIfNecessary);
@@ -529,14 +524,12 @@ public class CustomTrackSelector extends TiledVideoMappingTrackSelector {
                                                  boolean allowMixedMimeTypes, int requiredAdaptiveSupport, int maxVideoWidth,
                                                  int maxVideoHeight, int maxVideoBitrate, int viewportWidth, int viewportHeight,
                                                  boolean orientationMayChange) {
-    System.out.println("group length" + group.length);
     if (group.length < 2) {
       return NO_TRACKS;
     }
+
     List<Integer> selectedTrackIndices = getViewportFilteredTrackIndices(group, viewportWidth,
         viewportHeight, orientationMayChange);
-
-    System.out.println("selectedTrackIndices" + selectedTrackIndices.size());
     if (selectedTrackIndices.size() < 2) {
       return NO_TRACKS;
     }

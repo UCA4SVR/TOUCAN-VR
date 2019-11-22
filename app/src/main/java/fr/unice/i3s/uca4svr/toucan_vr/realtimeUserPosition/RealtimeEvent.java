@@ -17,25 +17,14 @@
 package fr.unice.i3s.uca4svr.toucan_vr.realtimeUserPosition;
 
 public class RealtimeEvent {
-  public long timestamp;
-  public boolean playing;
-  public long videoTime;
-  public float headW;
-  public float headX;
-  public float headY;
-  public float headZ;
-  public float x;
-  public float y;
-  public float z;
-  public int isPlaying;
-  public float lastDynamicOpTriggered;
-  public float snapAngle;
-  public boolean dynamic;
-  public boolean start = false;
-  public int nb_snaps_triggered;
-  public float last_possible_snap_time;
-  public float proba_trigger;
-  public float qualityFoV;
-  public int chunkIndex;
-
+    public long timestamp;
+    public boolean playing;
+    public long videoTime;
+    public float x;
+    public float y;
+    public float z;
+    public float w;
+    public float snapAngle;
+    public boolean dynamic;
+    public boolean start = false;
 }

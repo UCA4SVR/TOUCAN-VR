@@ -152,5 +152,4 @@ public class HeadMotionTracker {
 
     logger.error(rotationsString);
   }
-
 }

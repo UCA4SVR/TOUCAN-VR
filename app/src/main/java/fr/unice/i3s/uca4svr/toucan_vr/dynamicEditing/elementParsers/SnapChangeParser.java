@@ -40,7 +40,6 @@ public class SnapChangeParser extends ElementParser {
     if (tagname.equalsIgnoreCase("snapchange")) {
       // add video object to list and check if all the parameters are set
       if(snapchange!=null && snapchange.isWellDefined()) {
-        snapchange.setIndex(holder.getOperations().size());
         holder.add(snapchange);
         context.setElementParser(new GlobalParser());
       } else {

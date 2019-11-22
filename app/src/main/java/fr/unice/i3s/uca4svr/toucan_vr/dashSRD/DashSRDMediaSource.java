@@ -20,7 +20,6 @@
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
-import android.app.Activity;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -126,9 +125,8 @@ public final class DashSRDMediaSource implements MediaSource {
     private DynamicEditingHolder dynamicEditingHolder;
     private TileQualityTracker tileQualityTracker;
     private ReplacementTracker replacementTracker;
-    private Activity activity;
 
-  /**
+    /**
      * Constructs an instance to play a given {@link DashManifest}, which must be static.
      *
      * @param manifest The manifest. {@link DashManifest#dynamic} must be false.
@@ -136,9 +134,9 @@ public final class DashSRDMediaSource implements MediaSource {
      * @param eventHandler A handler for events. May be null if delivery of events is not required.
      * @param eventListener A listener of events. May be null if delivery of events is not required.
      */
-    public DashSRDMediaSource(Activity activity, DashManifest manifest, DashChunkSource.Factory chunkSourceFactory,
+    public DashSRDMediaSource(DashManifest manifest, DashChunkSource.Factory chunkSourceFactory,
                            Handler eventHandler, AdaptiveMediaSourceEventListener eventListener) {
-        this(activity, manifest, chunkSourceFactory, DEFAULT_MIN_LOADABLE_RETRY_COUNT, eventHandler,
+        this(manifest, chunkSourceFactory, DEFAULT_MIN_LOADABLE_RETRY_COUNT, eventHandler,
                 eventListener);
     }
 
@@ -151,10 +149,10 @@ public final class DashSRDMediaSource implements MediaSource {
      * @param eventHandler A handler for events. May be null if delivery of events is not required.
      * @param eventListener A listener of events. May be null if delivery of events is not required.
      */
-    public DashSRDMediaSource(Activity activity, DashManifest manifest, DashChunkSource.Factory chunkSourceFactory,
+    public DashSRDMediaSource(DashManifest manifest, DashChunkSource.Factory chunkSourceFactory,
                            int minLoadableRetryCount, Handler eventHandler, AdaptiveMediaSourceEventListener
                                    eventListener) {
-        this(activity, manifest, null, null, null, chunkSourceFactory, minLoadableRetryCount,
+        this(manifest, null, null, null, chunkSourceFactory, minLoadableRetryCount,
                 DEFAULT_LIVE_PRESENTATION_DELAY_PREFER_MANIFEST_MS, eventHandler, eventListener);
     }
 
@@ -169,10 +167,10 @@ public final class DashSRDMediaSource implements MediaSource {
      * @param eventHandler A handler for events. May be null if delivery of events is not required.
      * @param eventListener A listener of events. May be null if delivery of events is not required.
      */
-    public DashSRDMediaSource(Activity activity, Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
+    public DashSRDMediaSource(Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
                            DashChunkSource.Factory chunkSourceFactory, Handler eventHandler,
                            AdaptiveMediaSourceEventListener eventListener) {
-        this(activity, manifestUri, manifestDataSourceFactory, chunkSourceFactory,
+        this(manifestUri, manifestDataSourceFactory, chunkSourceFactory,
                 DEFAULT_MIN_LOADABLE_RETRY_COUNT, DEFAULT_LIVE_PRESENTATION_DELAY_PREFER_MANIFEST_MS,
                 eventHandler, eventListener);
     }
@@ -193,11 +191,11 @@ public final class DashSRDMediaSource implements MediaSource {
      * @param eventHandler A handler for events. May be null if delivery of events is not required.
      * @param eventListener A listener of events. May be null if delivery of events is not required.
      */
-    public DashSRDMediaSource(Activity activity, Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
+    public DashSRDMediaSource(Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
                            DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                            long livePresentationDelayMs, Handler eventHandler,
                            AdaptiveMediaSourceEventListener eventListener) {
-        this(activity, manifestUri, manifestDataSourceFactory, new DashSRDManifestParser(), chunkSourceFactory,
+        this(manifestUri, manifestDataSourceFactory, new DashSRDManifestParser(), chunkSourceFactory,
                 minLoadableRetryCount, livePresentationDelayMs, eventHandler, eventListener);
     }
 
@@ -218,15 +216,15 @@ public final class DashSRDMediaSource implements MediaSource {
      * @param eventHandler A handler for events. May be null if delivery of events is not required.
      * @param eventListener A listener of events. May be null if delivery of events is not required.
      */
-    public DashSRDMediaSource(Activity activity, Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
-                              DashSRDManifestParser manifestParser, DashChunkSource.Factory chunkSourceFactory,
-                              int minLoadableRetryCount, long livePresentationDelayMs, Handler eventHandler,
-                              AdaptiveMediaSourceEventListener eventListener) {
-        this(activity,null, manifestUri, manifestDataSourceFactory, manifestParser, chunkSourceFactory,
+    public DashSRDMediaSource(Uri manifestUri, DataSource.Factory manifestDataSourceFactory,
+                           DashSRDManifestParser manifestParser, DashChunkSource.Factory chunkSourceFactory,
+                           int minLoadableRetryCount, long livePresentationDelayMs, Handler eventHandler,
+                           AdaptiveMediaSourceEventListener eventListener) {
+        this(null, manifestUri, manifestDataSourceFactory, manifestParser, chunkSourceFactory,
                 minLoadableRetryCount, livePresentationDelayMs, eventHandler, eventListener);
     }
 
-    private DashSRDMediaSource(Activity activity, DashManifest manifest, Uri manifestUri,
+    private DashSRDMediaSource(DashManifest manifest, Uri manifestUri,
                             DataSource.Factory manifestDataSourceFactory, DashSRDManifestParser manifestParser,
                             DashChunkSource.Factory chunkSourceFactory, int minLoadableRetryCount,
                             long livePresentationDelayMs, Handler eventHandler,
@@ -238,7 +236,6 @@ public final class DashSRDMediaSource implements MediaSource {
         this.chunkSourceFactory = chunkSourceFactory;
         this.minLoadableRetryCount = minLoadableRetryCount;
         this.livePresentationDelayMs = livePresentationDelayMs;
-        this.activity = activity;
         sideloadedManifest = manifest != null;
         eventDispatcher = new EventDispatcher(eventHandler, eventListener);
         manifestUriLock = new Object();
@@ -302,7 +299,7 @@ public final class DashSRDMediaSource implements MediaSource {
     public MediaPeriod createPeriod(int periodIndex, Allocator allocator, long positionUs) {
         EventDispatcher periodEventDispatcher = eventDispatcher.copyWithMediaTimeOffsetMs(
                 manifest.getPeriod(periodIndex).startMs);
-        DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(this.activity, firstPeriodId + periodIndex, manifest,
+        DashSRDMediaPeriod mediaPeriod = new DashSRDMediaPeriod(firstPeriodId + periodIndex, manifest,
                 periodIndex, chunkSourceFactory, minLoadableRetryCount, periodEventDispatcher,
                 elapsedRealtimeOffsetMs, loaderErrorThrower, allocator, dynamicEditingHolder,
                 tileQualityTracker, replacementTracker);
