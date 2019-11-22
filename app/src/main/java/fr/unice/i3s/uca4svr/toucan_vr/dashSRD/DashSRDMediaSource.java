@@ -16,7 +16,7 @@
  * Modifications:
  * Package name
  * Added SRD support to the parser
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  */
 package fr.unice.i3s.uca4svr.toucan_vr.dashSRD;
 
@@ -666,7 +666,7 @@ public final class DashSRDMediaSource implements MediaSource {
                     + Assertions.checkIndex(periodIndex, 0, manifest.getPeriodCount()) : null;
             return period.set(id, uid, 0, manifest.getPeriodDurationUs(periodIndex),
                     C.msToUs(manifest.getPeriod(periodIndex).startMs - manifest.getPeriod(0).startMs)
-                            - offsetInFirstPeriodUs);
+                            - offsetInFirstPeriodUs, false);
         }
 
         @Override

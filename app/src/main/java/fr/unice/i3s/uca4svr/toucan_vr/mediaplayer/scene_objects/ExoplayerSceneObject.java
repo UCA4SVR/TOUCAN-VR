@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import android.view.Surface;
 
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.ExoPlayer;
+import com.google.android.exoplayer2.PlaybackParameters;
 import com.google.android.exoplayer2.Timeline;
 import com.google.android.exoplayer2.source.TrackGroupArray;
 import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
@@ -78,6 +79,11 @@ public class ExoplayerSceneObject implements GVRVideoSceneObjectPlayer<ExoPlayer
             @Override
             public void onPositionDiscontinuity() {
                 // Does Nothing
+            }
+
+            @Override
+            public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
+
             }
         });
         // Set the surface on which the video will be displayed

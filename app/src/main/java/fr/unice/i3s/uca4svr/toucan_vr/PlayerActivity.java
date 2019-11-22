@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Université Nice Sophia Antipolis (member of Université Côte d'Azur), CNRS
+ * Copyright 2017 Laboratoire I3S, CNRS, Université côte d'azur
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- 
  */
 package fr.unice.i3s.uca4svr.toucan_vr;
 
@@ -109,7 +108,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
     private boolean loggingBandwidth = false;
     private boolean loggingHeadMotion = false;
     private boolean loggingFreezes = false;
-    private boolean loggingSnapchanges = false;
+    private boolean loggingOperations = false;
     private boolean loggingRealTimeUserPosition = false;
     private String serverIPAddress;
     private boolean loggingQualityFoV = false;
@@ -131,6 +130,8 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
 
     private Intent intent;
     private boolean newIntent = false;
+
+    public TilesPicker tilesPicker;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -223,7 +224,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         loggingBandwidth = intent.getBooleanExtra("bandwidthLogging", false);
         loggingHeadMotion = intent.getBooleanExtra("headMotionLogging", false);
         loggingFreezes = intent.getBooleanExtra("freezingEventsLogging", false);
-        loggingSnapchanges = intent.getBooleanExtra("snapchangeEventsLogging", false);
+        loggingOperations = intent.getBooleanExtra("snapchangeEventsLogging", false);
         loggingRealTimeUserPosition = intent.getBooleanExtra("realtimeEventsLogging", false);
         serverIPAddress = intent.getStringExtra("serverIPAddress");
         loggingQualityFoV = intent.getBooleanExtra("loggingQualityFoV", false);
@@ -234,10 +235,11 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         numberOfTiles = tiles.length / 4;
         //Dynamic editing check
         dynamicEditingFN = intent.getStringExtra("dynamicEditingFN");
-        if(dynamicEditingFN != null && dynamicEditingFN.length() > 0)
-            dynamicEditingHolder = new DynamicEditingHolder(true);
-        else
-            dynamicEditingHolder = new DynamicEditingHolder(false);
+        if(dynamicEditingFN != null && dynamicEditingFN.length() > 0) {
+          dynamicEditingHolder = new DynamicEditingHolder(true);
+        } else {
+          dynamicEditingHolder = new DynamicEditingHolder(false);
+        }
     }
 
     /**
@@ -281,7 +283,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
             changeStatus(Status.CHECKING_INTERNET_AND_PERMISSION);
 
             if (Util.isLocalFileUri(Uri.parse(mediaUri)) ||
-                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingSnapchanges
+                    loggingHeadMotion || loggingBandwidth || loggingFreezes || loggingOperations
                     || loggingQualityFoV || loggingReplacement || dynamicEditingHolder.isDynamicEdited()) {
                 Set<String> permissions = new HashSet<>();
                 permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE);
@@ -467,11 +469,13 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
                         MASTER_TRANSFER_LISTENER.addListener(new BandwidthConsumedTracker(logPrefix));
                     if (loggingFreezes)
                         ((Minimal360Video) getMain()).initFreezingEventsTracker(logPrefix);
-                    if (loggingSnapchanges)
-                        ((Minimal360Video) getMain()).initSnapchangeEventsTracker(logPrefix);
+                    if (loggingOperations)
+                        ((Minimal360Video) getMain()).initDynamicOperationsTracker(logPrefix);
                     if (loggingQualityFoV) {
                         //The TilesPicker is a singleton class so perhaps an object already exists but we want to refresh the logger inside with the proper prefix
-                        TilesPicker.getPicker().refreshLogger(logPrefix);
+                      tilesPicker = TilesPicker.getPicker();
+                      tilesPicker.refreshLogger(logPrefix);
+                      ((Minimal360Video) getMain()).tilesPicker = tilesPicker;
                     } else {
                         TilesPicker.getPicker().disableLogger();
                     }
@@ -654,6 +658,7 @@ public class PlayerActivity extends GVRActivity implements RequestPermissionResu
         try {
             parser.parse(dynamicEditingHolder);
         } catch (Exception e) {
+            e.printStackTrace();
             changeStatus(Status.WRONGDYNED);
         }
     }
